@@ -1964,7 +1964,7 @@ async function loadModsData(force = false) {
 
 async function loadModsSearch(append = false) {
   const target = currentTargetInstance();
-  if (!target || target.loader === 'vanilla') return;
+  if (!target || (target.loader === 'vanilla' && state.mods.module === 'mods')) return;
   const requestId = ++state.mods.requestId;
   state.mods.loading = true;
   state.mods.error = '';

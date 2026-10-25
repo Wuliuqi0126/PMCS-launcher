@@ -82,6 +82,28 @@ function mockPayload() {
     versions: ['1.21.1'],
     dateModified: new Date(now - 86400000 * 3).toISOString(),
   }));
+  const shaderTitles = [
+    ['complementary', 'Complementary Shaders - Reimagined', 'EminGT', '高质量光影，均衡的画面与性能。'],
+    ['bsl', 'BSL Shaders', 'capttatsu', '经典柔和光影，支持大量版本。'],
+    ['sildurs', "Sildur's Vibrant Shaders", 'Sildur', '鲜艳色彩与水面反射。'],
+    ['makeup', 'MakeUp - Ultra Fast', 'XavierFST', '低配优先的超快光影。'],
+    ['photon', 'Photon Shader', 'SixthSurge', '写实光照与体积云。'],
+    ['bliss', 'Bliss Shaders', 'X0nk', '现代风格光影，默认配置友好。'],
+  ];
+  const shaderHits = shaderTitles.map(([slug, title, author, desc], index) => ({
+    projectId: slug,
+    slug,
+    title,
+    author,
+    description: desc,
+    iconUrl: icon(['#7c6bd8', '#4a9fd8', '#d8a34a', '#4ad89a', '#d86b6b', '#6bb9d8'][index], title.slice(0, 1)),
+    downloads: 12000000 - index * 900000,
+    follows: 4200 - index * 300,
+    categories: ['shaders'],
+    versions: ['1.21.1'],
+    dateModified: new Date(now - 86400000 * (index + 1)).toISOString(),
+    source: index % 2 ? 'curseforge' : 'modrinth',
+  }));
   return {
     app: { version: '1.3.0', name: 'OL启动器', platform: 'win32', arch: 'x64', electron: '45.0.0' },
     config: {
@@ -115,6 +137,7 @@ function mockPayload() {
     },
     versions: { latest: { release: '26.3', snapshot: '26.4-snapshot-1' }, versions, fetchedAt: now },
     hits,
+    shaderHits,
     installed: [
       { filename: 'sodium-fabric-0.6.13.jar', enabled: true, size: 2140000, title: 'Sodium', versionNumber: '0.6.13', projectId: 'sodium', iconUrl: icon('#4f8', 'S'), author: 'jellysquid3', installedAt: new Date(now - 8640000).toISOString() },
       { filename: 'iris-1.8.8.jar', enabled: true, size: 8400000, title: 'Iris Shaders', versionNumber: '1.8.8', projectId: 'iris', iconUrl: icon('#8e6bd8', 'I'), author: 'IrisShaders', installedAt: new Date(now - 8640000).toISOString() },
@@ -205,7 +228,8 @@ async function main() {
             const target = mock.library.instances.find((x) => x.id === args[0]?.instanceId);
             if (!target || target.loader === 'vanilla') return { hits: [], total: 0 };
             const q = String(args[0]?.query || '').toLowerCase();
-            const hits = mock.hits.filter((hit) => !q || hit.title.toLowerCase().includes(q) || hit.description.includes(q));
+            const pool = args[0]?.module === 'shaders' ? mock.shaderHits : mock.hits;
+            const hits = pool.filter((hit) => !q || hit.title.toLowerCase().includes(q) || hit.description.includes(q));
             const offset = Number(args[0]?.offset) || 0;
             const limit = Number(args[0]?.limit) || 12;
             return { hits: hits.slice(offset, offset + limit).map((hit, index) => ({ ...hit, source: index % 2 ? 'curseforge' : 'modrinth' })), total: hits.length, offset, limit, errors: [] };
