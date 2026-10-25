@@ -15,9 +15,9 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("OL启动器安装程序")]
 [assembly: AssemblyProduct("OL我的世界启动器")]
 [assembly: AssemblyCompany("OL Launcher")]
-[assembly: AssemblyDescription("OL我的世界启动器 1.4.3 安装程序")]
-[assembly: AssemblyVersion("1.4.3.0")]
-[assembly: AssemblyFileVersion("1.4.3.0")]
+[assembly: AssemblyDescription("OL我的世界启动器 1.4.4 安装程序")]
+[assembly: AssemblyVersion("1.4.4.0")]
+[assembly: AssemblyFileVersion("1.4.4.0")]
 
 namespace OLSetup
 {
@@ -146,7 +146,7 @@ namespace OLSetup
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher"))
                 {
                     key.SetValue("DisplayName", "OL我的世界启动器");
-                    key.SetValue("DisplayVersion", "1.4.3");
+                    key.SetValue("DisplayVersion", "1.4.4");
                     key.SetValue("Publisher", "OL Launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);

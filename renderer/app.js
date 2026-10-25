@@ -301,6 +301,10 @@ function toast(title, message = '', type = 'success', timeout = 4600) {
   setTimeout(close, timeout);
 }
 
+function cleanError(err) {
+  return String(err?.message || err || '未知错误').replace(/^Error invoking remote method '[^']+': Error: /, '');
+}
+
 function setText(el, value) {
   if (!el) return;
   const text = String(value == null ? '' : value);
@@ -433,7 +437,7 @@ function upsertTask(task) {
     }, 5200);
     state.taskTimers.set(task.id, timer);
   }
-  if (task.status === 'error' && !state.taskTimers.has(`notify:${task.id}`)) {
+  if (task.status === 'error' && !['mod', 'shader'].includes(task.kind) && !state.taskTimers.has(`notify:${task.id}`)) {
     state.taskTimers.set(`notify:${task.id}`, true);
     toast(task.title || '任务失败', task.error || task.stage || '请查看日志后重试', 'error', 8000);
   }
@@ -2329,7 +2333,7 @@ async function installMod(projectId, source = 'modrinth', module = state.mods.mo
     toast(module === 'shaders' ? '光影安装完成' : '模组安装完成', module === 'shaders' ? `已安装 ${result.installed?.length || 1} 个光影文件` : `已安装 ${result.installed?.length || 1} 个文件（含必要前置）`, 'success');
     paintModsContent();
   } catch (err) {
-    toast(module === 'shaders' ? '光影安装失败' : '模组安装失败', err.message || String(err), 'error', 9000);
+    toast(module === 'shaders' ? '光影安装失败' : '模组安装失败', cleanError(err), 'error', 9000);
   } finally {
     state.modInstalling.delete(projectId);
     paintModsContent();

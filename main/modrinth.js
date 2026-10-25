@@ -284,12 +284,14 @@ function createMods({ store, tasks }) {
     const dir = contentDir(instance, module);
     const filename = sanitizeFileName(file.filename, `${version.project_id}.${module === 'shaders' ? 'zip' : 'jar'}`);
     const destination = path.join(dir, filename);
-    await downloadFile(mirrorFileUrl(file.url, mirror), destination, {
+    const remoteUrls = [...new Set([mirrorFileUrl(file.url, mirror), file.url].filter(Boolean))];
+    await downloadFile(remoteUrls, destination, {
       sha1: file.hashes?.sha1,
       size: file.size,
       timeout: 120000,
       retries: 2,
       minSpeed: 0,
+      segmentThreshold: 256 * 1024,
       signal,
     });
     const info = source === 'curseforge'

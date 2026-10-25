@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray, nativeImage, nativeTheme } = require('electron');
 const { Store } = require('./store');
 const { Accounts } = require('./accounts');
 const { TaskManager } = require('./tasks');
@@ -559,6 +559,7 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  nativeTheme.themeSource = 'dark';
   migrateLegacyBrandData();
   store = new Store(app);
   accounts = new Accounts(app, store);

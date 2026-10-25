@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { ensureDir, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'OLLauncher/1.4.3 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'OLLauncher/1.4.4 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
   https: new https.Agent({ keepAlive: true, maxSockets: 128 }),
   http: new http.Agent({ keepAlive: true, maxSockets: 128 }),
@@ -447,7 +447,8 @@ async function downloadSegment(urls, destination, start, end, index, onBytes, ti
 
 async function downloadSegmented(urls, destination, options) {
   const total = Number(options.size) || 0;
-  if (!total || total < SEGMENT_THRESHOLD) throw new Error('文件太小，不使用分片下载');
+  const threshold = Math.max(0, Number(options.threshold) || SEGMENT_THRESHOLD);
+  if (!total || total < threshold) throw new Error('文件太小，不使用分片下载');
   const count = Math.min(SEGMENT_MAX, Math.max(8, Math.ceil(total / (2 * 1024 * 1024))));
   const segmentSize = Math.ceil(total / count);
   const fd = fs.openSync(destination, 'w');
@@ -523,12 +524,13 @@ async function downloadFile(urls, destination, options = {}) {
   }
   ensureDir(path.dirname(destination));
   const temp = `${destination}.part`;
-  if (options.segmentedRestart && Number(size) >= SEGMENT_THRESHOLD) {
+  const segmentThreshold = Math.max(0, Number(options.segmentThreshold) || SEGMENT_THRESHOLD);
+  if (options.segmentedRestart && Number(size) >= segmentThreshold) {
     try { fs.unlinkSync(temp); } catch (_) { /* ignore */ }
   }
   let lastError;
   const resumable = fs.existsSync(temp) && fs.statSync(temp).size > 0;
-  if (!resumable && Number(size) >= SEGMENT_THRESHOLD && options.segmented !== false) {
+  if (!resumable && Number(size) >= segmentThreshold && options.segmented !== false) {
     try {
       const segmentCandidates = candidates.slice(
         0,
@@ -536,6 +538,7 @@ async function downloadFile(urls, destination, options = {}) {
       );
       const segmented = await downloadSegmented(segmentCandidates, temp, {
         size: Number(size),
+        threshold: segmentThreshold,
         signal,
         onProgress,
         timeout: Math.max(timeout, 120000),
@@ -569,7 +572,7 @@ async function downloadFile(urls, destination, options = {}) {
           onProgress,
           timeout,
           resume: true,
-          minSpeed: options.minSpeed || (Number(size) >= 256 * 1024 ? 64 * 1024 : 0),
+          minSpeed: options.minSpeed != null ? Number(options.minSpeed) : (Number(size) >= 256 * 1024 ? 64 * 1024 : 0),
         });
         if (sha1 || sha256) {
           const actual = await hashFile(temp, sha256 ? 'sha256' : 'sha1');
