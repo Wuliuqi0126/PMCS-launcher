@@ -492,6 +492,9 @@ function registerIpc() {
     return mods.install(String(payload?.instanceId || ''), String(payload?.projectId || ''), { source: payload?.source, mirror: payload?.mirror, module: payload?.module });
   });
   ipcMain.handle('mods:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId), 'mods'));
+  ipcMain.handle('task:pause', async (_event, taskId) => tasks.pause(String(taskId)));
+  ipcMain.handle('task:resume', async (_event, taskId) => tasks.resume(String(taskId)));
+  ipcMain.handle('task:cancel', async (_event, taskId) => tasks.cancel(String(taskId)));
   ipcMain.handle('shaders:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId), 'shaders'));
   ipcMain.handle('shaders:openFolder', async (_event, instanceId) => {
     const instance = store.getInstance(String(instanceId));

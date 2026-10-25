@@ -207,6 +207,7 @@ async function ensureJava(store, requiredMajor, task) {
       segmented: true,
       segmentedRestart: true,
       skipSourceProbe: true,
+      signal: task?.signal,
       retries: 2,
       timeout: 180000,
       onProgress: (p) => {

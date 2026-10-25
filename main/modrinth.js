@@ -273,7 +273,7 @@ function createMods({ store, tasks }) {
     }
   }
 
-  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods') {
+  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null) {
     if (depth > 5) return [];
     const source = version.source === 'curseforge' ? 'curseforge' : 'modrinth';
     const projectKey = `${source}:${version.project_id}`;
@@ -290,6 +290,7 @@ function createMods({ store, tasks }) {
       timeout: 120000,
       retries: 2,
       minSpeed: 0,
+      signal,
     });
     const info = source === 'curseforge'
       ? await curseForgeProjectInfo(version.project_id)
@@ -325,7 +326,7 @@ function createMods({ store, tasks }) {
       }
       if (!depVersion) continue;
       depVersion.source = source;
-      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module);
+      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module, signal);
       installed.push(...nested);
     }
     return installed;
@@ -348,7 +349,7 @@ function createMods({ store, tasks }) {
       version.source = source;
       const manifest = readManifest(instance, module);
       task.update({ stage: `下载${module === 'shaders' ? '光影' : '模组'}文件`, percent: 20, detail: version.version_number || version.name || '' });
-      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module);
+      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal);
       task.done({ stage: '安装完成', detail: `${installed.length} 个${module === 'shaders' ? '光影' : '模组'}` });
       return { ok: true, installed: await listInstalled(instanceId, module), module };
     } catch (err) {

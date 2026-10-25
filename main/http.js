@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { ensureDir, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'OLLauncher/1.4.0 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'OLLauncher/1.4.1 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
   https: new https.Agent({ keepAlive: true, maxSockets: 128 }),
   http: new http.Agent({ keepAlive: true, maxSockets: 128 }),
@@ -224,6 +224,12 @@ function request(url, options = {}) {
       timeout: options.timeout || 30000,
     }, resolve);
     req.on('socket', (socket) => { try { socket.setNoDelay(true); } catch (_) { /* ignore */ } });
+    if (options.signal) {
+      if (options.signal.aborted) { req.destroy(new Error('任务已停止')); reject(new Error('任务已停止')); return; }
+      const onAbort = () => req.destroy(new Error('任务已停止'));
+      options.signal.addEventListener('abort', onAbort, { once: true });
+      req.on('close', () => options.signal.removeEventListener('abort', onAbort));
+    }
     req.on('error', reject);
     req.on('timeout', () => {
       req.destroy(new Error('连接超时'));
@@ -236,6 +242,12 @@ function request(url, options = {}) {
 async function follow(url, options = {}, redirects = 0) {
   if (redirects > 8) throw new Error('重定向次数过多');
   const res = await request(url, options);
+  if (options.signal) {
+    if (options.signal.aborted) { res.destroy(); throw new Error('任务已停止'); }
+    const onAbort = () => res.destroy(new Error('任务已停止'));
+    options.signal.addEventListener('abort', onAbort, { once: true });
+    res.on('close', () => options.signal.removeEventListener('abort', onAbort));
+  }
   if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
     res.resume();
     const next = new URL(res.headers.location, url).toString();
@@ -366,15 +378,17 @@ function pickUrl(urls) {
   return Array.isArray(urls) ? urls : [urls];
 }
 
-async function downloadSegment(urls, destination, start, end, index, onBytes, timeout) {
+async function downloadSegment(urls, destination, start, end, index, onBytes, timeout, signal) {
   let lastError;
   const expected = end - start + 1;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const url = urls[(index + attempt) % urls.length];
     let res = null;
     try {
+      if (signal?.aborted) throw new Error('任务已停止');
       res = await follow(url, {
         timeout,
+        signal,
         headers: {
           Range: `bytes=${start}-${end}`,
           'Accept-Encoding': 'identity',
@@ -458,7 +472,7 @@ async function downloadSegmented(urls, destination, options) {
   // 先单独探测第一片，服务器不支持 Range 时只浪费一个请求，
   // 而不是同时启动 8~16 个完整文件下载。
   const firstEnd = Math.min(total - 1, segmentSize - 1);
-  const first = await downloadSegment(urls, destination, 0, firstEnd, 0, onBytes, options.timeout || 45000);
+  const first = await downloadSegment(urls, destination, 0, firstEnd, 0, onBytes, options.timeout || 45000, options.signal);
   const segmentUrls = first.url ? [first.url] : urls;
   for (let index = 1; index < count; index += 1) {
     const start = index * segmentSize;
@@ -472,6 +486,7 @@ async function downloadSegmented(urls, destination, options) {
       index,
       onBytes,
       options.timeout || 45000,
+      options.signal,
     ));
   }
   const results = await Promise.allSettled(tasks);
@@ -500,7 +515,8 @@ async function downloadFile(urls, destination, options = {}) {
       if (url && !candidates.includes(url)) candidates.push(url);
     }
   }
-  const { sha1, sha256, size, onProgress, retries = 2, timeout = 45000 } = options;
+  const { sha1, sha256, size, onProgress, retries = 2, timeout = 45000, signal } = options;
+  if (signal?.aborted) throw new Error('任务已停止');
   if (await verifyFile(destination, { sha1, sha256, size })) {
     if (onProgress) onProgress({ downloaded: size || 0, total: size || 0, skipped: true });
     return { skipped: true, path: destination, size: size || 0 };
@@ -520,6 +536,7 @@ async function downloadFile(urls, destination, options = {}) {
       );
       const segmented = await downloadSegmented(segmentCandidates, temp, {
         size: Number(size),
+        signal,
         onProgress,
         timeout: Math.max(timeout, 120000),
       });
@@ -544,8 +561,10 @@ async function downloadFile(urls, destination, options = {}) {
   }
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     for (const url of candidates) {
+      if (signal?.aborted) throw new Error('任务已停止');
       try {
         const result = await downloadOnce(url, temp, {
+          signal,
           size,
           onProgress,
           timeout,
@@ -595,7 +614,7 @@ function downloadOnce(url, destination, options = {}) {
   return new Promise((resolve, reject) => {
     const existing = options.resume && fs.existsSync(destination) ? fs.statSync(destination).size : 0;
     const headers = existing > 0 ? { Range: `bytes=${existing}-` } : {};
-    follow(url, { timeout: options.timeout || 45000, headers })
+    follow(url, { timeout: options.timeout || 45000, headers, signal: options.signal })
       .then((res) => {
         if (res.statusCode === 416 && existing > 0) {
           res.resume();

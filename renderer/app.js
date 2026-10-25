@@ -35,6 +35,7 @@ const state = {
     limit: 12,
     data: null,
     loading: false,
+    refreshing: false,
     error: '',
     installed: [],
     installedLoading: false,
@@ -320,7 +321,11 @@ function createTaskCard(task) {
       <button class="task-close" type="button" data-task-close="${h(task.id)}" aria-label="关闭">${icon('x', 14)}</button>
     </div>
     <div class="task-error" data-task-error hidden></div>
-    <div class="task-bar"><span data-task-progress></span></div>`;
+    <div class="task-bar"><span data-task-progress></span></div>
+    <div class="task-actions" data-task-actions hidden>
+      <button class="task-action" type="button" data-task-toggle="${h(task.id)}"></button>
+      <button class="task-action stop" type="button" data-task-cancel="${h(task.id)}">${icon('stop', 11)} 停止</button>
+    </div>`;
   patchTaskCard(el, task);
   return el;
 }
@@ -328,23 +333,27 @@ function createTaskCard(task) {
 function patchTaskCard(el, task) {
   const status = task.status || 'running';
   const running = status === 'running';
+  const paused = status === 'paused';
+  const cancelled = status === 'cancelled';
   const error = status === 'error';
   const success = status === 'success';
   const pct = Math.max(0, Math.min(100, Number(task.percent) || 0));
 
   el.classList.toggle('error', error);
   el.classList.toggle('success', success);
+  el.classList.toggle('paused', paused);
+  el.classList.toggle('cancelled', cancelled);
   el.dataset.status = status;
 
   const iconEl = el.querySelector('[data-task-icon]');
   if (iconEl && iconEl.dataset.status !== status) {
     iconEl.dataset.status = status;
-    iconEl.innerHTML = running ? '<span class="spinner light"></span>' : icon(error ? 'alert' : 'check', 15);
+    iconEl.innerHTML = running ? '<span class="spinner light"></span>' : paused ? icon('pause', 15) : icon(cancelled ? 'stop' : error ? 'alert' : 'check', 15);
   }
 
   setText(el.querySelector('[data-task-title]'), task.title || '任务');
-  setText(el.querySelector('[data-task-pct]'), error ? '失败' : success ? '完成' : `${Math.round(pct)}%`);
-  setText(el.querySelector('[data-task-stage]'), task.stage || '处理中…');
+  setText(el.querySelector('[data-task-pct]'), cancelled ? '已停止' : paused ? '已暂停' : error ? '失败' : success ? '完成' : `${Math.round(pct)}%`);
+  setText(el.querySelector('[data-task-stage]'), cancelled ? '任务已停止' : task.stage || '处理中…');
 
   const detailEl = el.querySelector('[data-task-detail]');
   if (detailEl) {
@@ -358,6 +367,13 @@ function patchTaskCard(el, task) {
     const message = error ? (task.error || '任务执行失败') : '';
     setText(errorEl, message);
     errorEl.hidden = !message;
+  }
+
+  const actions = el.querySelector('[data-task-actions]');
+  if (actions) {
+    actions.hidden = !(running || paused);
+    const toggle = actions.querySelector('[data-task-toggle]');
+    if (toggle) toggle.innerHTML = paused ? `${icon('play', 11)} 继续` : `${icon('pause', 11)} 暂停`;
   }
 
   const bar = el.querySelector('[data-task-progress]');
@@ -651,10 +667,29 @@ function bindGlobalEvents() {
     }
   });
 
-  $('#task-root')?.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-task-close]');
-    if (!btn) return;
-    removeTask(btn.dataset.taskClose);
+  $('#task-root')?.addEventListener('click', async (event) => {
+    const closeBtn = event.target.closest('[data-task-close]');
+    if (closeBtn) { removeTask(closeBtn.dataset.taskClose); return; }
+    const toggleBtn = event.target.closest('[data-task-toggle]');
+    if (toggleBtn) {
+      const task = state.tasks.get(toggleBtn.dataset.taskToggle);
+      if (!task) return;
+      try {
+        await api.invoke(task.status === 'paused' ? 'task:resume' : 'task:pause', task.id);
+      } catch (err) {
+        toast('任务操作失败', err.message || String(err), 'error');
+      }
+      return;
+    }
+    const cancelBtn = event.target.closest('[data-task-cancel]');
+    if (cancelBtn) {
+      try {
+        await api.invoke('task:cancel', cancelBtn.dataset.taskCancel);
+        toast('任务已停止', '', 'info', 2600);
+      } catch (err) {
+        toast('停止任务失败', err.message || String(err), 'error');
+      }
+    }
   });
 
   window.addEventListener('hashchange', routeFromHash);
@@ -1812,6 +1847,7 @@ function resetModsState() {
     limit: 12,
     data: null,
     loading: false,
+    refreshing: false,
     error: '',
     installed: [],
     installedLoading: false,
@@ -1925,7 +1961,7 @@ function renderModsRoute() {
         </div>
       </div>
       <div class="toolbar-right">
-        <button class="icon-btn" title="刷新" data-action="refresh-mods">${icon('refresh', 16)}</button>
+        <button class="icon-btn" title="刷新" data-action="refresh-mods" ${state.mods.refreshing ? 'disabled' : ''}>${state.mods.refreshing ? '<span class="spinner light"></span>' : icon('refresh', 16)}</button>
       </div>
     </div>
     ${discovery}
@@ -4397,7 +4433,12 @@ async function runAction(action, el, event) {
         await openLogsModal(id);
         break;
       case 'refresh-versions':
-        await ensureVersions(true);
+        try {
+          await ensureVersions(true);
+          toast('版本清单已刷新', '已获取最新的 Mojang 版本列表', 'success', 2500);
+        } catch (err) {
+          toast('版本清单刷新失败', err.message || String(err), 'error', 6000);
+        }
         break;
       case 'set-version-filter':
         state.versionType = el.dataset.filter || 'release';
@@ -4426,13 +4467,30 @@ async function runAction(action, el, event) {
       case 'load-more-mods':
         if (!state.mods.loading) await loadModsSearch(true);
         break;
-      case 'refresh-mods':
-        if (state.mods.module === 'skins') { await loadSkins(true); break; }
-        state.mods.data = null;
-        state.mods.loadedAt = 0;
-        state.mods.installed = [];
-        await Promise.all([loadModsSearch(false), loadInstalledMods()]);
+      case 'refresh-mods': {
+        if (state.mods.refreshing) break;
+        state.mods.refreshing = true;
+        const refreshButton = $('[data-action="refresh-mods"]');
+        if (refreshButton) { refreshButton.disabled = true; refreshButton.innerHTML = '<span class="spinner light"></span>'; }
+        try {
+          if (state.mods.module === 'skins') {
+            await loadSkins(true);
+            toast('刷新完成', '皮肤库已更新', 'success', 2500);
+          } else {
+            state.mods.data = null;
+            state.mods.loadedAt = 0;
+            state.mods.installed = [];
+            await Promise.all([loadModsSearch(false), loadInstalledMods()]);
+            toast('刷新完成', state.mods.module === 'shaders' ? '光影库已更新' : '模组库已更新', 'success', 2500);
+          }
+        } catch (err) {
+          toast('刷新失败', err.message || String(err), 'error', 6000);
+        } finally {
+          state.mods.refreshing = false;
+          if (state.route === 'mods') renderModsRoute();
+        }
         break;
+      }
       case 'mods-module': {
         const module = ['mods', 'shaders', 'skins'].includes(el.dataset.module) ? el.dataset.module : 'mods';
         if (state.mods.module === module) break;

@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.1',
+    title: '刷新反馈与任务暂停/停止',
+    current: true,
+    items: [
+      '模组库刷新按钮增加加载动画、禁用状态和完成/失败提示。',
+      '版本清单与局域网存档刷新增加完成反馈。',
+      '右下角下载任务弹窗新增暂停/继续和停止按钮。',
+      '任务停止会中止正在进行的 Java 和模组下载。',
+    ],
+  },
+  {
     version: '1.4.0',
     title: '模组 / 光影 / 皮肤三模块',
-    current: true,
     items: [
       '模组市场拆分为模组、光影、皮肤三个独立模块，顶部一键切换。',
       '光影模块聚合 Modrinth 与 CurseForge，支持按游戏版本筛选并安装到 shaderpacks。',
