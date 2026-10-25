@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.3.2',
+    title: 'Java 运行时下载加速',
+    current: true,
+    items: [
+      'Java 运行时下载改为 Adoptium 资产元数据 + 16 线程 Range 分段。',
+      '自动测速选择更快的 GitHub 加速节点，直连不可用时自动切换。',
+      '下载前清理过小的残片，避免旧 .part 文件拖慢整个下载。',
+      '增加 Adoptium SHA256 校验和下载进度详情。',
+    ],
+  },
+  {
     version: '1.3.1',
     title: '中文模组搜索与英文结果',
-    current: true,
     items: [
       '模组市场支持中文关键词检索，自动转换为英文关键词后同时查询 Modrinth 与 CurseForge。',
       '搜索结果保持英文标题与简介，并在搜索框下方显示中文原词和实际使用的英文关键词。',

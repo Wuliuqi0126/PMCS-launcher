@@ -54,9 +54,9 @@ function exists(file) {
   try { fs.accessSync(file); return true; } catch (_) { return false; }
 }
 
-function sha1File(file) {
+function hashFile(file, algorithm = 'sha1') {
   return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha1');
+    const hash = crypto.createHash(algorithm);
     const stream = fs.createReadStream(file);
     stream.on('error', reject);
     stream.on('data', (chunk) => hash.update(chunk));
@@ -64,11 +64,22 @@ function sha1File(file) {
   });
 }
 
-async function verifyFile(file, { size, sha1 } = {}) {
+function sha1File(file) {
+  return hashFile(file, 'sha1');
+}
+
+function sha256File(file) {
+  return hashFile(file, 'sha256');
+}
+
+async function verifyFile(file, { size, sha1, sha256 } = {}) {
   if (!exists(file)) return false;
   if (typeof size === 'number' && size >= 0 && fileSize(file) !== size) return false;
   if (sha1) {
     try { return (await sha1File(file)) === sha1.toLowerCase(); } catch (_) { return false; }
+  }
+  if (sha256) {
+    try { return (await sha256File(file)) === sha256.toLowerCase(); } catch (_) { return false; }
   }
   return true;
 }
@@ -199,7 +210,9 @@ module.exports = {
   writeJson,
   fileSize,
   exists,
+  hashFile,
   sha1File,
+  sha256File,
   verifyFile,
   randomId,
   md5,

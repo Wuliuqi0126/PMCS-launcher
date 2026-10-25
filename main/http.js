@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { ensureDir, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'OLLauncher/1.3.1 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'OLLauncher/1.3.2 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
   https: new https.Agent({ keepAlive: true, maxSockets: 128 }),
   http: new http.Agent({ keepAlive: true, maxSockets: 128 }),
@@ -424,6 +424,7 @@ async function downloadSegment(urls, destination, start, end, index, onBytes, ti
         if (attempt === 0 && urls.length > 1) continue;
         break;
       }
+      if (attempt === 0 && urls.length > 1) continue;
       if (attempt === 0) await wait(250);
     }
   }
@@ -499,13 +500,16 @@ async function downloadFile(urls, destination, options = {}) {
       if (url && !candidates.includes(url)) candidates.push(url);
     }
   }
-  const { sha1, size, onProgress, retries = 2, timeout = 45000 } = options;
-  if (await verifyFile(destination, { sha1, size })) {
+  const { sha1, sha256, size, onProgress, retries = 2, timeout = 45000 } = options;
+  if (await verifyFile(destination, { sha1, sha256, size })) {
     if (onProgress) onProgress({ downloaded: size || 0, total: size || 0, skipped: true });
     return { skipped: true, path: destination, size: size || 0 };
   }
   ensureDir(path.dirname(destination));
   const temp = `${destination}.part`;
+  if (options.segmentedRestart && Number(size) >= SEGMENT_THRESHOLD) {
+    try { fs.unlinkSync(temp); } catch (_) { /* ignore */ }
+  }
   let lastError;
   const resumable = fs.existsSync(temp) && fs.statSync(temp).size > 0;
   if (!resumable && Number(size) >= SEGMENT_THRESHOLD && options.segmented !== false) {
@@ -519,10 +523,11 @@ async function downloadFile(urls, destination, options = {}) {
         onProgress,
         timeout: Math.max(timeout, 120000),
       });
-      if (sha1) {
-        const actual = await hashFile(temp);
-        if (actual !== String(sha1).toLowerCase()) {
-          throw new Error('文件校验失败 (SHA1 不匹配)');
+      if (sha1 || sha256) {
+        const actual = await hashFile(temp, sha256 ? 'sha256' : 'sha1');
+        const expected = sha256 ? String(sha256).toLowerCase() : String(sha1).toLowerCase();
+        if (actual !== expected) {
+          throw new Error(`文件校验失败 (${sha256 ? 'SHA256' : 'SHA1'} 不匹配)`);
         }
       }
       try { fs.renameSync(temp, destination); } catch (err) {
@@ -547,10 +552,11 @@ async function downloadFile(urls, destination, options = {}) {
           resume: true,
           minSpeed: options.minSpeed || (Number(size) >= 256 * 1024 ? 64 * 1024 : 0),
         });
-        if (sha1) {
-          const actual = await hashFile(temp);
-          if (actual !== String(sha1).toLowerCase()) {
-            throw new Error(`文件校验失败 (SHA1 不匹配)`);
+        if (sha1 || sha256) {
+          const actual = await hashFile(temp, sha256 ? 'sha256' : 'sha1');
+          const expected = sha256 ? String(sha256).toLowerCase() : String(sha1).toLowerCase();
+          if (actual !== expected) {
+            throw new Error(`文件校验失败 (${sha256 ? 'SHA256' : 'SHA1'} 不匹配)`);
           }
         }
         try { fs.renameSync(temp, destination); } catch (err) {
@@ -561,7 +567,7 @@ async function downloadFile(urls, destination, options = {}) {
         return { ...result, path: destination };
       } catch (err) {
         lastError = err;
-        if (/SHA1|校验/.test(String(err.message))) {
+        if (/SHA1|SHA256|校验/.test(String(err.message))) {
           try { fs.unlinkSync(temp); } catch (_) { /* ignore */ }
         }
         if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429) {
@@ -575,9 +581,9 @@ async function downloadFile(urls, destination, options = {}) {
   throw lastError || new Error(`下载失败: ${destination}`);
 }
 
-function hashFile(file) {
+function hashFile(file, algorithm = 'sha1') {
   return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha1');
+    const hash = crypto.createHash(algorithm);
     const stream = fs.createReadStream(file);
     stream.on('error', reject);
     stream.on('data', (chunk) => hash.update(chunk));

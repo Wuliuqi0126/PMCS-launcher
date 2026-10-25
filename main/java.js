@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const AdmZip = require('adm-zip');
-const { downloadFile } = require('./http');
+const { fetchJson, downloadFile, measureDownload } = require('./http');
 const {
   ensureDir, exists, randomId, parseJavaMajor, runToLog, readLogTail, fileSize,
 } = require('./util');
@@ -111,6 +111,58 @@ function adoptiumUrl(major) {
   return `https://api.adoptium.net/v3/binary/latest/${major}/ga/${platform}/${arch}/jre/hotspot/normal/eclipse?project=jdk`;
 }
 
+const JAVA_PROXIES = [
+  'https://ghfast.top/',
+  'https://gh-proxy.com/',
+];
+
+async function adoptiumAsset(major) {
+  const platform = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux';
+  const arch = process.arch === 'arm64' ? 'aarch64' : 'x64';
+  const api = `https://api.adoptium.net/v3/assets/latest/${major}/hotspot?architecture=${arch}&image_type=jre&os=${platform}&vendor=eclipse`;
+  try {
+    const data = await fetchJson(api, { timeout: 20000, retries: 1 });
+    const pkg = data?.[0]?.binary?.package;
+    if (pkg?.link && Number(pkg.size) > 0) {
+      return {
+        url: pkg.link,
+        size: Number(pkg.size),
+        sha256: pkg.checksum || '',
+        name: pkg.name || `temurin-jre-${major}.zip`,
+      };
+    }
+  } catch (_) { /* fall back to latest binary redirect */ }
+  return {
+    url: adoptiumUrl(major),
+    size: 0,
+    sha256: '',
+    name: `temurin-jre-${major}.zip`,
+  };
+}
+
+function javaCandidateUrls(url) {
+  return [...new Set([
+    url,
+    ...JAVA_PROXIES.map((proxy) => `${proxy}${url}`),
+  ].filter(Boolean))];
+}
+
+async function rankJavaCandidates(urls) {
+  const measured = await Promise.all(urls.map(async (url) => {
+    try {
+      const result = await measureDownload(url, { maxBytes: 512 * 1024, timeout: 8000 });
+      return { url, ...result };
+    } catch (_) {
+      return { url, bytes: 0, bytesPerSecond: 0, firstByteMs: null };
+    }
+  }));
+  const usable = measured
+    .filter((item) => item.bytes > 32 * 1024 && item.bytesPerSecond > 0)
+    .sort((a, b) => b.bytesPerSecond - a.bytesPerSecond);
+  const ranked = usable.length ? usable : measured;
+  return ranked.length ? ranked.map((item) => item.url) : urls;
+}
+
 function validZip(file) {
   if (!exists(file) || fileSize(file) < 1024 * 1024) return false;
   try {
@@ -144,15 +196,24 @@ async function ensureJava(store, requiredMajor, task) {
   const zipFile = path.join(cacheDir, `temurin-jre-${downloadMajor}.zip`);
   if (!validZip(zipFile)) {
     try { fs.unlinkSync(zipFile); } catch (_) { /* ignore */ }
-    if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 0, detail: 'Temurin JRE · Adoptium' });
-    await downloadFile(adoptiumUrl(downloadMajor), zipFile, {
+    const asset = await adoptiumAsset(downloadMajor);
+    if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 0, detail: '测速选择 Java 加速节点…' });
+    const candidates = javaCandidateUrls(asset.url);
+    const ranked = await rankJavaCandidates(candidates);
+    if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 1, detail: `Temurin JRE · ${asset.size ? `${(asset.size / 1048576).toFixed(1)} MB · ` : ''}16 线程分段` });
+    await downloadFile(ranked, zipFile, {
+      size: asset.size || undefined,
+      sha256: asset.sha256 || undefined,
+      segmented: true,
+      segmentedRestart: true,
+      skipSourceProbe: true,
       retries: 2,
       timeout: 180000,
       onProgress: (p) => {
         if (task) task.update({
           stage: `下载 Java ${downloadMajor} 运行时`,
           percent: Math.min(95, p.percent || 0),
-          detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB` : '正在下载…',
+          detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB · 16 线程` : '正在下载…',
         });
       },
     });
