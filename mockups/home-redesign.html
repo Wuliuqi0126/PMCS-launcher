@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>OL 启动器 · 首页改版预览</title>
+<style>
+  :root {
+    --bg: #070b09;
+    --sidebar: #090f0b;
+    --panel: #0d1611;
+    --panel-2: #101c15;
+    --line: rgba(174, 238, 193, .11);
+    --line-strong: rgba(174, 238, 193, .2);
+    --text: #eef7ef;
+    --text-soft: #c9d8cc;
+    --muted: #829487;
+    --muted-2: #5d7063;
+    --green: #73e69a;
+    --green-2: #3dbf70;
+    --amber: #e9c46a;
+    --radius: 16px;
+    --font: "Microsoft YaHei UI", "Segoe UI", "PingFang SC", sans-serif;
+    --mono: "Cascadia Code", "Consolas", monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; width: 1440px; height: 900px; overflow: hidden;
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(900px 600px at 76% -10%, rgba(50, 154, 92, .12), transparent 60%),
+      radial-gradient(700px 500px at 8% 100%, rgba(50, 110, 75, .08), transparent 65%);
+  }
+  .app { display: flex; width: 1440px; height: 900px; position: relative; }
+  .sidebar {
+    width: 218px; flex: 0 0 218px; height: 900px; padding: 22px 16px 16px;
+    background: linear-gradient(180deg, #0a120d 0%, #080d0a 62%, #070b08 100%);
+    border-right: 1px solid rgba(160, 225, 180, .09);
+    display: flex; flex-direction: column; position: relative;
+  }
+  .sidebar::after {
+    content: ""; position: absolute; right: -1px; top: 70px; width: 1px; height: 260px;
+    background: linear-gradient(180deg, transparent, rgba(115, 230, 154, .24), transparent);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 26px; }
+  .brand img { width: 34px; height: 34px; border-radius: 9px; }
+  .brand-copy { display: flex; flex-direction: column; gap: 3px; line-height: 1; }
+  .brand-copy strong { font-size: 16px; letter-spacing: .02em; }
+  .brand-copy small { font-size: 7px; letter-spacing: .23em; color: var(--muted-2); font-weight: 700; }
+  .nav-label { padding: 0 10px; margin: 7px 0 7px; color: #506355; font-size: 9px; letter-spacing: .14em; font-weight: 700; }
+  .nav { display: flex; flex-direction: column; gap: 3px; }
+  .nav-item {
+    height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 11px;
+    border-radius: 10px; color: #8b9b8e; font-size: 12px; position: relative;
+    border: 1px solid transparent; cursor: default;
+  }
+  .nav-item .ico { width: 17px; height: 17px; display: grid; place-items: center; color: #778b7c; }
+  .nav-item.active {
+    color: #ecfff1; background: linear-gradient(90deg, rgba(93, 226, 133, .15), rgba(93, 226, 133, .035));
+    border-color: rgba(112, 230, 148, .14);
+    box-shadow: inset 0 0 22px rgba(60, 190, 105, .035);
+  }
+  .nav-item.active .ico { color: var(--green); }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: -1px; top: 9px; bottom: 9px; width: 2px;
+    border-radius: 2px; background: var(--green); box-shadow: 0 0 10px rgba(115, 230, 154, .7);
+  }
+  .nav-count {
+    margin-left: auto; min-width: 19px; height: 17px; padding: 0 5px; border-radius: 5px;
+    background: rgba(116, 230, 154, .09); color: #81dca0; font-size: 9px; font-family: var(--mono);
+    display: grid; place-items: center;
+  }
+  .sidebar-spacer { flex: 1; }
+  .support {
+    display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 8px;
+    border-radius: 11px; color: #7e9082; border: 1px solid transparent;
+  }
+  .support .ico { color: var(--amber); opacity: .8; }
+  .support-copy { display: flex; flex-direction: column; gap: 2px; }
+  .support-copy strong { font-size: 11px; font-weight: 500; color: #b6c6b9; }
+  .support-copy small { font-size: 9px; color: var(--muted-2); }
+  .account {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 13px;
+    border: 1px solid rgba(170, 230, 185, .12);
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 9px; flex: 0 0 36px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #55735f, #263e2e); border: 1px solid rgba(255,255,255,.12);
+    font-family: var(--mono); font-size: 15px; color: #dff2e4; box-shadow: inset 0 0 12px rgba(0,0,0,.25);
+  }
+  .account-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .account-meta strong { font-size: 11.5px; font-weight: 600; }
+  .account-meta small { font-size: 9.5px; color: var(--muted); }
+  .account .chev { color: #5c7062; }
+  .main { flex: 1; min-width: 0; position: relative; }
+  .topbar {
+    height: 56px; padding: 0 28px 0 30px; display: flex; align-items: center;
+    border-bottom: 1px solid rgba(160, 225, 180, .07);
+    background: rgba(8, 13, 10, .48);
+  }
+  .crumb { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #667a6b; }
+  .crumb strong { font-weight: 500; color: #a9bbad; }
+  .crumb i { font-style: normal; color: #415147; }
+  .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .online { display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: #78917e; }
+  .online b { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(115,230,154,.7); }
+  .win { display: flex; align-items: center; gap: 14px; color: #647568; margin-left: 7px; }
+  .win span { width: 10px; height: 10px; display: block; position: relative; opacity: .75; }
+  .win span::before, .win span::after { content: ""; position: absolute; background: currentColor; }
+  .win .min::before { left: 1px; right: 1px; top: 5px; height: 1px; }
+  .win .max::before { inset: 1px; border: 1px solid currentColor; background: none; }
+  .win .close::before, .win .close::after { width: 10px; height: 1px; top: 5px; left: 0; transform: rotate(45deg); }
+  .win .close::after { transform: rotate(-45deg); }
+  .content { padding: 26px 30px 28px; }
+  .hero {
+    height: 306px; position: relative; overflow: hidden; border-radius: 20px;
+    border: 1px solid rgba(138, 232, 165, .16);
+    background:
+      radial-gradient(700px 420px at 84% 18%, rgba(79, 214, 123, .22), transparent 56%),
+      radial-gradient(460px 300px at 64% 96%, rgba(53, 150, 90, .11), transparent 70%),
+      linear-gradient(120deg, #10241a 0%, #0c1b13 48%, #0a150f 100%);
+    box-shadow: inset 0 1px 0 rgba(220,255,230,.05), 0 18px 50px rgba(0,0,0,.18);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; opacity: .32; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(157, 242, 180, .04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(157, 242, 180, .04) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(90deg, rgba(0,0,0,.45), transparent 66%);
+  }
+  .hero::after {
+    content: ""; position: absolute; right: 140px; top: -180px; width: 440px; height: 440px;
+    border-radius: 50%; border: 1px solid rgba(141, 235, 169, .1);
+    box-shadow: 0 0 0 42px rgba(109, 220, 143, .025), 0 0 0 96px rgba(109, 220, 143, .018);
+    pointer-events: none;
+  }
+  .hero-copy { position: relative; z-index: 2; padding: 30px 0 22px 32px; width: 640px; }
+  .eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .eyebrow .tag {
+    display: inline-flex; align-items: center; gap: 6px; height: 21px; padding: 0 8px;
+    border: 1px solid rgba(150, 235, 176, .15); border-radius: 6px;
+    background: rgba(109, 223, 143, .07); color: #9ddbb0; font-size: 9px;
+  }
+  .eyebrow .date { color: #748a79; font-size: 9.5px; letter-spacing: .02em; }
+  h1 { margin: 0; font-size: 34px; line-height: 1.28; letter-spacing: -.02em; font-weight: 650; }
+  h1 span { color: var(--green); text-shadow: 0 0 22px rgba(92, 219, 128, .18); }
+  .hero-sub { margin: 10px 0 0; color: #91a596; font-size: 11px; line-height: 1.8; width: 605px; }
+  .actions { display: flex; align-items: center; gap: 9px; margin-top: 21px; }
+  .btn {
+    height: 34px; padding: 0 15px; border-radius: 9px; display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--font); font-size: 10.5px; border: 1px solid transparent; cursor: default;
+  }
+  .btn-primary {
+    color: #0b1c12; font-weight: 700; background: linear-gradient(180deg, #82efa6, #65d98c);
+    border-color: rgba(190, 255, 208, .4); box-shadow: 0 5px 18px rgba(74, 206, 118, .2), inset 0 1px 0 rgba(255,255,255,.36);
+  }
+  .btn-secondary {
+    color: #c5d9c9; background: rgba(255,255,255,.045); border-color: rgba(183, 226, 193, .14);
+  }
+  .btn-ghost { color: #93a798; }
+  .stats { display: flex; align-items: center; gap: 24px; margin-top: 24px; }
+  .stat { display: flex; align-items: baseline; gap: 6px; }
+  .stat b { font-family: var(--mono); font-weight: 500; font-size: 15px; color: #dcecdf; }
+  .stat span { font-size: 9px; color: #6e8273; }
+  .stat-div { width: 1px; height: 14px; background: rgba(177, 230, 191, .11); }
+  .hero-side { position: absolute; right: 0; top: 0; width: 500px; height: 100%; z-index: 2; }
+  .hero-cube {
+    position: absolute; right: 94px; top: 23px; width: 238px; height: 238px;
+    filter: drop-shadow(0 25px 28px rgba(0,0,0,.36)) drop-shadow(0 0 28px rgba(87, 221, 124, .14));
+    transform: rotate(2deg);
+  }
+  .float-chip {
+    position: absolute; z-index: 3; height: 26px; padding: 0 9px; border-radius: 7px;
+    display: inline-flex; align-items: center; gap: 5px; font-size: 9px; color: #cce8d2;
+    background: rgba(12, 30, 19, .78); border: 1px solid rgba(165, 235, 183, .18);
+    backdrop-filter: blur(8px); box-shadow: 0 6px 18px rgba(0,0,0,.18);
+  }
+  .chip-a { right: 286px; top: 58px; }
+  .instance-card {
+    position: absolute; right: 24px; bottom: 20px; width: 238px; padding: 13px 14px;
+    border-radius: 13px; background: rgba(7, 18, 11, .78); border: 1px solid rgba(169, 238, 186, .18);
+    box-shadow: 0 12px 30px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter: blur(10px);
+  }
+  .ic-head { display: flex; align-items: center; gap: 6px; color: #7f9b86; font-size: 8.5px; }
+  .ic-head b { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px rgba(115,230,154,.8); }
+  .ic-head .ready { margin-left: auto; color: #8dd8a4; font-size: 8px; }
+  .ic-name { margin-top: 8px; font-size: 16px; font-weight: 650; letter-spacing: .01em; }
+  .ic-meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; color: #7f9485; font-size: 9.5px; }
+  .ic-meta em { font-style: normal; padding: 2px 5px; border-radius: 4px; color: #92dba9; background: rgba(105, 224, 139, .08); font-size: 8px; }
+  .ic-bar { height: 3px; margin: 12px 0 9px; border-radius: 4px; background: rgba(188, 236, 199, .08); overflow: hidden; }
+  .ic-bar span { display: block; height: 100%; width: 72%; border-radius: 4px; background: linear-gradient(90deg, #48bf71, #87eda7); }
+  .ic-foot { display: flex; align-items: center; justify-content: space-between; color: #617766; font-size: 8.5px; }
+  .ic-foot b { color: #a3c4ab; font-weight: 500; }
+  .section { margin-top: 25px; }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; }
+  .section-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650; letter-spacing: .01em; }
+  .section-title .ico { color: var(--green); opacity: .9; }
+  .section-sub { margin-left: 3px; font-size: 9px; font-weight: 400; color: #5f7466; }
+  .section-link { color: #6e8977; font-size: 9px; display: flex; align-items: center; gap: 4px; }
+  .recent { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .recent-card {
+    height: 88px; display: flex; align-items: center; gap: 12px; padding: 13px;
+    border-radius: 13px; border: 1px solid rgba(167, 229, 183, .105);
+    background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.012));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.018); position: relative;
+  }
+  .recent-card::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: radial-gradient(240px 100px at 0% 0%, rgba(88, 212, 124, .055), transparent 70%);
+  }
+  .instance-icon {
+    width: 52px; height: 52px; flex: 0 0 52px; border-radius: 12px; display: grid; place-items: center;
+    font-family: var(--mono); font-size: 14px; font-weight: 600; position: relative; overflow: hidden;
+  }
+  .instance-icon::after { content: ""; position: absolute; inset: 0; background: linear-gradient(145deg, rgba(255,255,255,.14), transparent 45%); }
+  .ic-fabric { color: #d9c28b; background: linear-gradient(145deg, #4b402f, #241f18); border: 1px solid rgba(229,196,122,.18); }
+  .ic-forge { color: #c7a0ff; background: linear-gradient(145deg, #392e51, #211a2f); border: 1px solid rgba(188,153,255,.17); }
+  .ic-vanilla { color: #9fe3b2; background: linear-gradient(145deg, #2e4a39, #16271c); border: 1px solid rgba(135,227,163,.16); }
+  .recent-main { min-width: 0; flex: 1; }
+  .recent-name { font-size: 12px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent-meta { display: flex; align-items: center; gap: 7px; margin-top: 6px; color: #718777; font-size: 9px; }
+  .mini-pill { padding: 2px 5px; border-radius: 4px; background: rgba(255,255,255,.05); color: #91a595; font-size: 8px; }
+  .recent-time { color: #53675a; }
+  .recent-chev { color: #4c6153; flex: 0 0 auto; }
+  .explore { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .explore-card {
+    height: 146px; padding: 15px; border-radius: 14px; position: relative;
+    border: 1px solid rgba(167, 229, 183, .105);
+    background: linear-gradient(160deg, rgba(20, 37, 26, .72), rgba(11, 19, 14, .72));
+    overflow: hidden;
+  }
+  .explore-card::after {
+    content: ""; position: absolute; right: -38px; bottom: -54px; width: 150px; height: 150px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(99, 227, 133, .075), transparent 67%);
+  }
+  .explore-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .explore-icon {
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    color: #8ce3a6; background: rgba(103, 224, 136, .09); border: 1px solid rgba(144, 234, 168, .11);
+  }
+  .explore-icon.amber { color: #e6c577; background: rgba(230,197,119,.08); border-color: rgba(230,197,119,.12); }
+  .explore-icon.blue { color: #8fb8ff; background: rgba(120,170,255,.08); border-color: rgba(120,170,255,.12); }
+  .external { color: #5b7462; }
+  .explore h3 { margin: 13px 0 5px; font-size: 12px; font-weight: 650; }
+  .explore p { margin: 0; color: #657c6b; font-size: 9.5px; line-height: 1.65; width: 88%; }
+  .explore-foot { position: absolute; left: 15px; bottom: 13px; right: 15px; display: flex; align-items: center; justify-content: space-between; color: #799381; font-size: 9px; }
+  .explore-foot .arrow { color: #6b8b74; }
+  .status-strip {
+    margin-top: 20px; height: 54px; display: flex; align-items: center; gap: 17px;
+    padding: 0 17px; border: 1px solid rgba(167, 229, 183, .08); border-radius: 12px;
+    background: rgba(255, 255, 255, .014);
+  }
+  .strip-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .strip-item .ico { color: #6c8372; width: 15px; height: 15px; }
+  .strip-item div { display: flex; align-items: baseline; gap: 7px; }
+  .strip-item small { color: #586d5e; font-size: 8.5px; }
+  .strip-item strong { color: #a9c1ae; font-size: 10px; font-weight: 500; }
+  .strip-item em { color: #72cf8e; font-style: normal; font-size: 8.5px; }
+  .strip-item em.ok { padding: 2px 5px; border-radius: 4px; background: rgba(104,219,138,.08); }
+  .strip-sep { width: 1px; height: 20px; background: rgba(167,229,183,.09); }
+  .footer-hint { position: absolute; left: 30px; bottom: 12px; color: #394b3e; font-size: 8px; letter-spacing: .06em; }
+
+  [data-icon] { display: inline-grid; place-items: center; flex: 0 0 auto; width: 14px; height: 14px; }
+  [data-icon] svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ico { width: 16px; height: 16px; }
+  .section-title .ico { width: 15px; height: 15px; }
+  .scroll-mask { position: absolute; inset: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="../assets/icon-256.png" alt="">
+      <div class="brand-copy"><strong>OL启动器</strong><small>OL LAUNCHER</small></div>
+    </div>
+
+    <div class="nav-label">游戏</div>
+    <nav class="nav">
+      <div class="nav-item active"><span class="ico" data-icon="home"></span><span>首页</span></div>
+      <div class="nav-item"><span class="ico" data-icon="download"></span><span>版本库</span><span class="nav-count">3</span></div>
+      <div class="nav-item"><span class="ico" data-icon="layers"></span><span>模组市场</span></div>
+      <div class="nav-item"><span class="ico" data-icon="wifi"></span><span>局域网联机</span></div>
+      <div class="nav-item"><span class="ico" data-icon="box"></span><span>实例管理</span><span class="nav-count">3</span></div>
+    </nav>
+
+    <div class="nav-label" style="margin-top:18px">启动器</div>
+    <nav class="nav">
+      <div class="nav-item"><span class="ico" data-icon="settings"></span><span>设置</span></div>
+    </nav>
+
+    <div class="sidebar-spacer"></div>
+    <div class="support">
+      <span class="ico" data-icon="coffee" style="width:17px;height:17px"></span>
+      <div class="support-copy"><strong>支持作者</strong><small>自愿赞赏</small></div>
+    </div>
+    <div class="account">
+      <div class="avatar">S</div>
+      <div class="account-meta"><strong>Steve</strong><small>离线账号</small></div>
+      <span class="chev" data-icon="chevronRight" style="width:14px;height:14px"></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="crumb"><span>OL启动器</span><i>›</i><strong>首页</strong></div>
+      <div class="top-right">
+        <span class="online"><b></b>运行正常</span>
+        <div class="win"><span class="min"></span><span class="max"></span><span class="close"></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            <span class="tag"><span data-icon="sparkles" style="width:10px;height:10px"></span>官方版本 · 模组社区</span>
+            <span class="date">10月25日 星期六 · 22:41</span>
+          </div>
+          <h1>夜深了，Steve。<br><span>暮色生存</span> 已准备就绪。</h1>
+          <p class="hero-sub">所有文件都已就绪，随时可以出发。<br>从 Mojang 官方获取原版游戏，或用 Fabric / Forge 加载你喜欢的模组。</p>
+          <div class="actions">
+            <span class="btn btn-primary"><span data-icon="play" style="width:13px;height:13px"></span>启动游戏</span>
+            <span class="btn btn-secondary"><span data-icon="layers" style="width:13px;height:13px"></span>模组设置</span>
+            <span class="btn btn-secondary"><span data-icon="box" style="width:13px;height:13px"></span>管理实例</span>
+          </div>
+          <div class="stats">
+            <div class="stat"><b>3</b><span>实例</span></div><div class="stat-div"></div>
+            <div class="stat"><b>3</b><span>已下载版本</span></div><div class="stat-div"></div>
+            <div class="stat"><b>139</b><span>小时游玩</span></div>
+          </div>
+        </div>
+
+        <div class="hero-side">
+          <img class="hero-cube" src="../assets/icon-512.png" alt="">
+          <span class="float-chip chip-a"><span data-icon="clock" style="width:10px;height:10px"></span>上次游玩 2 小时前</span>
+          <div class="instance-card">
+            <div class="ic-head"><b></b>当前实例<span class="ready">● 已就绪</span></div>
+            <div class="ic-name">暮色生存</div>
+            <div class="ic-meta">1.21.1 <em>Fabric</em> <span>3 个模组</span></div>
+            <div class="ic-bar"><span></span></div>
+            <div class="ic-foot"><span>上次游玩 <b>2 小时前</b></span><span style="color:#8fdba5">打开 ›</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-title"><span class="ico" data-icon="clock"></span>最近实例<span class="section-sub">按最近游玩时间排序</span></div>
+          <div class="section-link">全部实例 <span data-icon="arrowRight" style="width:10px;height:10px"></span></div>
+        </div>
+        <div class="recent">
+          <div class="recent-card">
+            <div class="instance-icon ic-fabric">Fa</div>
+            <div class="recent-main">
+              <div class="recent-name">暮色生存</div>
+              <div class="recent-meta"><span class="mini-pill">1.21.1</span><span class="mini-pill">Fabric</span><span class="recent-time">2 小时前</span></div>
+            </div>
+            <span class="recent-chev" data-icon="chevronRight" style="width:14px;height:14px"></span>
+          </div>
+          <div class="recent-card">
+            <div class="instance-icon ic-forge">Fo</div>
+            <div class="recent-main">
+              <div class="recent-name">红石实验室</div>
+              <div class="recent-meta"><span class="mini-pill">1.20.1</span><span class="mini-pill">Forge</span><span class="recent-time">3 天前</span></div>
+            </div>
+            <span class="recent-chev" data-icon="chevronRight" style="width:14px;height:14px"></span>
+          </div>
+          <div class="recent-card">
+            <div class="instance-icon ic-vanilla">V</div>
+            <div class="recent-main">
+              <div class="recent-name">原版旅游服</div>
+              <div class="recent-meta"><span class="mini-pill">1.21.8</span><span class="mini-pill">原版</span><span class="recent-time">5 天前</span></div>
+            </div>
+            <span class="recent-chev" data-icon="chevronRight" style="width:14px;height:14px"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div class="section-title"><span class="ico" data-icon="sparkles"></span>继续探索<span class="section-sub">官方资源与社区入口</span></div>
+        </div>
+        <div class="explore">
+          <div class="explore-card">
+            <div class="explore-top">
+              <div class="explore-icon"><span data-icon="download" style="width:16px;height:16px"></span></div>
+              <span class="external" data-icon="external" style="width:13px;height:13px"></span>
+            </div>
+            <h3>下载原版游戏</h3>
+            <p>浏览 Mojang 官方版本清单，下载正式版或快照。</p>
+            <div class="explore-foot"><span>打开版本库</span><span class="arrow">→</span></div>
+          </div>
+          <div class="explore-card">
+            <div class="explore-top">
+              <div class="explore-icon amber"><span data-icon="layers" style="width:16px;height:16px"></span></div>
+              <span class="external" data-icon="external" style="width:13px;height:13px"></span>
+            </div>
+            <h3>发现模组</h3>
+            <p>从 Modrinth 为当前实例寻找合适的模组与前置。</p>
+            <div class="explore-foot"><span>打开模组市场</span><span class="arrow">→</span></div>
+          </div>
+          <div class="explore-card">
+            <div class="explore-top">
+              <div class="explore-icon blue"><span data-icon="globe" style="width:16px;height:16px"></span></div>
+              <span class="external" data-icon="external" style="width:13px;height:13px"></span>
+            </div>
+            <h3>Minecraft 官网</h3>
+            <p>查看官方新闻、游戏介绍与社区内容。</p>
+            <div class="explore-foot"><span>访问官网</span><span class="arrow">→</span></div>
+          </div>
+        </div>
+      </section>
+          <div class="status-strip">
+        <div class="strip-item"><span class="ico" data-icon="clock"></span><div><small>本周游玩</small><strong>6.4 小时</strong></div><em>+18%</em></div>
+        <div class="strip-sep"></div>
+        <div class="strip-item"><span class="ico" data-icon="folder"></span><div><small>最近备份</small><strong>今天 21:30</strong></div></div>
+        <div class="strip-sep"></div>
+        <div class="strip-item"><span class="ico" data-icon="shield"></span><div><small>启动器状态</small><strong>1.3.0</strong></div><em class="ok">已是最新</em></div>
+      </div>
+    </div>
+    <div class="footer-hint">OL LAUNCHER · 1.3.0</div>
+  </main>
+</div>
+<script>
+  const paths = {
+    home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.5-9.17 4.17a2 2 0 0 1-1.66 0L2 12.5"/><path d="m22 17-9.17 4.17a2 2 0 0 1-1.66 0L2 17"/>',
+    wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+    box: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+    coffee: '<path d="M10 2v2M14 2v2M6 2v2"/><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4Z"/>',
+    play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+    sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    arrowRight: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+    chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+    folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>'
+  };
+  document.querySelectorAll('[data-icon]').forEach((el) => {
+    const p = paths[el.dataset.icon];
+    if (p) el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+  });
+</script>
+</body>
+</html>

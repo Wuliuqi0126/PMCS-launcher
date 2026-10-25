@@ -1,0 +1,109 @@
+'use strict';
+
+const { contextBridge, ipcRenderer, clipboard } = require('electron');
+
+const INVOKE_CHANNELS = new Set([
+  'app:bootstrap',
+  'app:openExternal',
+  'app:openPath',
+  'app:pickDirectory',
+  'app:pickFile',
+  'window:minimize',
+  'window:maximize',
+  'window:close',
+  'app:closePromptReady',
+  'app:closeAction',
+  'window:isMaximized',
+  'config:update',
+  'sources:test',
+  'versions:list',
+  'versions:detail',
+  'versions:install',
+  'instances:create',
+  'instances:repair',
+  'instances:delete',
+  'instances:rename',
+  'instances:setActive',
+  'instances:openFolder',
+  'loader:versions',
+  'launch:start',
+  'launch:kill',
+  'launch:log',
+  'launch:running',
+  'lan:state',
+  'lan:worlds',
+  'lan:hostStart',
+  'lan:stopHost',
+  'lan:setPort',
+  'lan:join',
+  'accounts:list',
+  'accounts:addOffline',
+  'accounts:setActive',
+  'accounts:remove',
+  'accounts:msStart',
+  'accounts:msPoll',
+  'java:detect',
+  'java:ensure',
+  'mods:search',
+  'mods:install',
+  'mods:installed',
+  'mods:toggle',
+  'mods:remove',
+  'mods:openFolder',
+  'components:list',
+  'components:toggle',
+  'tailscale:status',
+  'tailscale:install',
+  'tailscale:login',
+  'playit:status',
+  'playit:install',
+  'playit:claim',
+  'playit:start',
+  'playit:stop',
+  'playit:openDashboard',
+  'backups:latest',
+  'backups:create',
+]);
+
+const EVENT_CHANNELS = new Set([
+  'task:update',
+  'instances:changed',
+  'bootstrap:reload',
+  'lan:update',
+  'tailscale:changed',
+  'playit:changed',
+  'game:log',
+  'game:exit',
+  'window:maximized',
+  'app:closeRequest',
+]);
+
+contextBridge.exposeInMainWorld('oasis', {
+  platform: process.platform,
+  versions: {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+  },
+  invoke(channel, ...args) {
+    if (!INVOKE_CHANNELS.has(channel)) {
+      return Promise.reject(new Error(`未授权的调用: ${channel}`));
+    }
+    return ipcRenderer.invoke(channel, ...args);
+  },
+  on(channel, listener) {
+    if (!EVENT_CHANNELS.has(channel)) throw new Error(`未授权的事件: ${channel}`);
+    const wrapped = (_event, payload) => listener(payload);
+    ipcRenderer.on(channel, wrapped);
+    return () => ipcRenderer.removeListener(channel, wrapped);
+  },
+  writeClipboard(text) {
+    clipboard.writeText(String(text == null ? '' : text));
+    return true;
+  },
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    maximize: () => ipcRenderer.invoke('window:maximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  },
+});

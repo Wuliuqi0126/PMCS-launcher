@@ -1,0 +1,75 @@
+# ============================================================
+# OL 启动器 .gitignore
+# 源码进 Git，安装包/构建产物不进普通 Git
+# ============================================================
+
+# ---------- 操作系统 / 编辑器 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---------- Node / 依赖 ----------
+node_modules/
+.pnpm-store/
+.npm/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+coverage/
+*.tsbuildinfo
+
+# ---------- 构建 / 发布产物 ----------
+dist/
+out/
+release/
+build/
+setup/
+electron-app.*
+smoke.*
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.AppImage
+*.blockmap
+
+# ---------- 压缩包 / 安装包 ----------
+*.zip
+*.7z
+*.rar
+*.iso
+*.tar.gz
+*.tgz
+
+# 内置第三方组件交给 Git LFS，不按普通大文件忽略
+!assets/tailscale/*.msi
+!assets/playit/playit.zip
+
+# ---------- 密钥 / 本地配置 ----------
+.env
+.env.*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+config.local.json
+*.log
+
+# ---------- 临时文件 / 测试目录 ----------
+.testgame/
+.teststore*/
+tmp/
+temp/
+*.tmp
+*.part
+*.crop.png
+
+# ---------- 旧源码备份 ----------
+OL启动器-*-源码备份.zip

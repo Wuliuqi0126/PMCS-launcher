@@ -1,0 +1,2 @@
+assets/tailscale/*.msi filter=lfs diff=lfs merge=lfs -text
+assets/playit/*.zip filter=lfs diff=lfs merge=lfs -text
