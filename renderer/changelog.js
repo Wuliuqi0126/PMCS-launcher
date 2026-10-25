@@ -6,9 +6,18 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.3.1',
+    title: '中文模组搜索与英文结果',
+    current: true,
+    items: [
+      '模组市场支持中文关键词检索，自动转换为英文关键词后同时查询 Modrinth 与 CurseForge。',
+      '搜索结果保持英文标题与简介，并在搜索框下方显示中文原词和实际使用的英文关键词。',
+      '新增本地中文模组词典，覆盖钠、优化、机械动力、苹果皮、光影等常用术语。',
+    ],
+  },
+  {
     version: '1.3.0',
     title: 'React 渲染入口与体验修复',
-    current: true,
     items: [
       '渲染进程切换为 React 19 + esbuild，React 接管渲染根、标题栏和侧边栏。',
       '修复 React 根容器缺少高度导致的页面无法上下滚动。',

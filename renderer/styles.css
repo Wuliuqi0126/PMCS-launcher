@@ -1554,3 +1554,10 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
   .mods-source-bar { align-items: flex-start; flex-direction: column; }
   .mods-source-actions { width: 100%; flex-wrap: wrap; }
 }
+
+.mods-query-hint {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin: 8px 2px 0; color: var(--muted); font-size: 9.5px; line-height: 1.6;
+}
+.mods-query-hint:empty { display: none; }
+.mods-query-hint strong { color: var(--accent); font-weight: 600; }

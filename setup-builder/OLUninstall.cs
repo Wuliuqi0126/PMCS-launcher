@@ -11,8 +11,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("OL我的世界启动器 卸载程序")]
 [assembly: System.Reflection.AssemblyProduct("OL我的世界启动器")]
 [assembly: System.Reflection.AssemblyCompany("OL Launcher")]
-[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.3.1.0")]
 
 namespace OLUninstall
 {

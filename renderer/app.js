@@ -1884,7 +1884,7 @@ function renderModsRoute() {
     ${!vanilla && state.mods.tab === 'discover' ? `<div class="toolbar panel" style="padding:10px">
       <div class="search-field">
         ${icon('search', 16)}
-        <input id="mods-query" type="search" placeholder="搜索模组，例如 Sodium、JEI、Create…" value="${h(state.mods.query)}" autocomplete="off">
+        <input id="mods-query" type="search" placeholder="搜索模组，支持中文：钠 / 优化 / 机械动力…" value="${h(state.mods.query)}" autocomplete="off">
       </div>
       <div class="toolbar-right">
         <div class="select-wrap">
@@ -1899,7 +1899,8 @@ function renderModsRoute() {
         </div>
         <button class="btn btn-secondary btn-sm" data-action="search-mods">${icon('search', 13)} 搜索</button>
       </div>
-    </div>` : ''}
+    </div>
+    <div id="mods-query-hint" class="mods-query-hint"></div>` : ''}
     <div id="mods-content"></div>
 
     <div class="mod-resource-panel">
@@ -2035,9 +2036,28 @@ function targetLoaderClass() {
   return target?.loader === 'fabric' ? 'amber' : target?.loader === 'forge' ? 'blue' : 'green';
 }
 
+function updateModsQueryHint() {
+  const el = $('#mods-query-hint');
+  if (!el) return;
+  const data = state.mods.data;
+  const original = String(state.mods.query || '').trim();
+  const chinese = /[\u3400-\u9fff]/.test(original);
+  if (!data || !chinese || !original) {
+    el.innerHTML = '';
+    return;
+  }
+  if (data.translated && data.searchQuery && data.searchQuery !== original) {
+    el.innerHTML = `${icon('globe', 13)} 中文检索：<strong>${h(original)}</strong> → 英文关键词 <strong>${h(data.searchQuery)}</strong> · 结果标题保持英文原名`;
+  } else {
+    el.innerHTML = `${icon('info', 13)} 未识别这个中文关键词，已按原文搜索；可尝试“钠 / 优化 / 机械动力 / 苹果皮”。`;
+  }
+  hydrateIcons(el);
+}
+
 function paintModsContent() {
   const box = $('#mods-content');
   if (!box) return;
+  updateModsQueryHint();
   const target = currentTargetInstance();
   if (!target) return;
   if (target.loader === 'vanilla') {

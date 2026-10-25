@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { fetchJson, downloadFile } = require('./http');
+const { translateQuery } = require('./mod-search-i18n');
 const { ensureDir, readJson, writeJson, exists, fileSize, sanitizeFileName } = require('./util');
 
 const MR_API = 'https://api.modrinth.com/v2';
@@ -70,7 +71,9 @@ function createMods({ store, tasks }) {
 
   async function searchModrinth(instance, options, mirror) {
     const loader = loaderCategory(instance.loader);
-    const query = String(options.query || '').trim();
+    const originalQuery = String(options.query || '').trim();
+    const translation = translateQuery(originalQuery);
+    const query = translation.query;
     const offset = Math.max(0, Number(options.offset) || 0);
     const limit = Math.max(1, Math.min(24, Number(options.limit) || 12));
     const sort = ['relevance', 'downloads', 'follows', 'newest', 'updated'].includes(options.sort) ? options.sort : 'relevance';
@@ -101,7 +104,9 @@ function createMods({ store, tasks }) {
   }
 
   async function searchCurseForge(instance, options) {
-    const query = String(options.query || '').trim();
+    const originalQuery = String(options.query || '').trim();
+    const translation = translateQuery(originalQuery);
+    const query = translation.query;
     const offset = Math.max(0, Number(options.offset) || 0);
     const limit = Math.max(1, Math.min(24, Number(options.limit) || 12));
     const sortField = { relevance: 2, downloads: 6, follows: 2, newest: 3, updated: 3 }[options.sort] || 2;
@@ -142,11 +147,13 @@ function createMods({ store, tasks }) {
   async function search(instanceId, options = {}) {
     const instance = store.getInstance(instanceId);
     if (!instance) return { hits: [], total: 0, offset: 0, limit: 20, errors: [] };
-    const query = String(options.query || '').trim();
+    const originalQuery = String(options.query || '').trim();
+    const translation = translateQuery(originalQuery);
+    const query = translation.query;
     const offset = Math.max(0, Number(options.offset) || 0);
     const limit = Math.max(1, Math.min(24, Number(options.limit) || 12));
     const mirror = options.mirror === 'direct' ? 'direct' : store.config.modMirror === 'direct' ? 'direct' : 'mcim';
-    const key = JSON.stringify({ instanceId, mirror, query, offset, limit, sort: options.sort });
+    const key = JSON.stringify({ instanceId, mirror, query: originalQuery, offset, limit, sort: options.sort });
     const cached = searchCache.get(key);
     if (cached && Date.now() - cached.at < 60 * 1000) return cached.data;
 
@@ -188,6 +195,10 @@ function createMods({ store, tasks }) {
       offset,
       limit,
       hits: paged,
+      originalQuery,
+      searchQuery: query,
+      translated: translation.translated,
+      terms: translation.terms,
       errors,
       providers: {
         modrinth: mr ? mr.total : 0,
