@@ -211,6 +211,13 @@ async function main() {
             return { hits: hits.slice(offset, offset + limit).map((hit, index) => ({ ...hit, source: index % 2 ? 'curseforge' : 'modrinth' })), total: hits.length, offset, limit, errors: [] };
           }
           case 'mods:installed': return mock.installed;
+          case 'shaders:installed': return [];
+          case 'shaders:remove': return [];
+          case 'shaders:openFolder': return true;
+          case 'skins:list': return { items: [], dir: 'C:\\mock\\skins' };
+          case 'skins:import': return { canceled: true, items: [] };
+          case 'skins:remove': return { items: [] };
+          case 'skins:openFolder': return true;
           case 'mods:install': return { ok: true, installed: mock.installed };
           case 'mods:toggle': return mock.installed;
           case 'mods:remove': return mock.installed;
@@ -386,6 +393,18 @@ async function main() {
     await page.waitForSelector(selector, { timeout: 20000 });
     await new Promise((r) => setTimeout(r, 900));
     await page.screenshot({ path: path.join(OUT, `${name}.png`) });
+    if (name === 'mods') {
+      await page.click('[data-action="mods-module"][data-module="shaders"]');
+      await page.waitForSelector('#mods-content .mod-card', { timeout: 20000 });
+      await new Promise((r) => setTimeout(r, 700));
+      await page.screenshot({ path: path.join(OUT, 'shaders.png') });
+      await page.click('[data-action="mods-module"][data-module="skins"]');
+      await page.waitForSelector('.skin-toolbar', { timeout: 20000 });
+      await new Promise((r) => setTimeout(r, 700));
+      await page.screenshot({ path: path.join(OUT, 'skins.png') });
+      await page.click('[data-action="mods-module"][data-module="mods"]');
+      await page.waitForSelector('#mods-content .mod-card', { timeout: 20000 });
+    }
     if (name === 'lan') {
       await page.evaluate(() => document.querySelector('#playit-panel')?.scrollIntoView({ block: 'center' }));
       await new Promise((r) => setTimeout(r, 350));

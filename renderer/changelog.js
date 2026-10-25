@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.0',
+    title: '模组 / 光影 / 皮肤三模块',
+    current: true,
+    items: [
+      '模组市场拆分为模组、光影、皮肤三个独立模块，顶部一键切换。',
+      '光影模块聚合 Modrinth 与 CurseForge，支持按游戏版本筛选并安装到 shaderpacks。',
+      '皮肤模块支持导入 64×64 / 64×32 PNG、预览、删除和打开本地皮肤文件夹。',
+      '皮肤模块提供 NameMC、SkinMC、MinecraftSkins、Planet Minecraft 资源入口。',
+    ],
+  },
+  {
     version: '1.3.2',
     title: 'Java 运行时下载加速',
-    current: true,
     items: [
       'Java 运行时下载改为 Adoptium 资产元数据 + 16 线程 Range 分段。',
       '自动测速选择更快的 GitHub 加速节点，直连不可用时自动切换。',

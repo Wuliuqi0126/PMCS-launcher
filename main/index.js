@@ -10,6 +10,7 @@ const { createMojang } = require('./mojang');
 const { createInstaller } = require('./installer');
 const { createLauncher } = require('./launch');
 const { createMods } = require('./modrinth');
+const { createSkins } = require('./skins');
 const { createLanService } = require('./lan');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
@@ -59,6 +60,7 @@ let mojang = null;
 let installer = null;
 let launcher = null;
 let mods = null;
+let skins = null;
 let components = null;
 let tailscale = null;
 let playit = null;
@@ -487,9 +489,26 @@ function registerIpc() {
     return mods.search(String(payload?.instanceId || ''), payload || {});
   });
   ipcMain.handle('mods:install', async (_event, payload) => {
-    return mods.install(String(payload?.instanceId || ''), String(payload?.projectId || ''), { source: payload?.source, mirror: payload?.mirror });
+    return mods.install(String(payload?.instanceId || ''), String(payload?.projectId || ''), { source: payload?.source, mirror: payload?.mirror, module: payload?.module });
   });
-  ipcMain.handle('mods:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId)));
+  ipcMain.handle('mods:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId), 'mods'));
+  ipcMain.handle('shaders:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId), 'shaders'));
+  ipcMain.handle('shaders:openFolder', async (_event, instanceId) => {
+    const instance = store.getInstance(String(instanceId));
+    if (!instance) throw new Error('实例不存在');
+    const dir = path.join(store.instanceDir(instance), 'shaderpacks');
+    ensureDir(dir);
+    const error = await shell.openPath(dir);
+    if (error) throw new Error(error);
+    return dir;
+  });
+  ipcMain.handle('shaders:remove', async (_event, payload) => {
+    return mods.remove(String(payload?.instanceId), String(payload?.filename), 'shaders');
+  });
+  ipcMain.handle('skins:list', async () => skins.list());
+  ipcMain.handle('skins:import', async () => skins.importSkin());
+  ipcMain.handle('skins:remove', async (_event, filename) => skins.remove(String(filename)));
+  ipcMain.handle('skins:openFolder', async () => skins.openFolder());
   ipcMain.handle('mods:toggle', async (_event, payload) => {
     return mods.setEnabled(String(payload?.instanceId), String(payload?.filename), Boolean(payload?.enabled));
   });
@@ -564,6 +583,7 @@ app.whenReady().then(() => {
     onActiveChange: sendInstancesChanged,
   });
   mods = createMods({ store, tasks });
+  skins = createSkins({ store, getWindow: () => mainWindow });
   components = createComponents({ store, mods, launcher });
   tailscale = createTailscale({
     app,
