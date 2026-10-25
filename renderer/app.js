@@ -2172,7 +2172,7 @@ function updateModsQueryHint() {
   if (data.translated && data.searchQuery && data.searchQuery !== original) {
     el.innerHTML = `${icon('globe', 13)} 中文检索：<strong>${h(original)}</strong> → 英文关键词 <strong>${h(data.searchQuery)}</strong> · 结果标题保持英文原名`;
   } else {
-    el.innerHTML = `${icon('info', 13)} 未识别这个中文关键词，已按原文搜索；可尝试“钠 / 优化 / 机械动力 / 苹果皮”。`;
+    el.innerHTML = `${icon('info', 13)} 未识别这个中文关键词，已按原文搜索；可尝试“钠 / 优化 / 机械动力 / 连锁采集”。<button class="link-text" data-action="external" data-url="https://search.mcmod.cn/s?key=${encodeURIComponent(original)}">在 MC百科搜索</button>`;
   }
   hydrateIcons(el);
 }
@@ -2226,7 +2226,7 @@ function paintModsContent() {
   }
 
   if (!state.mods.data || !state.mods.data.hits.length) {
-    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('search', 30)}</div><h3>没有找到兼容${isShader ? '光影' : '模组'}</h3><p>试试更换关键词，或确认当前实例的游戏版本${isShader ? '' : '与加载器'}。</p><div class="empty-actions"><button class="btn btn-secondary" data-action="clear-mods-search">清除搜索</button></div></div>`;
+    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('search', 30)}</div><h3>没有找到兼容${isShader ? '光影' : '模组'}</h3><p>试试更换关键词，或确认当前实例的游戏版本${isShader ? '' : '与加载器'}。</p><div class="empty-actions"><button class="btn btn-secondary" data-action="clear-mods-search">清除搜索</button><button class="btn btn-ghost" data-action="external" data-url="https://search.mcmod.cn/s?key=${encodeURIComponent(state.mods.query || '')}">${icon('external', 14)} 在 MC百科搜索</button></div></div>`;
     hydrateIcons(box);
     return;
   }

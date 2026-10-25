@@ -5,6 +5,19 @@
 // Modrinth / CurseForge 搜索。标题与简介保持 API 返回的英文原名。
 const TERMS = {
   // 常见模组中文名
+  '连锁采集': 'vein mining',
+  '连锁挖矿': 'vein miner',
+  '矿脉挖掘': 'vein mining',
+  '连锁破坏': 'vein mining',
+  '一键采集': 'vein mining',
+  '一键挖矿': 'vein miner',
+  '连锁砍树': 'tree vein miner',
+  '一键砍树': 'tree capitator',
+  '连锁': 'vein',
+  '矿脉': 'vein',
+  '砍树': 'tree capitator',
+  '自动采集': 'auto harvest',
+  '自动挖矿': 'auto mining',
   '机械动力': 'create',
   '通用机械': 'mekanism',
   '植物魔法': 'botania',

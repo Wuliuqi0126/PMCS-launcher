@@ -1642,3 +1642,5 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .danger-text { color: #e3a19a !important; }
 .danger-text:hover { color: var(--red) !important; background: rgba(240,124,114,.07) !important; }
 @media (max-width: 900px) { .downloaded-sections { grid-template-columns: 1fr; } }
+
+.link-text { border: 0; background: transparent; color: var(--accent); font-family: var(--font); font-size: 9.5px; padding: 0 2px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
