@@ -239,6 +239,15 @@ function createMojang(store) {
     };
   }
 
+  function deleteVersion(versionId) {
+    const id = String(versionId || '');
+    if (!/^[A-Za-z0-9._-]+$/.test(id)) throw new Error('无效的版本号');
+    const dir = versionDir(id);
+    if (!exists(dir)) return false;
+    fs.rmSync(dir, { recursive: true, force: true });
+    return true;
+  }
+
   function clientJarFor(merged, chain = null) {
     const candidates = [];
     if (merged.jar) candidates.push(merged.jar);
@@ -271,6 +280,7 @@ function createMojang(store) {
     mergeVersions,
     resolveVersion,
     getVersionDetail,
+    deleteVersion,
     clientJarFor,
     manifestFile,
   };

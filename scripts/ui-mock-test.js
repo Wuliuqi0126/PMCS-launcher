@@ -202,6 +202,9 @@ async function main() {
             return { id: v.id, type: v.type, releaseTime: v.releaseTime, javaVersion: { majorVersion: 21, component: 'java-runtime-delta' }, mainClass: 'net.minecraft.client.main.Main', assets: '17', clientSize: 26836906, libraries: 53, inheritsFrom: null, path: `C:\\game\\versions\\${v.id}\\${v.id}.json`, installed: v.installed };
           }
           case 'versions:install': return { ok: true, versionId: args[0] };
+          case 'versions:delete': return true;
+          case 'cache:info': return { bytes: 58240000, files: 4, items: [{ label: 'Java 运行时缓存', bytes: 55000000, files: 1 }, { label: '版本清单缓存', bytes: 3200000, files: 1 }, { label: 'Tailscale 安装缓存', bytes: 24000, files: 1 }] };
+          case 'cache:clear': return { bytes: 0, files: 0, items: [] };
           case 'loader:versions':
             if (args[0]?.loader === 'fabric') return [{ version: '0.16.14', stable: true }, { version: '0.16.13', stable: true }, { version: '0.15.11', stable: false }];
             if (args[0]?.loader === 'forge') return [{ version: '47.2.0', recommended: true }, { version: '47.3.12', recommended: false }, { version: '47.1.3', recommended: false }];
@@ -417,7 +420,20 @@ async function main() {
     await page.waitForSelector(selector, { timeout: 20000 });
     await new Promise((r) => setTimeout(r, 900));
     await page.screenshot({ path: path.join(OUT, `${name}.png`) });
+    if (name === 'versions') {
+      await page.click('[data-action="set-version-filter"][data-filter="installed"]');
+      await page.waitForSelector('.downloaded-sections', { timeout: 20000 });
+      await new Promise((r) => setTimeout(r, 500));
+      await page.screenshot({ path: path.join(OUT, 'versions-installed.png') });
+      await page.click('[data-action="set-version-filter"][data-filter="release"]');
+    }
     if (name === 'mods') {
+      await page.click('[data-action="mods-tab"][data-tab="installed"]');
+      await page.waitForSelector('.installed-panel', { timeout: 20000 });
+      await new Promise((r) => setTimeout(r, 500));
+      await page.screenshot({ path: path.join(OUT, 'my-mods.png') });
+      await page.click('[data-action="mods-tab"][data-tab="discover"]');
+      await page.waitForSelector('#mods-content .mod-card', { timeout: 20000 });
       await page.click('[data-action="mods-module"][data-module="shaders"]');
       await page.waitForSelector('#mods-content .mod-card', { timeout: 20000 });
       await new Promise((r) => setTimeout(r, 700));

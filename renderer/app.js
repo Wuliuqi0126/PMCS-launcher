@@ -1326,6 +1326,7 @@ function renderVersionsRoute() {
       <div class="segmented" data-role="version-filter">
         <button type="button" data-action="set-version-filter" data-filter="release" class="${state.versionType === 'release' ? 'active' : ''}">正式版</button>
         <button type="button" data-action="set-version-filter" data-filter="snapshot" class="${state.versionType === 'snapshot' ? 'active' : ''}">快照</button>
+        <button type="button" data-action="set-version-filter" data-filter="installed" class="${state.versionType === 'installed' ? 'active' : ''}">已下载</button>
         <button type="button" data-action="set-version-filter" data-filter="all" class="${state.versionType === 'all' ? 'active' : ''}">全部</button>
       </div>
       <div class="toolbar-right">
@@ -1396,16 +1397,47 @@ function filteredVersions() {
   if (!state.versions) return [];
   const query = state.versionQuery.trim().toLowerCase();
   return state.versions.versions.filter((version) => {
+    if (state.versionType === 'installed') return Boolean(version.installed);
     if (state.versionType !== 'all' && version.type !== state.versionType) return false;
     if (query && !version.id.toLowerCase().includes(query)) return false;
     return true;
   });
 }
 
+function versionDownloadedRow(version) {
+  const type = VERSION_TYPES[version.type] || { label: version.type, cls: '' };
+  return `<div class="downloaded-row">
+    <div class="version-name"><span class="v-dot"></span><strong>${h(version.id)}</strong><span class="version-date">${h(formatDate(version.releaseTime))}</span></div>
+    <span class="chip ${type.cls}">${h(type.label)}</span>
+    <div class="downloaded-actions">
+      <button class="btn btn-sm btn-secondary" data-action="create-with-version" data-id="${h(version.id)}">创建实例</button>
+      <button class="btn btn-sm btn-ghost danger-text" data-action="uninstall-version" data-id="${h(version.id)}">${icon('trash', 12)} 卸载</button>
+    </div>
+  </div>`;
+}
+
+function paintInstalledVersions(versions) {
+  const body = $('#versions-body');
+  const releases = versions.filter((version) => version.type !== 'snapshot');
+  const snapshots = versions.filter((version) => version.type === 'snapshot');
+  body.innerHTML = `<div class="downloaded-sections">
+    <section class="downloaded-panel panel">
+      <div class="downloaded-head"><div><span class="eyebrow">RELEASES</span><h3>已下载正式版</h3></div><span class="chip green">${releases.length} 个</span></div>
+      ${releases.length ? releases.map(versionDownloadedRow).join('') : '<div class="table-empty">还没有下载正式版</div>'}
+    </section>
+    <section class="downloaded-panel panel">
+      <div class="downloaded-head"><div><span class="eyebrow">SNAPSHOTS</span><h3>已下载快照</h3></div><span class="chip amber">${snapshots.length} 个</span></div>
+      ${snapshots.length ? snapshots.map(versionDownloadedRow).join('') : '<div class="table-empty">还没有下载快照</div>'}
+    </section>
+  </div>`;
+  hydrateIcons(body);
+}
+
 function paintVersionsBody() {
   const body = $('#versions-body');
   if (!body || !state.versions) return;
   const all = filteredVersions();
+  if (state.versionType === 'installed') { paintInstalledVersions(all); return; }
   const visible = all.slice(0, state.versionLimit);
   body.innerHTML = `<div class="version-table panel">
     <div class="version-table-head"><span>版本</span><span>类型</span><span>发布日期</span><span>状态</span><span style="text-align:right">操作</span></div>
@@ -1420,7 +1452,7 @@ function paintVersionsBody() {
         <div class="version-action">
           <button class="icon-btn" title="详情" data-action="version-detail" data-id="${h(version.id)}">${icon('info', 15)}</button>
           ${version.installed
-            ? `<button class="btn btn-sm btn-secondary" data-action="create-with-version" data-id="${h(version.id)}">创建实例</button>`
+            ? `<button class="btn btn-sm btn-secondary" data-action="create-with-version" data-id="${h(version.id)}">创建实例</button><button class="icon-btn danger" title="卸载版本" data-action="uninstall-version" data-id="${h(version.id)}">${icon('trash', 14)}</button>`
             : `<button class="btn btn-sm btn-secondary" data-action="install-version" data-id="${h(version.id)}" ${installing ? 'disabled' : ''}>${installing ? '<span class="spinner light"></span>' : '下载'}</button>`}
         </div>
       </div>`;
@@ -1447,6 +1479,27 @@ async function installVersionById(versionId) {
   } finally {
     state.versionInstalling.delete(versionId);
     paintVersions();
+  }
+}
+
+async function uninstallVersion(versionId) {
+  const used = (state.boot?.library?.instances || []).filter((item) => item.versionId === versionId);
+  const answer = await confirmDialog({
+    title: '卸载 Minecraft 版本',
+    message: `确定要删除 <strong>${h(versionId)}</strong> 的本地版本文件吗？${used.length ? `<br><br><span style="color:var(--red)">有 ${used.length} 个实例正在使用这个版本：${used.map((item) => h(item.name)).join('、')}。卸载后这些实例将无法启动，除非重新下载。</span>` : ''}`,
+    confirmText: '卸载',
+    danger: true,
+  });
+  if (!answer.confirmed) return;
+  try {
+    await api.invoke('versions:delete', versionId);
+    const version = state.versions?.versions.find((item) => item.id === versionId);
+    if (version) version.installed = false;
+    updateVersionNavBadge();
+    paintVersions();
+    toast('版本已卸载', `Minecraft ${versionId} 的本地文件已删除`, 'info', 3200);
+  } catch (err) {
+    toast('卸载版本失败', err.message || String(err), 'error', 8000);
   }
 }
 
@@ -1922,7 +1975,7 @@ function renderModsRoute() {
     ${vanilla && !isShader ? `<div class="notice">${icon('info', 16)}<span>原版实例无法加载 Mod。请切换到 Fabric / Forge 实例，或新建一个支持模组的实例。</span></div>` : ''}
     <div class="mods-tabs">
       <button class="mods-tab ${state.mods.tab === 'discover' ? 'active' : ''}" data-action="mods-tab" data-tab="discover">${icon('sparkles', 14)} 发现${isShader ? '光影' : '模组'}</button>
-      <button class="mods-tab ${state.mods.tab === 'installed' ? 'active' : ''}" data-action="mods-tab" data-tab="installed">${icon('box', 14)} 已安装 <span class="count" id="mods-installed-count">${state.mods.installed.length || ''}</span></button>
+      <button class="mods-tab ${state.mods.tab === 'installed' ? 'active' : ''}" data-action="mods-tab" data-tab="installed">${icon('box', 14)} 我的${isShader ? '光影' : '模组'} <span class="count" id="mods-installed-count">${state.mods.installed.length || ''}</span></button>
       <span class="top-note" style="margin-left:auto"><span class="dot"></span> 数据来自 Modrinth + CurseForge · 聚合搜索</span>
     </div>
     ${(isShader || !vanilla) && state.mods.tab === 'discover' ? `<div class="toolbar panel" style="padding:10px">
@@ -3564,6 +3617,10 @@ function renderSettingsRoute() {
           <div class="setting-info"><strong>日志与诊断</strong><p>查看最近的游戏输出，排查启动失败或模组崩溃。</p></div>
           <div class="setting-control"><button class="btn btn-secondary btn-sm" data-action="open-logs-dir">${icon('terminal2', 13)} 打开日志目录</button></div>
         </div>
+        <div class="setting-row">
+          <div class="setting-info"><strong>缓存</strong><p id="cache-summary">正在计算缓存大小…</p><p id="cache-detail" class="faint" style="font-size:9px;margin-top:3px"></p></div>
+          <div class="setting-control"><button class="btn btn-secondary btn-sm" data-action="clear-cache">${icon('trash', 13)} 清除当前缓存</button></div>
+        </div>
       </section>
 
       <section class="panel settings-panel">
@@ -3677,6 +3734,50 @@ function renderSettingsRoute() {
     </div>
   </div>`;
   hydrateIcons($('#view'));
+  loadCacheInfo();
+}
+
+function formatCacheSize(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(0)} KB`;
+  return `${value} B`;
+}
+
+async function loadCacheInfo() {
+  const summary = $('#cache-summary');
+  const detail = $('#cache-detail');
+  if (!summary) return;
+  try {
+    const info = await api.invoke('cache:info');
+    summary.textContent = `${formatCacheSize(info.bytes)} · ${info.files} 个文件`;
+    const parts = (info.items || []).filter((item) => item.bytes > 0).map((item) => `${item.label} ${formatCacheSize(item.bytes)}`);
+    if (detail) detail.textContent = parts.length ? parts.join(' · ') : '当前没有可清理的缓存';
+  } catch (err) {
+    summary.textContent = '缓存信息读取失败';
+    if (detail) detail.textContent = err.message || String(err);
+  }
+}
+
+async function clearCurrentCache() {
+  const answer = await confirmDialog({
+    title: '清除当前缓存',
+    message: '将删除 Java 运行时压缩包、版本清单缓存和 Tailscale 安装包缓存。<br><br>不会删除已安装版本、实例、存档、模组、光影或资源文件。',
+    confirmText: '清除缓存',
+    danger: true,
+  });
+  if (!answer.confirmed) return;
+  try {
+    const info = await api.invoke('cache:clear');
+    const summary = $('#cache-summary');
+    const detail = $('#cache-detail');
+    if (summary) summary.textContent = `${formatCacheSize(info.bytes)} · ${info.files} 个文件`;
+    if (detail) detail.textContent = '缓存已清空';
+    toast('缓存已清除', '已释放缓存文件，版本与实例不受影响', 'success', 3200);
+  } catch (err) {
+    toast('清除缓存失败', err.message || String(err), 'error', 8000);
+  }
 }
 
 async function testDownloadSources() {
@@ -4432,6 +4533,9 @@ async function runAction(action, el, event) {
       case 'open-logs':
         await openLogsModal(id);
         break;
+      case 'clear-cache':
+        await clearCurrentCache();
+        break;
       case 'refresh-versions':
         try {
           await ensureVersions(true);
@@ -4455,6 +4559,9 @@ async function runAction(action, el, event) {
         break;
       case 'version-detail':
         openVersionDetail(id);
+        break;
+      case 'uninstall-version':
+        await uninstallVersion(id);
         break;
       case 'create-with-version':
         await openCreateModal(id);

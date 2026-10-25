@@ -1624,3 +1624,21 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .task-card.paused .task-bar span { background: rgba(255,255,255,.25); box-shadow: none; }
 .task-card.cancelled .task-icon { background: rgba(240,124,114,.1); color: var(--red); }
 .task-card.cancelled .task-bar span { background: var(--red); }
+
+/* ==== DOWNLOADED VERSIONS ==== */
+.downloaded-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; align-items: start; }
+.downloaded-panel { overflow: hidden; }
+.downloaded-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 15px 17px 13px; border-bottom: 1px solid var(--line); }
+.downloaded-head > div { display: flex; flex-direction: column; gap: 3px; }
+.downloaded-head .eyebrow { font-size: 8.5px; }
+.downloaded-head h3 { margin: 0; font-size: 12.5px; }
+.downloaded-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.downloaded-row:last-child { border-bottom: 0; }
+.downloaded-row .version-name { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.downloaded-row .version-name strong { font-size: 11px; white-space: nowrap; }
+.downloaded-row .version-date { color: var(--muted-2); font-size: 8.5px; margin-left: 2px; white-space: nowrap; }
+.downloaded-actions { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
+.downloaded-actions .btn { height: 26px; font-size: 9px; }
+.danger-text { color: #e3a19a !important; }
+.danger-text:hover { color: var(--red) !important; background: rgba(240,124,114,.07) !important; }
+@media (max-width: 900px) { .downloaded-sections { grid-template-columns: 1fr; } }

@@ -11,6 +11,7 @@ const { createInstaller } = require('./installer');
 const { createLauncher } = require('./launch');
 const { createMods } = require('./modrinth');
 const { createSkins } = require('./skins');
+const { createCache } = require('./cache');
 const { createLanService } = require('./lan');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
@@ -61,6 +62,7 @@ let installer = null;
 let launcher = null;
 let mods = null;
 let skins = null;
+let cacheManager = null;
 let components = null;
 let tailscale = null;
 let playit = null;
@@ -382,6 +384,11 @@ function registerIpc() {
   ipcMain.handle('versions:install', async (_event, versionId) => {
     return installer.installVersion(String(versionId));
   });
+  ipcMain.handle('versions:delete', async (_event, versionId) => {
+    return mojang.deleteVersion(String(versionId));
+  });
+  ipcMain.handle('cache:info', async () => cacheManager.info());
+  ipcMain.handle('cache:clear', async () => cacheManager.clear());
 
   ipcMain.handle('instances:create', async (_event, payload) => {
     const instance = await installer.createInstance({
@@ -587,6 +594,7 @@ app.whenReady().then(() => {
   });
   mods = createMods({ store, tasks });
   skins = createSkins({ store, getWindow: () => mainWindow });
+  cacheManager = createCache({ store, app });
   components = createComponents({ store, mods, launcher });
   tailscale = createTailscale({
     app,
