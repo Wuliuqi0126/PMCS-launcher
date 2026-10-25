@@ -4,6 +4,16 @@
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
+## 下载
+
+> 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
+
+- [OL启动器 1.3.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher/releases/download/v1.3.0/OLLauncher-1.3.0-Setup.exe)
+- [OL启动器 1.3.0 便携版](https://github.com/Wuliuqi0126/ol-launcher/releases/download/v1.3.0/OLLauncher-1.3.0-Portable.zip)
+- [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher/releases)
+
+安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
+
 ![首页](screenshots/home.png)
 
 | 开屏动画 | 首次启动创建账户 |
