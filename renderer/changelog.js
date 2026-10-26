@@ -14,6 +14,7 @@ export const CHANGELOG = [
       'Tailscale 状态增加 tailscale ip -4 兜底，修复浏览器已登录但启动器仍显示未连接。',
       'playit 授权改为浏览器分步引导，并实时解析运行日志中的公网隧道地址。',
       '联机页面新增 Tailscale/playit 状态自动轮询和公网地址显示。',
+      '安装程序自动添加 Windows 防火墙规则：启动器程序、UDP 24454、Java 局域网 TCP 端口。',
     ],
   },
   {

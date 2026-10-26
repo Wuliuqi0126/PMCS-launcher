@@ -140,6 +140,8 @@ namespace OLSetup
             }
             catch { /* keep the installed files usable */ }
             RemoveLegacyShortcuts();
+            if (progress != null) progress(96, "正在配置 Windows 防火墙…");
+            ConfigureFirewall(exe);
             if (progress != null) progress(98, "正在写入卸载信息…");
             try
             {
@@ -157,6 +159,32 @@ namespace OLSetup
             }
             catch { /* registry can be restricted by policy */ }
             if (progress != null) progress(100, "安装完成。");
+        }
+
+        private static void ConfigureFirewall(string exe)
+        {
+            string[] rules =
+            {
+                "name=\"OL Launcher Private\" dir=in action=allow program=\"" + exe + "\" profile=private,domain enable=yes",
+                "name=\"OL Launcher LAN Discovery\" dir=in action=allow protocol=UDP localport=24454 profile=private,domain enable=yes",
+                "name=\"OL Launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
+                "name=\"OL Launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
+            };
+            foreach (string rule in rules)
+            {
+                try
+                {
+                    ProcessStartInfo info = new ProcessStartInfo("netsh.exe", "advfirewall firewall add rule " + rule);
+                    info.UseShellExecute = false;
+                    info.CreateNoWindow = true;
+                    info.WindowStyle = ProcessWindowStyle.Hidden;
+                    using (Process process = Process.Start(info))
+                    {
+                        if (process != null) process.WaitForExit(8000);
+                    }
+                }
+                catch { /* firewall policy may be managed by the organization */ }
+            }
         }
 
         private static void RemoveLegacyShortcuts()

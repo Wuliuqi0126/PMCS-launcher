@@ -187,6 +187,7 @@ namespace OLUninstall
                         BeginInvoke((Action)delegate { status.Text = "正在卸载 Tailscale…"; });
                         RemoveTailscale();
                     }
+                    RemoveFirewallRules();
                     RemoveShortcuts();
                     RemoveRegistry();
                     DeleteProgramFiles(resources);
@@ -325,6 +326,32 @@ namespace OLUninstall
                 }
             }
             Thread.Sleep(400);
+        }
+
+        private static void RemoveFirewallRules()
+        {
+            string[] names =
+            {
+                "OL Launcher Private",
+                "OL Launcher LAN Discovery",
+                "OL Launcher Java LAN",
+                "OL Launcher Java 25565",
+            };
+            foreach (string name in names)
+            {
+                try
+                {
+                    ProcessStartInfo info = new ProcessStartInfo("netsh.exe", "advfirewall firewall delete rule name=\"" + name + "\"");
+                    info.UseShellExecute = false;
+                    info.CreateNoWindow = true;
+                    info.WindowStyle = ProcessWindowStyle.Hidden;
+                    using (Process process = Process.Start(info))
+                    {
+                        if (process != null) process.WaitForExit(5000);
+                    }
+                }
+                catch { /* ignore */ }
+            }
         }
 
         private void RemoveShortcuts()
