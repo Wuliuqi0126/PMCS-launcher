@@ -552,7 +552,7 @@ function registerIpc() {
   ipcMain.handle('tailscale:status', async () => tailscale.status());
   ipcMain.handle('tailscale:install', async () => tailscale.install());
   ipcMain.handle('tailscale:login', async () => tailscale.login());
-  ipcMain.handle('playit:status', async () => playit.status());
+  ipcMain.handle('playit:status', async (_event, payload) => playit.status(payload?.localPort));
   ipcMain.handle('playit:install', async () => playit.install());
   ipcMain.handle('playit:claim', async () => playit.claim());
   ipcMain.handle('playit:start', async () => playit.start());

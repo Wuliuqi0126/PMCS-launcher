@@ -3229,7 +3229,7 @@ async function refreshPlayit() {
   state.playit.loading = true;
   paintPlayitPanel();
   try {
-    state.playit.status = await api.invoke('playit:status');
+    state.playit.status = await api.invoke('playit:status', { localPort: state.lan.host?.port || 0 });
     state.playit.error = '';
     state.playit.initialized = true;
     const address = state.playit.status?.tunnelAddress || '';

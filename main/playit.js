@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 const { spawn, execFile } = require('child_process');
+const net = require('net');
 const { promisify } = require('util');
 const { app, safeStorage } = require('electron');
 const { ensureDir } = require('./util');
@@ -48,8 +49,60 @@ function readLogTail(file, bytes = 96 * 1024) {
 }
 
 function parseTunnelAddress(text) {
-  const matches = [...String(text || '').matchAll(/([a-z0-9-]+\.playit\.gg:\d{2,5})/gi)];
+  const matches = [...String(text || '').matchAll(/([a-z0-9-]+\.(?:playit\.gg|tun\.ply\.gg)(?::\d{2,5})?)/gi)];
   return matches.length ? matches[matches.length - 1][1] : '';
+}
+
+function queryDaemonState(timeout = 900) {
+  return new Promise((resolve) => {
+    const socket = net.connect('\\\\.\\pipe\\playitd-system');
+    let buffer = '';
+    let settled = false;
+    let requested = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      try { socket.destroy(); } catch (_) { /* ignore */ }
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeout);
+    socket.setTimeout(timeout);
+    socket.on('connect', () => {
+      // The daemon sends a Hello frame first; the request can be sent immediately,
+      // but parsing line-by-line makes this robust to frame order.
+    });
+    socket.on('data', (chunk) => {
+      buffer += chunk.toString('utf8');
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let message;
+        try { message = JSON.parse(line); } catch (_) { continue; }
+        if (message.message_kind === 'hello' && !requested) {
+          requested = true;
+          try { socket.write(JSON.stringify({ ipc_version: 2, request_id: 1, request: { type: 'get_state' } }) + '\n'); } catch (_) { finish(null); }
+          continue;
+        }
+        const response = message.message_kind === 'response' ? message.data : null;
+        if (response?.type !== 'state') continue;
+        const lifecycle = response.data;
+        if (lifecycle?.state !== 'running') { finish({ tunnels: [], notices: [] }); continue; }
+        const state = lifecycle.data || {};
+        const tunnels = (state.tunnels || []).map((tunnel) => ({
+          address: String(tunnel.display_address || ''),
+          destination: String(tunnel.destination || ''),
+          disabled: Boolean(tunnel.is_disabled),
+          reason: tunnel.disabled_reason || '',
+        })).filter((tunnel) => tunnel.address);
+        finish({ tunnels, notices: state.notices || [], accountStatus: state.account_status || '' });
+      }
+    });
+    socket.on('timeout', () => finish(null));
+    socket.on('error', () => finish(null));
+    socket.on('close', () => { clearTimeout(timer); if (!settled) finish(null); });
+    setTimeout(() => { if (!requested) requested = true; try { socket.write(JSON.stringify({ ipc_version: 2, request_id: 1, request: { type: 'get_state' } }) + '\n'); } catch (_) { finish(null); } }, 250);
+  });
 }
 
 function createPlayit({ onChange, openExternal, openGuide }) {
@@ -148,15 +201,27 @@ function createPlayit({ onChange, openExternal, openGuide }) {
     }).then((result) => cleanOutput(result.stdout || result.stderr));
   }
 
-  async function status() {
+  async function status(localPort) {
     const ready = await installed();
     const secret = ready ? readSecret() : '';
+    let ipc = null;
+    if (ready) {
+      try { ipc = await queryDaemonState(); } catch (_) { ipc = null; }
+    }
+    const tunnels = Array.isArray(ipc?.tunnels) ? ipc.tunnels : [];
+    const enabled = tunnels.filter((tunnel) => !tunnel.disabled);
+    const port = Number(localPort) || 0;
+    const matched = port ? enabled.find((tunnel) => tunnel.destination.endsWith(`:${port}`)) : null;
+    const tunnelAddress = matched?.address || enabled[0]?.address || parseTunnelAddress(readLogTail(logPath()));
     return {
       installed: ready,
       claimed: Boolean(secret),
-      running: Boolean(daemon),
+      running: Boolean(daemon) || Boolean(ipc),
       claiming: Boolean(claimInfo),
-      tunnelAddress: daemon ? parseTunnelAddress(readLogTail(logPath())) : '',
+      tunnelAddress,
+      tunnels,
+      accountStatus: ipc?.accountStatus || '',
+      notices: ipc?.notices || [],
       version: PLAYIT_VERSION,
       lastError,
     };
