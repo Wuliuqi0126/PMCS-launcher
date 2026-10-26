@@ -445,7 +445,9 @@ function registerIpc() {
     const gameVersion = String(payload?.gameVersion || '');
     if (!gameVersion) throw new Error('请先选择游戏版本');
     if (loader === 'fabric') return loaders.listFabricVersions(gameVersion);
+    if (loader === 'quilt') return loaders.listQuiltVersions(gameVersion);
     if (loader === 'forge') return loaders.listForgeVersions(gameVersion);
+    if (loader === 'neoforge') return loaders.listNeoForgeVersions(gameVersion);
     return [];
   });
 

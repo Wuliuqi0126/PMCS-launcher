@@ -207,6 +207,8 @@ async function main() {
           case 'cache:clear': return { bytes: 0, files: 0, items: [] };
           case 'loader:versions':
             if (args[0]?.loader === 'fabric') return [{ version: '0.16.14', stable: true }, { version: '0.16.13', stable: true }, { version: '0.15.11', stable: false }];
+            if (args[0]?.loader === 'quilt') return [{ version: '0.30.1', stable: true }, { version: '0.30.0', stable: true }];
+            if (args[0]?.loader === 'neoforge') return [{ version: '21.1.265', stable: true }, { version: '21.1.264', stable: true }];
             if (args[0]?.loader === 'forge') return [{ version: '47.2.0', recommended: true }, { version: '47.3.12', recommended: false }, { version: '47.1.3', recommended: false }];
             return [];
           case 'instances:create': return { ...mock.library.instances[0], id: 'ins_new', name: args[0]?.name || '新实例', status: 'pending' };

@@ -56,6 +56,36 @@ function createInstaller({ store, tasks, mojang, java, onChange }) {
       profileId = result.profileId;
       loaderVersion = result.loaderVersion;
       task.update({ stage: '解析 Fabric 依赖', percent: 58, detail: `Fabric ${loaderVersion}` });
+    } else if (instance.loader === 'quilt') {
+      const result = await loaders.installQuiltProfile(store, instance.versionId, instance.loaderVersion, task);
+      profileId = result.profileId;
+      loaderVersion = result.loaderVersion;
+      task.update({ stage: '解析 Quilt 依赖', percent: 58, detail: `Quilt ${loaderVersion}` });
+    } else if (instance.loader === 'neoforge') {
+      const major = baseJson.javaVersion?.majorVersion || 21;
+      const javaInfo = await java.ensureJava(store, major, task);
+      if (!loaderVersion) {
+        const versions = await loaders.listNeoForgeVersions(instance.versionId);
+        loaderVersion = versions.find((item) => item.stable)?.version || versions[0]?.version;
+      }
+      if (!loaderVersion) throw new Error(`找不到适用于 ${instance.versionId} 的 NeoForge 版本`);
+      const expectedProfile = `${instance.versionId}-neoforge-${loaderVersion}`;
+      const expectedJson = mojang.versionJsonPath(expectedProfile);
+      if (fs.existsSync(expectedJson)) {
+        profileId = expectedProfile;
+        task.update({ stage: 'NeoForge 已安装', percent: 70, detail: expectedProfile });
+      } else {
+        const installer = await loaders.downloadNeoForgeInstaller(store, instance.versionId, loaderVersion, task);
+        const result = await loaders.runNeoForgeInstaller(store, javaInfo, instance.versionId, loaderVersion, task, installer);
+        profileId = result.profileId;
+      }
+      const baseJar = mojang.versionJarPath(instance.versionId);
+      const profileJar = mojang.versionJarPath(profileId);
+      if (fs.existsSync(baseJar) && !fs.existsSync(profileJar)) {
+        fs.mkdirSync(path.dirname(profileJar), { recursive: true });
+        fs.copyFileSync(baseJar, profileJar);
+      }
+      task.update({ stage: '解析 NeoForge 依赖', percent: 72, detail: profileId });
     } else if (instance.loader === 'forge') {
       const major = baseJson.javaVersion?.majorVersion || 8;
       const javaInfo = await java.ensureJava(store, major, task);

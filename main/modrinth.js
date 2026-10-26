@@ -15,6 +15,7 @@ function loaderCategory(loader) {
   if (loader === 'fabric') return 'fabric';
   if (loader === 'forge') return 'forge';
   if (loader === 'neoforge') return 'neoforge';
+  if (loader === 'quilt') return 'quilt';
   return null;
 }
 

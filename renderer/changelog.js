@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.5',
+    title: 'NeoForge 与 Quilt 加载器支持',
+    current: true,
+    items: [
+      '创建实例新增 NeoForge 加载器，使用 NeoForge 官方安装程序并通过 BMCL Maven 镜像加速。',
+      '新增 Quilt 加载器，通过 Quilt Meta 生成客户端配置，兼容 Quilt 模组。',
+      '模组搜索支持按 NeoForge / Quilt 加载器过滤。',
+      'NeoForge 版本列表支持 21.x、20.x 和新版本号格式。',
+    ],
+  },
+  {
     version: '1.4.4',
     title: '下拉菜单主题与模组下载提速',
-    current: true,
     items: [
       '所有原生下拉菜单强制使用深色主题，选项文字与背景保持一致。',
       '修复模组下载因 minSpeed 判断误判“镜像速度过慢”而中断的问题。',

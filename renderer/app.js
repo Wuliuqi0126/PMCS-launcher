@@ -102,7 +102,9 @@ const state = {
 const LOADERS = {
   vanilla: { label: '原版', mark: 'V', desc: '纯净官方体验' },
   fabric: { label: 'Fabric', mark: 'Fa', desc: '轻量 · 更新快' },
+  quilt: { label: 'Quilt', mark: 'Qu', desc: 'Fabric 兼容 · 新生态' },
   forge: { label: 'Forge', mark: 'Fo', desc: '经典 · 生态广' },
+  neoforge: { label: 'NeoForge', mark: 'Ne', desc: 'Forge 新分支' },
 };
 
 const VERSION_TYPES = {
@@ -1603,7 +1605,7 @@ async function openCreateModal(preselectedVersion = '') {
       </div>
       <div class="field" style="margin-bottom:0">
         <label>安装说明</label>
-        <p class="form-note" style="margin:0">原版与 Fabric 安装较快；Forge 需要运行官方安装程序，可能需要几分钟。安装过程可在右下角查看，完成后即可启动。内存等设置在「设置」中调整。</p>
+        <p class="form-note" style="margin:0">原版、Fabric、Quilt 安装较快；Forge、NeoForge 需要运行官方安装程序，可能需要几分钟。安装过程可在右下角查看，完成后即可启动。内存等设置在「设置」中调整。</p>
       </div>
     </form>`,
     footer: `<button class="btn btn-ghost" type="button" data-modal-close>取消</button><button class="btn btn-primary" type="submit" form="create-instance-form" id="create-submit">${icon('plus', 15)} 创建并安装</button>`,
@@ -1633,14 +1635,14 @@ async function openCreateModal(preselectedVersion = '') {
         const requestId = ++loaderRequest;
         loaderSelect.disabled = true;
         loaderSelect.innerHTML = '<option value="">正在获取版本列表…</option>';
-        hint.textContent = `从 ${loader === 'fabric' ? 'FabricMC' : 'MinecraftForge'} 官方元数据获取…`;
+        hint.textContent = `从 ${loader === 'fabric' ? 'FabricMC' : loader === 'quilt' ? 'QuiltMC' : loader === 'neoforge' ? 'NeoForge' : 'MinecraftForge'} 官方元数据获取…`;
         try {
           const list = await api.invoke('loader:versions', { loader, gameVersion });
           if (requestId !== loaderRequest) return;
           if (!list?.length) throw new Error('该游戏版本没有可用的加载器版本');
           loaderSelect.innerHTML = list.slice(0, 80).map((item) => `<option value="${h(item.version)}">${h(item.version)}${item.stable ? ' · 稳定' : item.recommended ? ' · 推荐' : ''}</option>`).join('');
           loaderSelect.disabled = false;
-          hint.textContent = `已找到 ${list.length} 个 ${loader === 'fabric' ? 'Fabric' : 'Forge'} 版本，默认使用最新稳定版。`;
+          hint.textContent = `已找到 ${list.length} 个 ${loaderInfo(loader).label} 版本，默认使用最新稳定版。`;
         } catch (err) {
           if (requestId !== loaderRequest) return;
           loaderSelect.innerHTML = '<option value="">自动选择（稍后由安装器决定）</option>';
@@ -2160,7 +2162,7 @@ function modCard(mod) {
 
 function targetLoaderClass() {
   const target = currentTargetInstance();
-  return target?.loader === 'fabric' ? 'amber' : target?.loader === 'forge' ? 'blue' : 'green';
+  return target?.loader === 'fabric' ? 'amber' : target?.loader === 'quilt' ? 'amber' : target?.loader === 'forge' || target?.loader === 'neoforge' ? 'blue' : 'green';
 }
 
 function updateModsQueryHint() {
