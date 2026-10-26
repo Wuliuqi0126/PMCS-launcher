@@ -39,7 +39,7 @@ function runFile(file, args, options = {}) {
   });
 }
 
-function createTailscale({ app, tasks, onChange, openExternal, cliPath: cliOverride }) {
+function createTailscale({ app, tasks, onChange, openExternal, openGuide, cliPath: cliOverride }) {
   let cliPath = '';
   let loginChild = null;
 
@@ -81,7 +81,7 @@ function createTailscale({ app, tasks, onChange, openExternal, cliPath: cliOverr
     // Tailscale can briefly report NoState/Starting after the browser auth
     // completes even though the node key and address are already available.
     const loggedIn = state === 'Running' ||
-      (hasIp && state !== 'NeedsLogin' && state !== 'NeedsMachineAuth' && state !== 'Stopped');
+      (hasIp && state !== 'Stopped');
     return {
       installed: true,
       state,
@@ -130,11 +130,37 @@ function createTailscale({ app, tasks, onChange, openExternal, cliPath: cliOverr
       }
       return parsed;
     } catch (err) {
+      // `status --json` can fail while the daemon is still starting. `ip -4`
+      // is a cheap fallback that tells us whether the node already has an
+      // address and is actually logged in.
+      try {
+        const ipRaw = await runFile(cli, ['ip', '-4'], { timeout: 5000 });
+        const ip = String(ipRaw).split(/\r?\n/).map((line) => line.trim()).find((line) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(line)) || '';
+        if (ip) {
+          return {
+            installed: true,
+            state: 'Running',
+            starting: false,
+            loggedIn: true,
+            needsLogin: false,
+            ip,
+            ips: [ip],
+            hostName: '',
+            dnsName: '',
+            version: '',
+            online: true,
+            health: [],
+            authUrl: '',
+            error: '',
+            msiVersion: TAILSCALE_MSI_VERSION,
+          };
+        }
+      } catch (_) { /* fall through */ }
       // The CLI exists but the service is stopped, starting, or not authorized.
       return {
         installed: true,
         state: 'Stopped',
-        starting: false,
+        starting: /starting|NoState/i.test(String(err.stderr || err.message || '')),
         loggedIn: false,
         needsLogin: false,
         ip: '',
@@ -262,14 +288,17 @@ function createTailscale({ app, tasks, onChange, openExternal, cliPath: cliOverr
     const openAuthUrl = async (url) => {
       if (!url) return { ok: false, opened: false, url: '', message: 'Tailscale 没有返回登录地址' };
       let opened = false;
-      if (typeof openExternal === 'function') {
+      if (typeof openGuide === 'function') {
+        try { opened = await openGuide('tailscale', url); } catch (_) { opened = false; }
+      }
+      if (!opened && typeof openExternal === 'function') {
         try { await openExternal(url); opened = true; } catch (_) { opened = false; }
       }
       return {
         ok: opened,
         opened,
         url,
-        message: opened ? '已打开 Tailscale 登录授权页面' : '已获取登录链接，请在浏览器打开',
+        message: opened ? '已打开浏览器分步引导和 Tailscale 登录页' : '已获取登录链接，请在浏览器打开',
       };
     };
 

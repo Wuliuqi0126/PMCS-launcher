@@ -12,6 +12,7 @@ const { createLauncher } = require('./launch');
 const { createMods } = require('./modrinth');
 const { createSkins } = require('./skins');
 const { createCache } = require('./cache');
+const { createGuides } = require('./guide');
 const { createLanService } = require('./lan');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
@@ -63,6 +64,7 @@ let launcher = null;
 let mods = null;
 let skins = null;
 let cacheManager = null;
+let guides = null;
 let components = null;
 let tailscale = null;
 let playit = null;
@@ -599,17 +601,20 @@ app.whenReady().then(() => {
   mods = createMods({ store, tasks });
   skins = createSkins({ store, getWindow: () => mainWindow });
   cacheManager = createCache({ store, app });
+  guides = createGuides({ app, openExternal: (url) => shell.openExternal(url) });
   components = createComponents({ store, mods, launcher });
   tailscale = createTailscale({
     app,
     tasks,
     onChange: () => broadcast('tailscale:changed', true),
     openExternal: (url) => shell.openExternal(url),
+    openGuide: (kind, url) => guides.open(kind, url),
   });
   backups = createBackups({ store });
   playit = createPlayit({
     onChange: (payload) => broadcast('playit:changed', payload),
     openExternal: (url) => shell.openExternal(url),
+    openGuide: (kind, url) => guides.open(kind, url),
   });
   registerIpc();
   installer.reconcileInstances();

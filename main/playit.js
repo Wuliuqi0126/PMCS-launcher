@@ -33,7 +33,26 @@ function cleanOutput(text) {
     .trim();
 }
 
-function createPlayit({ onChange, openExternal }) {
+function readLogTail(file, bytes = 96 * 1024) {
+  try {
+    const stat = fs.statSync(file);
+    const start = Math.max(0, stat.size - bytes);
+    const fd = fs.openSync(file, 'r');
+    const buffer = Buffer.alloc(stat.size - start);
+    fs.readSync(fd, buffer, 0, buffer.length, start);
+    fs.closeSync(fd);
+    return buffer.toString('utf8');
+  } catch (_) {
+    return '';
+  }
+}
+
+function parseTunnelAddress(text) {
+  const matches = [...String(text || '').matchAll(/([a-z0-9-]+\.playit\.gg:\d{2,5})/gi)];
+  return matches.length ? matches[matches.length - 1][1] : '';
+}
+
+function createPlayit({ onChange, openExternal, openGuide }) {
   const root = () => path.join(app.getPath('userData'), 'playit');
   const desktopPath = () => path.join(root(), 'playit-desktop.exe');
   const daemonPath = () => path.join(root(), 'playitd.exe');
@@ -137,6 +156,7 @@ function createPlayit({ onChange, openExternal }) {
       claimed: Boolean(secret),
       running: Boolean(daemon),
       claiming: Boolean(claimInfo),
+      tunnelAddress: daemon ? parseTunnelAddress(readLogTail(logPath())) : '',
       version: PLAYIT_VERSION,
       lastError,
     };
@@ -190,7 +210,11 @@ function createPlayit({ onChange, openExternal }) {
 
     claimInfo = { code, url };
     if (onChange) onChange({ claiming: true });
-    openExternal(url);
+    let guided = false;
+    if (typeof openGuide === 'function') {
+      try { guided = await openGuide('playit', url); } catch (_) { guided = false; }
+    }
+    if (!guided) openExternal(url);
 
     const child = spawn(desktopPath(), ['claim', 'exchange', code, '--wait', '300'], {
       windowsHide: true,

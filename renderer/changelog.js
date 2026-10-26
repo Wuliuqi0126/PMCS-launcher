@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.7',
+    title: 'Tailscale/playit 浏览器引导与实时状态',
+    current: true,
+    items: [
+      'Tailscale 登录改为浏览器分步引导，授权完成后启动器每 2.5 秒刷新登录状态。',
+      'Tailscale 状态增加 tailscale ip -4 兜底，修复浏览器已登录但启动器仍显示未连接。',
+      'playit 授权改为浏览器分步引导，并实时解析运行日志中的公网隧道地址。',
+      '联机页面新增 Tailscale/playit 状态自动轮询和公网地址显示。',
+    ],
+  },
+  {
     version: '1.4.6',
     title: '局域网自动发现与端口同步',
-    current: true,
     items: [
       '启动器启动后即监听局域网发现广播，不再需要先打开联机页面。',
       '增强游戏日志端口识别，覆盖 Started serving、Local game hosted、LAN 等日志格式。',

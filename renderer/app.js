@@ -813,7 +813,7 @@ function routeFromHash() {
 
 function renderRoute() {
   if (!state.boot) return;
-  if (state.route !== 'lan') stopLanScan();
+  if (state.route !== 'lan') { stopLanScan(); stopIntegrationWatch(); }
   closeModal();
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.route === state.route));
   if (state.route === 'home') renderHomeRoute();
@@ -3015,7 +3015,7 @@ async function loginTailscale() {
       api.writeClipboard(result.url);
       toast('登录链接已复制', `无法自动打开浏览器，请把链接粘贴到浏览器：${result.url}`, 'info', 15000);
     } else if (result?.opened) {
-      toast('已打开 Tailscale 登录', '在浏览器完成授权后，点击「刷新」或等待状态更新', 'info', 8000);
+      toast('已打开 Tailscale 分步引导', '在浏览器完成授权后，启动器会自动更新连接状态', 'info', 8000);
     } else {
       toast('未获取到登录链接', result?.message || '请打开 Tailscale 托盘图标，点击 Log in', 'error', 12000);
     }
@@ -3138,7 +3138,7 @@ function playitPanelHtml() {
     <div class="playit-body">
       <div class="playit-status">
         <div class="playit-copy">
-          ${!s ? '<strong>正在检测 playit 状态…</strong>' : !installed ? '<strong>playit 尚未准备</strong><span>点击「准备 playit」会从安装包内置组件部署，不需要联网下载。</span>' : !claimed ? '<strong>playit 已准备，等待登录</strong><span>点击「登录并绑定 playit」，浏览器会打开授权页；完成后启动器会自动启动隧道。</span>' : running ? '<strong>playit 已在后台运行</strong><span>请到 playit.gg 控制台创建 Minecraft Java 隧道，并把本地端口指向当前的局域端口。</span>' : '<strong>playit 已登录，但未运行</strong><span>点击「启动 playit」，然后到控制台创建或检查隧道。</span>'}
+          ${!s ? '<strong>正在检测 playit 状态…</strong>' : !installed ? '<strong>playit 尚未准备</strong><span>点击「准备 playit」会从安装包内置组件部署，不需要联网下载。</span>' : !claimed ? '<strong>playit 已准备，等待登录</strong><span>点击「登录并绑定 playit」，浏览器会打开分步引导；完成后启动器会自动启动隧道。</span>' : running ? `<strong>playit 已在后台运行</strong><span>${s.tunnelAddress ? `公网地址：${h(s.tunnelAddress)}` : '正在读取隧道地址；请到 playit.gg 控制台创建 Minecraft Java 隧道，并把本地端口指向当前的局域端口。'}</span>` : '<strong>playit 已登录，但未运行</strong><span>点击「启动 playit」，然后到控制台创建或检查隧道。</span>'}
         </div>
         <div class="playit-actions">
           ${!installed ? `<button class="btn btn-primary btn-sm" data-action="playit-install" ${busy ? 'disabled' : ''}>${busy === 'install' ? '<span class="spinner"></span> 正在准备' : `${icon('download', 13)} 准备 playit`}</button>` : ''}
@@ -3157,8 +3157,8 @@ function playitPanelHtml() {
           ${portText ? `<div class="playit-address"><code>127.0.0.1:${h(portText)}</code><button class="icon-btn" data-action="lan-copy" data-text="127.0.0.1:${h(portText)}" title="复制本地地址">${icon('copy', 15)}</button></div>` : `<p class="playit-hint">先在游戏内「对局域网开放」，这里会自动读取端口；然后把同样的端口填到 playit 隧道的本地端口。</p>`}
         </div>
         <div class="playit-card">
-          <div class="playit-card-head">${icon('external', 15)}<strong>公网地址在哪里</strong></div>
-          <p class="playit-hint">在 playit.gg 控制台创建 <b>Minecraft Java</b> 隧道，本地地址填 <code>127.0.0.1:${h(portText || '端口')}</code>，控制台会生成 <code>*.playit.gg:端口</code> 公网地址，复制给客机即可。</p>
+          <div class="playit-card-head">${icon('external', 15)}<strong>公网地址</strong></div>
+          ${s.tunnelAddress ? `<div class="playit-address"><code>${h(s.tunnelAddress)}</code><button class="icon-btn" data-action="lan-copy" data-text="${h(s.tunnelAddress)}" title="复制公网地址">${icon('copy', 15)}</button></div><p class="playit-hint">把这个地址发给客机。若隧道尚未创建，请到 playit.gg 控制台创建 Minecraft Java 隧道。</p>` : `<p class="playit-hint">正在等待 playit 分配公网地址。请到 playit.gg 控制台创建 <b>Minecraft Java</b> 隧道，本地地址填 <code>127.0.0.1:${h(portText || '端口')}</code>。</p>`}
         </div>
       </div>` : ''}
 
@@ -3220,7 +3220,7 @@ async function claimPlayit() {
     const result = await api.invoke('playit:claim');
     if (result?.url) {
       api.writeClipboard(result.url);
-      toast('已打开 playit 登录页', '完成浏览器授权后会自动启动；若浏览器未打开，登录链接已复制', 'info', 12000);
+      toast('已打开 playit 分步引导', '在浏览器完成授权后，启动器会自动启动隧道', 'info', 12000);
     }
     await refreshPlayit();
   } catch (err) {
@@ -3319,6 +3319,21 @@ function openPlayitGuide() {
 
 
 let lanScanTimer = null;
+let integrationWatchTimer = null;
+
+function startIntegrationWatch() {
+  if (integrationWatchTimer) return;
+  integrationWatchTimer = setInterval(() => {
+    if (state.route !== 'lan') return;
+    if (state.tailscale.status?.installed && !state.tailscale.loading) refreshTailscale();
+    if (state.playit.status?.claimed && !state.playit.loading) refreshPlayit();
+  }, 2500);
+}
+
+function stopIntegrationWatch() {
+  if (integrationWatchTimer) clearInterval(integrationWatchTimer);
+  integrationWatchTimer = null;
+}
 
 function startLanScan() {
   if (lanScanTimer) return;
@@ -3436,6 +3451,7 @@ function renderLanRoute() {
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
   if (!state.lan.initialized) refreshLanState();
   startLanScan();
+  startIntegrationWatch();
   if (host && state.lan.worldsInstanceId !== host.id && !state.lan.worldsLoading) {
     loadLanWorlds();
   }

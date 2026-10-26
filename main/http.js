@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { ensureDir, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'OLLauncher/1.4.6 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'OLLauncher/1.4.7 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
   https: new https.Agent({ keepAlive: true, maxSockets: 128 }),
   http: new http.Agent({ keepAlive: true, maxSockets: 128 }),
