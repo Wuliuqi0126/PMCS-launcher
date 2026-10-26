@@ -3120,7 +3120,8 @@ function playitStatusLabel(s) {
   if (!s) return '正在检测';
   if (!s.installed) return '未准备';
   if (s.claiming) return '等待浏览器授权';
-  if (!s.claimed) return '待登录';
+  if (s.tunnelAddress) return '公网已就绪';
+  if (!s.claimed && !s.running) return '待登录';
   return s.running ? '运行中' : '已登录·未运行';
 }
 
@@ -3171,7 +3172,9 @@ function playitPanelHtml() {
   const busy = p.busy;
   const installed = Boolean(s?.installed);
   const claimed = Boolean(s?.claimed);
-  const running = Boolean(s?.running);
+  const hasTunnel = Boolean(s?.tunnelAddress || (s?.tunnels || []).length);
+  const active = claimed || hasTunnel;
+  const running = Boolean(s?.running) || hasTunnel;
   const port = state.lan.host?.port;
   const portText = port ? String(port) : '';
 
@@ -3184,22 +3187,22 @@ function playitPanelHtml() {
     <div class="playit-body">
       <div class="playit-status">
         <div class="playit-copy">
-          ${!s ? '<strong>正在检测 playit 状态…</strong>' : !installed ? '<strong>playit 尚未准备</strong><span>点击「准备 playit」会从安装包内置组件部署，不需要联网下载。</span>' : !claimed ? '<strong>playit 已准备，等待登录</strong><span>点击「登录并绑定 playit」，浏览器会打开分步引导；完成后启动器会自动启动隧道。</span>' : running ? `<strong>playit 已在后台运行</strong><span>${s.tunnelAddress ? `公网地址：${h(s.tunnelAddress)}` : '正在读取隧道地址；请到 playit.gg 控制台创建 Minecraft Java 隧道，并把本地端口指向当前的局域端口。'}</span>` : '<strong>playit 已登录，但未运行</strong><span>点击「启动 playit」，然后到控制台创建或检查隧道。</span>'}
+          ${!s ? '<strong>正在检测 playit 状态…</strong>' : !installed ? '<strong>playit 尚未准备</strong><span>点击「准备 playit」会从安装包内置组件部署，不需要联网下载。</span>' : !active ? '<strong>playit 已准备，等待登录</strong><span>点击「登录并绑定 playit」，浏览器会打开分步引导；完成后启动器会自动启动隧道。</span>' : running ? `<strong>playit 已在后台运行</strong><span>${s.tunnelAddress ? `公网地址：${h(s.tunnelAddress)}` : '正在读取隧道地址；请到 playit.gg 控制台创建 Minecraft Java 隧道，并把本地端口指向当前的局域端口。'}</span>` : '<strong>playit 已登录，但未运行</strong><span>点击「启动 playit」，然后到控制台创建或检查隧道。</span>'}
         </div>
         <div class="playit-actions">
           ${!installed ? `<button class="btn btn-primary btn-sm" data-action="playit-install" ${busy ? 'disabled' : ''}>${busy === 'install' ? '<span class="spinner"></span> 正在准备' : `${icon('download', 13)} 准备 playit`}</button>` : ''}
           ${installed && !claimed ? `<button class="btn btn-primary btn-sm" data-action="playit-claim" ${busy ? 'disabled' : ''}>${busy === 'claim' ? '<span class="spinner"></span> 等待授权' : `${icon('user', 13)} 登录并绑定 playit`}</button>` : ''}
-          ${installed && claimed && !running ? `<button class="btn btn-primary btn-sm" data-action="playit-start" ${busy ? 'disabled' : ''}>${busy === 'start' ? '<span class="spinner"></span> 启动中' : `${icon('play', 13)} 启动 playit`}</button>` : ''}
+          ${installed && active && !running ? `<button class="btn btn-primary btn-sm" data-action="playit-start" ${busy ? 'disabled' : ''}>${busy === 'start' ? '<span class="spinner"></span> 启动中' : `${icon('play', 13)} 启动 playit`}</button>` : ''}
           ${running ? `<button class="btn btn-secondary btn-sm" data-action="playit-stop" ${busy ? 'disabled' : ''}>停止 playit</button>` : ''}
           <button class="btn btn-secondary btn-sm" data-action="playit-refresh" ${busy ? 'disabled' : ''}>${icon('refresh', 13)} 刷新</button>
           <button class="btn btn-ghost btn-sm" data-action="playit-tunnel-guide">${icon('compass', 13)} 设置步骤</button>
           <button class="btn btn-ghost btn-sm" data-action="playit-guide">${icon('info', 13)} 操作指引</button>
-          ${claimed ? `<button class="btn btn-ghost btn-sm" data-action="playit-dashboard">${icon('external', 13)} 隧道管理</button>` : ''}
+          ${active ? `<button class="btn btn-ghost btn-sm" data-action="playit-dashboard">${icon('external', 13)} 隧道管理</button>` : ''}
         </div>
       </div>
 
-      ${claimed ? playitTunnelStepsHtml() : ''}
-      ${claimed ? `<div class="playit-grid">
+      ${active ? playitTunnelStepsHtml() : ''}
+      ${active ? `<div class="playit-grid">
         <div class="playit-card">
           <div class="playit-card-head">${icon('radio', 15)}<strong>当前局域端口</strong></div>
           ${portText ? `<div class="playit-address"><code>127.0.0.1:${h(portText)}</code><button class="icon-btn" data-action="lan-copy" data-text="127.0.0.1:${h(portText)}" title="复制本地地址">${icon('copy', 15)}</button></div>` : `<p class="playit-hint">先在游戏内「对局域网开放」，这里会自动读取端口；然后把同样的端口填到 playit 隧道的本地端口。</p>`}
@@ -3380,7 +3383,7 @@ function startIntegrationWatch() {
   integrationWatchTimer = setInterval(() => {
     if (state.route !== 'lan') return;
     if (state.tailscale.status?.installed && !state.tailscale.loading) refreshTailscale();
-    if (state.playit.status?.claimed && !state.playit.loading) refreshPlayit();
+    if (state.playit.status?.installed && !state.playit.loading) refreshPlayit();
   }, 2500);
 }
 

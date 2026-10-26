@@ -616,6 +616,14 @@ app.whenReady().then(() => {
     openExternal: (url) => shell.openExternal(url),
     openGuide: (kind, url) => guides.open(kind, url),
   });
+  // Recover the tunnel automatically after an app restart when playit has
+  // already been claimed. Without this the secret exists but the daemon is
+  // not running, so the launcher has no IPC state or tunnel address to show.
+  playit.status().then((current) => {
+    if (current?.claimed && !current.running) {
+      playit.start().catch((err) => logLine(`playit auto-start failed: ${err.message}`));
+    }
+  }).catch(() => {});
   registerIpc();
   installer.reconcileInstances();
   createWindow();

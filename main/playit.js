@@ -343,4 +343,4 @@ function createPlayit({ onChange, openExternal, openGuide }) {
   };
 }
 
-module.exports = { createPlayit, PLAYIT_VERSION };
+module.exports = { createPlayit, PLAYIT_VERSION, queryDaemonState, parseTunnelAddress };

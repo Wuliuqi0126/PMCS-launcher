@@ -1,6 +1,6 @@
 # OL启动器 · OL Launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.4.8**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.4.9**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [OL启动器 1.4.8 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.4.8/OLLauncher-1.4.8-Setup.exe)
-- [OL启动器 1.4.8 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.4.8/OLLauncher-1.4.8-Portable.zip)
+- [OL启动器 1.4.9 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.4.9/OLLauncher-1.4.9-Setup.exe)
+- [OL启动器 1.4.9 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.4.9/OLLauncher-1.4.9-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -116,7 +116,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/OL启动器-1.4.8-安装程序.exe
+setup/OL启动器-1.4.9-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `OL launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -133,14 +133,14 @@ setup/OL启动器-1.4.8-安装程序.exe
 OL我的世界启动器.exe
 ```
 
-安装包文件名保持 **OL启动器-1.4.8-安装程序.exe** 不变。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名保持 **OL启动器-1.4.9-安装程序.exe** 不变。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: 5B35C21E4E34A6A10D9877129859C12294822B3B350E92906DC4DC45AE7F4C34
+SHA256: 07027B520F9EF2729BFB973D51AE116573E442252DC096486E1A0C552D27D336
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
@@ -152,13 +152,13 @@ SHA256: 5B35C21E4E34A6A10D9877129859C12294822B3B350E92906DC4DC45AE7F4C34
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/OL启动器-1.4.8-便携版.zip
+setup/OL启动器-1.4.9-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-D18D1E1AEA92F20751051CF5EA8230D43B3D1308669A823524C177F42AFBF3BE
+728045D9A0B9C0D31451A52D1847423D7AEFE72E98A7E37614C65EDF286610CA
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
@@ -203,7 +203,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `OL我的世界启动器.exe`，快捷方式同名。
-- 安装包文件名保持 `OL启动器-1.4.8-安装程序.exe`。
+- 安装包文件名保持 `OL启动器-1.4.9-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -224,7 +224,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-OL启动器-1.4.8-安装程序.exe /S /DIR="D:\Games\OL我的世界启动器"
+OL启动器-1.4.9-安装程序.exe /S /DIR="D:\Games\OL我的世界启动器"
 ```
 
 electron-builder 和缓存保留在：

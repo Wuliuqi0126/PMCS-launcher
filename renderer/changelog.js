@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.9',
+    title: 'playit 公网地址自动识别修复',
+    current: true,
+    items: [
+      'playit 状态通过本地 IPC 读取隧道列表，兼容 *.tun.ply.gg 地址格式。',
+      '已登录 playit 的用户在启动器重启后自动恢复 playit 守护进程。',
+      '隧道公网地址按当前局域端口自动匹配并显示、复制。',
+      '没有 launcher secret 但已有 playit 隧道时也会显示公网地址。',
+    ],
+  },
+  {
     version: '1.4.8',
     title: 'playit 隧道开启分步提醒',
-    current: true,
     items: [
       '启动 playit 后自动弹出隧道开启步骤，提示创建 Minecraft Java 隧道。',
       'playit 面板内始终显示隧道步骤、当前局域端口和公网地址。',

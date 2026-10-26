@@ -1,6 +1,6 @@
 {
   "name": "ol-launcher",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "OL启动器 - 我的世界 Java 版启动器，支持官方版本、局域网联机、Fabric/Forge 与 Modrinth 模组",
   "main": "main/index.js",
   "author": "OL Launcher",
@@ -68,7 +68,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "OL我的世界启动器",
-      "uninstallDisplayName": "OL我的世界启动器 1.4.8",
+      "uninstallDisplayName": "OL我的世界启动器 1.4.9",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
