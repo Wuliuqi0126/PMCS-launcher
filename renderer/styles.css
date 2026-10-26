@@ -1672,3 +1672,8 @@ select option:checked, select option:hover {
 .playit-tunnel-modal .playit-tunnel-steps { padding: 12px 0 2px; }
 .playit-tunnel-modal .playit-tunnel-steps strong { font-size: 11px; }
 .playit-tunnel-modal .playit-tunnel-steps p { font-size: 9.5px; }
+
+/* ==== LAN HOST ADDRESS ==== */
+.lan-host-address { display: flex; align-items: center; gap: 7px; margin: 9px 0 7px; }
+.lan-host-address .input { flex: 1; height: 32px; font-family: var(--font-mono); font-size: 10px; color: var(--accent); background: rgba(0,0,0,.22); }
+.lan-host-address .btn { flex: 0 0 auto; white-space: nowrap; }

@@ -675,6 +675,10 @@ function bindGlobalEvents() {
     }
   });
 
+  document.addEventListener('click', (event) => {
+    if (event.target?.id === 'lan-host-address') event.target.select();
+  });
+
   $('#task-root')?.addEventListener('click', async (event) => {
     const closeBtn = event.target.closest('[data-task-close]');
     if (closeBtn) { removeTask(closeBtn.dataset.taskClose); return; }
@@ -2591,9 +2595,16 @@ function lanHostStatusHtml() {
       <div>
         <strong>房间已开放 · 端口 ${host.port}</strong>
         <p>${h(host.instanceName)} · ${h(host.worldName || host.worldId || '当前世界')}</p>
-        <div class="lan-address-list">
-          ${addresses.length ? addresses.map((item) => `<button class="lan-address" data-action="lan-copy" data-text="${h(item.endpoint)}" title="复制地址">${icon('copy', 12)} <code>${h(item.endpoint)}</code></button>`).join('') : '<span class="form-note">正在获取本机地址…</span>'}
-        </div>
+        ${(() => {
+          const preferred = addresses.find((item) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(item.address)) || addresses[0];
+          return `<div class="lan-host-address">
+            <input class="input" id="lan-host-address" readonly value="${h(preferred?.endpoint || '')}" placeholder="正在获取本机地址…" aria-label="主机地址">
+            <button class="btn btn-primary btn-sm" data-action="lan-copy" data-text="${h(preferred?.endpoint || '')}" ${preferred ? '' : 'disabled'}>${icon('copy', 13)} 复制主机地址</button>
+          </div>
+          <div class="lan-address-list">
+            ${addresses.length ? addresses.map((item) => `<button class="lan-address" data-action="lan-copy" data-text="${h(item.endpoint)}" title="复制地址">${icon('copy', 12)} <code>${h(item.endpoint)}</code></button>`).join('') : '<span class="form-note">正在获取本机地址…</span>'}
+          </div>`;
+        })()}
         <div class="lan-open-actions">
           <span class="form-note">客机可在「加入房间」中发现，或在 Minecraft 多人游戏中从局域网列表进入。</span>
           <button class="btn btn-ghost btn-sm" data-action="lan-stop-host">${icon('x', 13)} 停止广播</button>
@@ -3607,11 +3618,23 @@ async function joinLanManual() {
 }
 
 async function copyLanText(text) {
+  const value = String(text || '').trim();
+  if (!value) {
+    toast('还没有可复制的主机地址', '等待启动器读取到局域网端口后重试', 'info', 5000);
+    return;
+  }
   try {
-    api.writeClipboard(text);
-    toast('地址已复制', text, 'success', 2500);
+    await Promise.resolve(api.writeClipboard(value));
+    toast('主机地址已复制', value, 'success', 2800);
   } catch (err) {
-    toast('复制失败', err.message || String(err), 'error');
+    try {
+      await navigator.clipboard.writeText(value);
+      toast('主机地址已复制', value, 'success', 2800);
+    } catch (_) {
+      const input = $('#lan-host-address');
+      if (input) { input.focus(); input.select(); }
+      toast('自动复制失败', '地址已选中，请按 Ctrl+C 复制', 'error', 6000);
+    }
   }
 }
 
