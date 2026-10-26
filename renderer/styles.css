@@ -1656,3 +1656,19 @@ select option:checked, select option:hover {
   background-color: #1c5a35 !important;
   color: #ffffff !important;
 }
+
+/* ==== PLAYIT TUNNEL STEPS ==== */
+.playit-tunnel-guide { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.015); overflow: hidden; }
+.playit-tunnel-head { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--accent); }
+.playit-tunnel-head strong { color: var(--text-soft); font-size: 10.5px; }
+.playit-tunnel-head span { color: var(--muted-2); font-size: 8.5px; margin-left: 2px; }
+.playit-tunnel-steps { list-style: none; margin: 0; padding: 10px 12px; display: grid; gap: 8px; }
+.playit-tunnel-steps li { display: flex; align-items: flex-start; gap: 9px; }
+.playit-tunnel-steps li > span { flex: 0 0 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: rgba(110,231,149,.08); color: var(--accent); font-size: 8.5px; font-weight: 700; }
+.playit-tunnel-steps li > div { min-width: 0; }
+.playit-tunnel-steps strong { display: block; color: var(--text-soft); font-size: 10px; font-weight: 600; }
+.playit-tunnel-steps p { margin: 2px 0 0; color: var(--muted-2); font-size: 8.5px; line-height: 1.55; }
+.playit-tunnel-steps code { color: var(--accent); }
+.playit-tunnel-modal .playit-tunnel-steps { padding: 12px 0 2px; }
+.playit-tunnel-modal .playit-tunnel-steps strong { font-size: 11px; }
+.playit-tunnel-modal .playit-tunnel-steps p { font-size: 9.5px; }

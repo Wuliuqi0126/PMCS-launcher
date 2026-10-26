@@ -6,9 +6,18 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.8',
+    title: 'playit 隧道开启分步提醒',
+    current: true,
+    items: [
+      '启动 playit 后自动弹出隧道开启步骤，提示创建 Minecraft Java 隧道。',
+      'playit 面板内始终显示隧道步骤、当前局域端口和公网地址。',
+      '公网地址分配后自动提示，并支持从步骤弹窗直接打开隧道管理。',
+    ],
+  },
+  {
     version: '1.4.7',
     title: 'Tailscale/playit 浏览器引导与实时状态',
-    current: true,
     items: [
       'Tailscale 登录改为浏览器分步引导，授权完成后启动器每 2.5 秒刷新登录状态。',
       'Tailscale 状态增加 tailscale ip -4 兜底，修复浏览器已登录但启动器仍显示未连接。',

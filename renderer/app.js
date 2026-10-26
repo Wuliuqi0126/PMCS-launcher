@@ -70,6 +70,7 @@ const state = {
     error: '',
     busy: '',
     initialized: false,
+    lastTunnelAddress: '',
   },
   javaDetect: null,
   sourceTest: null,
@@ -3119,6 +3120,40 @@ function playitStatusClass(s) {
   return 'muted';
 }
 
+function playitTunnelStepsHtml() {
+  const port = state.lan.host?.port;
+  const address = state.playit.status?.tunnelAddress;
+  return `<div class="playit-tunnel-guide">
+    <div class="playit-tunnel-head">${icon('compass', 15)}<strong>隧道开启步骤</strong><span>按顺序完成，客机才能加入</span></div>
+    <ol class="playit-tunnel-steps">
+      <li><span>01</span><div><strong>确认 playit 正在运行</strong><p>当前状态：${state.playit.status?.running ? '运行中' : '未运行'}${address ? ` · 公网地址已分配` : ' · 等待公网地址'}</p></div></li>
+      <li><span>02</span><div><strong>打开 playit.gg 控制台</strong><p>点击「隧道管理」，登录与启动器相同的 playit 账号。</p></div></li>
+      <li><span>03</span><div><strong>创建 Minecraft Java 隧道</strong><p>类型选择 Minecraft Java，本地地址填 <code>127.0.0.1:${h(port || '游戏端口')}</code>。</p></div></li>
+      <li><span>04</span><div><strong>复制公网地址给客机</strong><p>${address ? `当前地址：<code>${h(address)}</code>` : '控制台分配地址后，启动器会自动读取并显示在这里。'}</p></div></li>
+    </ol>
+  </div>`;
+}
+
+function openPlayitTunnelGuide() {
+  const port = state.lan.host?.port;
+  const address = state.playit.status?.tunnelAddress;
+  openModal({
+    title: 'playit 隧道开启步骤',
+    subtitle: 'playit 已启动；还需要在控制台创建隧道，客机才能连接',
+    wide: true,
+    body: `<div class="playit-tunnel-modal">
+      <div class="notice info">${icon('info', 16)}<span>启动器只负责运行 playit 代理，公网隧道需要在 playit.gg 控制台创建一次。</span></div>
+      <ol class="playit-tunnel-steps">
+        <li><span>01</span><div><strong>保持 playit 运行</strong><p>不要关闭启动器或停止 playit；当前状态：${state.playit.status?.running ? '运行中' : '未运行'}。</p></div></li>
+        <li><span>02</span><div><strong>打开隧道管理</strong><p>在浏览器登录或注册 playit.gg，进入 Account → Tunnels。</p></div></li>
+        <li><span>03</span><div><strong>创建 Minecraft Java 隧道</strong><p>Local Address 填 <code>127.0.0.1:${h(port || '游戏端口')}</code>；如果还没有端口，先在游戏内「对局域网开放」。</p></div></li>
+        <li><span>04</span><div><strong>把公网地址发给客机</strong><p>${address ? `已检测到：<code>${h(address)}</code>` : '控制台显示 *.playit.gg:端口 后，启动器会自动显示公网地址。'}</p></div></li>
+      </ol>
+    </div>`,
+    footer: `<button class="btn btn-ghost" data-action="playit-guide">查看完整指引</button><button class="btn btn-secondary" data-modal-close>稍后设置</button><button class="btn btn-primary" data-action="playit-dashboard">${icon('external', 14)} 打开隧道管理</button>`,
+  });
+}
+
 function playitPanelHtml() {
   const p = state.playit;
   const s = p.status;
@@ -3146,11 +3181,13 @@ function playitPanelHtml() {
           ${installed && claimed && !running ? `<button class="btn btn-primary btn-sm" data-action="playit-start" ${busy ? 'disabled' : ''}>${busy === 'start' ? '<span class="spinner"></span> 启动中' : `${icon('play', 13)} 启动 playit`}</button>` : ''}
           ${running ? `<button class="btn btn-secondary btn-sm" data-action="playit-stop" ${busy ? 'disabled' : ''}>停止 playit</button>` : ''}
           <button class="btn btn-secondary btn-sm" data-action="playit-refresh" ${busy ? 'disabled' : ''}>${icon('refresh', 13)} 刷新</button>
+          <button class="btn btn-ghost btn-sm" data-action="playit-tunnel-guide">${icon('compass', 13)} 设置步骤</button>
           <button class="btn btn-ghost btn-sm" data-action="playit-guide">${icon('info', 13)} 操作指引</button>
           ${claimed ? `<button class="btn btn-ghost btn-sm" data-action="playit-dashboard">${icon('external', 13)} 隧道管理</button>` : ''}
         </div>
       </div>
 
+      ${claimed ? playitTunnelStepsHtml() : ''}
       ${claimed ? `<div class="playit-grid">
         <div class="playit-card">
           <div class="playit-card-head">${icon('radio', 15)}<strong>当前局域端口</strong></div>
@@ -3184,6 +3221,11 @@ async function refreshPlayit() {
     state.playit.status = await api.invoke('playit:status');
     state.playit.error = '';
     state.playit.initialized = true;
+    const address = state.playit.status?.tunnelAddress || '';
+    if (address && address !== state.playit.lastTunnelAddress) {
+      state.playit.lastTunnelAddress = address;
+      toast('playit 公网地址已分配', address, 'success', 8000);
+    }
   } catch (err) {
     state.playit.error = err.message || String(err);
   } finally {
@@ -3239,7 +3281,8 @@ async function startPlayit() {
   paintPlayitPanel();
   try {
     state.playit.status = await api.invoke('playit:start');
-    toast('playit 已启动', '请到 playit.gg 控制台创建 Minecraft Java 隧道', 'success', 7000);
+    toast('playit 已启动', '还需要在控制台创建一次 Minecraft Java 隧道', 'success', 7000);
+    openPlayitTunnelGuide();
   } catch (err) {
     state.playit.error = err.message || String(err);
     toast('playit 启动失败', err.message || String(err), 'error', 9000);
@@ -4498,6 +4541,9 @@ async function runAction(action, el, event) {
         break;
       case 'playit-start':
         await startPlayit();
+        break;
+      case 'playit-tunnel-guide':
+        openPlayitTunnelGuide();
         break;
       case 'playit-stop':
         await stopPlayit();
