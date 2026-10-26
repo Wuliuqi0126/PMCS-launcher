@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.4.6',
+    title: '局域网自动发现与端口同步',
+    current: true,
+    items: [
+      '启动器启动后即监听局域网发现广播，不再需要先打开联机页面。',
+      '增强游戏日志端口识别，覆盖 Started serving、Local game hosted、LAN 等日志格式。',
+      '主机开放局域网后每 1.5 秒广播房间，客机每 3 秒自动刷新房间列表。',
+      '加入房间区域新增手动刷新按钮和刷新反馈。',
+    ],
+  },
+  {
     version: '1.4.5',
     title: 'NeoForge 与 Quilt 加载器支持',
-    current: true,
     items: [
       '创建实例新增 NeoForge 加载器，使用 NeoForge 官方安装程序并通过 BMCL Maven 镜像加速。',
       '新增 Quilt 加载器，通过 Quilt Meta 生成客户端配置，兼容 Quilt 模组。',

@@ -125,6 +125,25 @@ function readLevelName(levelFile) {
   }
 }
 
+function parseLanPort(lines) {
+  const text = Array.isArray(lines) ? lines.join('\n') : String(lines || '');
+  const patterns = [
+    /Started serving on(?:\s+port)?\s+(\d{1,5})/gi,
+    /Local game hosted on port\s+(\d{1,5})/gi,
+    /LAN (?:world|server|game).*?(?:port|on)\s+(\d{1,5})/gi,
+    /(?:opened|started|hosting).*?LAN.*?(?:port|on)\s+(\d{1,5})/gi,
+    /对局域网开放.*?(\d{1,5})/g,
+  ];
+  for (const pattern of patterns) {
+    const matches = [...text.matchAll(pattern)];
+    if (matches.length) {
+      const port = Number(matches[matches.length - 1][1]);
+      if (Number.isInteger(port) && port > 0 && port < 65536) return port;
+    }
+  }
+  return null;
+}
+
 function createLanService({ store, launcher, onUpdate, onActiveChange }) {
   const hostId = crypto.randomBytes(8).toString('hex');
   const rooms = new Map();
@@ -273,7 +292,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     sender.bind(0, () => {
       try { sender.setBroadcast(true); } catch (_) { /* ignore */ }
       sendBeacon();
-      beaconTimer = setInterval(sendBeacon, BEACON_INTERVAL);
+      beaconTimer = setInterval(sendBeacon, 1500);
     });
     emitSoon();
   }
@@ -293,19 +312,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     if (!host) return null;
     let lines = [];
     try { lines = launcher.latestLog(host.instanceId); } catch (_) { return null; }
-    const text = lines.join('\n');
-    const patterns = [
-      /Started serving on\s+(?:port\s+)?(\d{1,5})/gi,
-      /Local game hosted on port\s+(\d{1,5})/gi,
-    ];
-    for (const pattern of patterns) {
-      const matches = [...text.matchAll(pattern)];
-      if (matches.length) {
-        const port = Number(matches[matches.length - 1][1]);
-        if (Number.isInteger(port) && port > 0 && port < 65536) return port;
-      }
-    }
-    return null;
+    return parseLanPort(lines);
   }
 
   function startPolling() {
@@ -322,7 +329,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       idleChecks = 0;
       const port = detectPort();
       if (port && port !== host.port) startBeacon(port);
-    }, 1200);
+    }, 600);
   }
 
   async function startHost({ instanceId, worldId }) {
@@ -475,4 +482,4 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
   };
 }
 
-module.exports = { createLanService, DISCOVERY_PORT };
+module.exports = { createLanService, DISCOVERY_PORT, parseLanPort };

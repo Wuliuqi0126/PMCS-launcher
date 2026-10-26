@@ -595,6 +595,7 @@ app.whenReady().then(() => {
     onUpdate: (payload) => broadcast('lan:update', payload),
     onActiveChange: sendInstancesChanged,
   });
+  lan.start();
   mods = createMods({ store, tasks });
   skins = createSkins({ store, getWindow: () => mainWindow });
   cacheManager = createCache({ store, app });

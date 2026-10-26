@@ -75,6 +75,7 @@ const state = {
   sourceTest: null,
   lan: {
     rooms: [],
+    scanning: false,
     host: null,
     addresses: [],
     discoveryError: '',
@@ -812,6 +813,7 @@ function routeFromHash() {
 
 function renderRoute() {
   if (!state.boot) return;
+  if (state.route !== 'lan') stopLanScan();
   closeModal();
   $$('.nav-item').forEach((item) => item.classList.toggle('active', item.dataset.route === state.route));
   if (state.route === 'home') renderHomeRoute();
@@ -3316,6 +3318,20 @@ function openPlayitGuide() {
 }
 
 
+let lanScanTimer = null;
+
+function startLanScan() {
+  if (lanScanTimer) return;
+  lanScanTimer = setInterval(() => {
+    if (state.route === 'lan' && !state.lan.loading) refreshLanState();
+  }, 3000);
+}
+
+function stopLanScan() {
+  if (lanScanTimer) clearInterval(lanScanTimer);
+  lanScanTimer = null;
+}
+
 function renderLanRoute() {
   const instances = lanInstances();
   if (!state.lan.hostInstanceId || !instances.some((item) => item.id === state.lan.hostInstanceId)) {
@@ -3396,7 +3412,7 @@ function renderLanRoute() {
             </select>
             <div class="field-hint" id="lan-guest-hint">${guest ? `当前：${h(guest.versionId)} · ${h(loaderInfo(guest.loader).label)}` : ''}</div>
           </div>
-          <div class="lan-scan-head"><span class="top-note"><span class="dot"></span> ${state.lan.discoveryError ? '自动发现不可用' : '自动扫描中'}</span><span class="faint">${(state.lan.rooms || []).length} 个房间</span></div>
+          <div class="lan-scan-head"><span class="top-note"><span class="dot"></span> ${state.lan.discoveryError ? '自动发现不可用' : '自动扫描中'}</span><span class="faint">${(state.lan.rooms || []).length} 个房间</span><button class="btn btn-ghost btn-sm" data-action="lan-refresh-rooms" ${state.lan.scanning ? 'disabled' : ''}>${state.lan.scanning ? '<span class="spinner"></span>' : `${icon('refresh', 12)} 刷新`}</button></div>
           <div id="lan-rooms">${lanRoomsHtml()}</div>
           <div class="lan-manual">
             <label for="lan-manual-address">手动输入主机地址</label>
@@ -3419,6 +3435,7 @@ function renderLanRoute() {
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
   if (!state.lan.initialized) refreshLanState();
+  startLanScan();
   if (host && state.lan.worldsInstanceId !== host.id && !state.lan.worldsLoading) {
     loadLanWorlds();
   }
@@ -4481,6 +4498,13 @@ async function runAction(action, el, event) {
       case 'lan-refresh':
         await refreshLanState();
         if (state.route === 'lan') await loadLanWorlds();
+        break;
+      case 'lan-refresh-rooms':
+        if (state.lan.scanning) break;
+        state.lan.scanning = true;
+        paintLanRooms(true);
+        try { await refreshLanState(); toast('房间扫描已刷新', '', 'success', 1800); }
+        finally { state.lan.scanning = false; paintLanRooms(true); }
         break;
       case 'lan-refresh-worlds':
         await loadLanWorlds();
