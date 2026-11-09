@@ -76,6 +76,9 @@ const INVOKE_CHANNELS = new Set([
   'playit:openDashboard',
   'backups:latest',
   'backups:create',
+  'resources:latest',
+  'resources:scan',
+  'resources:openPath',
 ]);
 
 const EVENT_CHANNELS = new Set([
@@ -89,6 +92,8 @@ const EVENT_CHANNELS = new Set([
   'game:exit',
   'window:maximized',
   'app:closeRequest',
+  'resources:scan-progress',
+  'resources:scan-done',
 ]);
 
 contextBridge.exposeInMainWorld('oasis', {

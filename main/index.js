@@ -18,6 +18,7 @@ const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
 const { createPlayit } = require('./playit');
 const { createBackups } = require('./backup');
+const { createResourceScanner } = require('./resource-scan');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -69,6 +70,7 @@ let components = null;
 let tailscale = null;
 let playit = null;
 let backups = null;
+let resources = null;
 let lan = null;
 let tray = null;
 let quitting = false;
@@ -264,6 +266,7 @@ function buildBootstrap() {
     accounts: accounts.list(),
     library: store.libraryPublic(),
     backup: backups ? backups.latest() : null,
+    resources: resources ? resources.summary() : null,
     running: launcher ? launcher.status() : [],
     lan: lan ? lan.state() : null,
     paths: {
@@ -560,6 +563,31 @@ function registerIpc() {
   ipcMain.handle('playit:openDashboard', async () => playit.openDashboard());
   ipcMain.handle('backups:latest', async () => backups.latest());
   ipcMain.handle('backups:create', async (_event, instanceId) => backups.create(String(instanceId || '')));
+
+  ipcMain.handle('resources:latest', async () => resources.latest());
+  ipcMain.handle('resources:scan', async (_event, payload) => {
+    const reason = payload?.reason === 'auto' ? 'auto' : 'manual';
+    const result = await resources.scan(reason);
+    broadcast('resources:scan-done', result);
+    return result;
+  });
+  ipcMain.handle('resources:openPath', async (_event, payload) => {
+    const target = path.resolve(String(payload?.path || ''));
+    if (!resources.allowsPath(target)) throw new Error('该路径不在本次检索结果中');
+    if (!fs.existsSync(target)) throw new Error('路径已不存在，请重新检索');
+    if (payload?.reveal) {
+      shell.showItemInFolder(target);
+      return true;
+    }
+    const stat = fs.statSync(target);
+    if (stat.isDirectory()) {
+      const error = await shell.openPath(target);
+      if (error) throw new Error(error);
+    } else {
+      shell.showItemInFolder(target);
+    }
+    return true;
+  });
 }
 
 app.whenReady().then(() => {
@@ -611,6 +639,11 @@ app.whenReady().then(() => {
     openGuide: (kind, url) => guides.open(kind, url),
   });
   backups = createBackups({ store });
+  resources = createResourceScanner({
+    app,
+    store,
+    onProgress: (payload) => broadcast('resources:scan-progress', payload),
+  });
   playit = createPlayit({
     onChange: (payload) => broadcast('playit:changed', payload),
     openExternal: (url) => shell.openExternal(url),
