@@ -139,6 +139,8 @@ function App() {
       <div id="modal-root" />
       <div id="toast-root" className="toast-stack" aria-live="polite" />
       <div id="task-root" className="task-stack" aria-live="polite" />
+      <div id="scan-toast-root" className="scan-toast-stack" aria-live="polite" />
+      <div id="resource-scan-root" className="resource-scan-root" aria-live="polite" />
     </>
   );
 }

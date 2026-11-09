@@ -72,6 +72,28 @@ const state = {
     initialized: false,
     lastTunnelAddress: '',
   },
+  resourceScan: {
+    visible: false,
+    running: false,
+    done: false,
+    error: '',
+    percent: 0,
+    phase: 'discover',
+    phaseLabel: '准备检索',
+    stage: '正在准备检索本机资源…',
+    detail: '',
+    counts: { roots: 0, versions: 0, mods: 0 },
+    startedAt: 0,
+    scanToken: '',
+    auto: false,
+    hidden: false,
+    result: null,
+    resultKey: '',
+    prompts: [],
+    versionsPrompted: false,
+    modsPrompted: false,
+    modalTab: 'versions',
+  },
   javaDetect: null,
   sourceTest: null,
   lan: {
@@ -307,6 +329,475 @@ function toast(title, message = '', type = 'success', timeout = 4600) {
 
 function cleanError(err) {
   return String(err?.message || err || '未知错误').replace(/^Error invoking remote method '[^']+': Error: /, '');
+}
+
+// ==== LOCAL RESOURCE SCAN ====
+
+const RESOURCE_SCAN_PHASE_LABELS = {
+  discover: '定位游戏目录',
+  versions: '游戏包体',
+  mods: '模组文件',
+  finalize: '保存结果',
+  done: '检索完成',
+};
+
+function resourceScanResultFrom(value) {
+  if (!value || typeof value !== 'object') return null;
+  if (value.result && value.result.stats && Array.isArray(value.result.versions)) return value.result;
+  if (value.stats && Array.isArray(value.versions)) return value;
+  return null;
+}
+
+function resourceScanPanelVisible() {
+  const scan = state.resourceScan;
+  return Boolean(!scan.hidden && (scan.visible || scan.running));
+}
+
+function scanPanelHeight() {
+  const panel = $('#resource-scan-root .resource-scan-card');
+  return panel ? Math.ceil(panel.getBoundingClientRect().height) : 0;
+}
+
+function syncScanPanelOffset() {
+  const height = resourceScanPanelVisible() ? scanPanelHeight() : 0;
+  document.body.style.setProperty('--scan-panel-height', `${height}px`);
+}
+
+function renderScanPrompts() {
+  const root = $('#scan-toast-root');
+  if (!root) return;
+  const prompts = state.resourceScan.prompts || [];
+  root.innerHTML = prompts.map((prompt) => {
+    const iconName = prompt.type === 'error' ? 'alert' : prompt.type === 'info' ? 'info' : 'check';
+    const mainTag = prompt.clickable ? 'button' : 'div';
+    const mainAttrs = prompt.clickable
+      ? `type="button" data-action="scan-prompt-open" data-prompt="${h(prompt.id)}"`
+      : '';
+    return `<div class="scan-toast ${prompt.type || 'success'}" data-scan-prompt-id="${h(prompt.id)}">
+      <${mainTag} class="scan-toast-main" ${mainAttrs}>
+        <span class="scan-toast-icon">${icon(iconName, 15)}</span>
+        <span class="scan-toast-copy"><strong>${h(prompt.title)}</strong><p>${h(prompt.message || '')}</p></span>
+        ${prompt.clickable ? `<span class="scan-toast-arrow">${icon('chevronRight', 14)}</span>` : ''}
+      </${mainTag}>
+      <button class="scan-toast-close" type="button" data-action="scan-prompt-close" data-prompt="${h(prompt.id)}" aria-label="关闭提示">${icon('x', 12)}</button>
+    </div>`;
+  }).join('');
+  hydrateIcons(root);
+  syncScanPanelOffset();
+}
+
+function addScanPrompt({ id = '', title, message = '', type = 'success', clickable = false, persistent = false }) {
+  const scan = state.resourceScan;
+  const promptId = id || `scan_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  scan.prompts = scan.prompts.filter((item) => item.id !== promptId);
+  scan.prompts.push({ id: promptId, title, message, type, clickable, persistent, createdAt: Date.now() });
+  while (scan.prompts.length > 3) scan.prompts.shift();
+  renderScanPrompts();
+  if (!persistent) {
+    setTimeout(() => removeScanPrompt(promptId), 7000);
+  }
+  return promptId;
+}
+
+function removeScanPrompt(id) {
+  const scan = state.resourceScan;
+  const before = scan.prompts.length;
+  scan.prompts = scan.prompts.filter((item) => item.id !== id);
+  if (scan.prompts.length !== before) renderScanPrompts();
+}
+
+function renderResourceScan() {
+  const root = $('#resource-scan-root');
+  if (!root) return;
+  const scan = state.resourceScan;
+  const visible = resourceScanPanelVisible();
+  document.body.classList.toggle('scan-open', visible);
+  if (!visible) {
+    root.innerHTML = '';
+    syncScanPanelOffset();
+    return;
+  }
+
+  const percent = Math.max(0, Math.min(100, Math.round(Number(scan.percent) || 0)));
+  const counts = scan.counts || { roots: 0, versions: 0, mods: 0 };
+  const phaseLabel = scan.phaseLabel || RESOURCE_SCAN_PHASE_LABELS[scan.phase] || '检索中';
+  const stateClass = scan.error ? 'error' : scan.done ? 'done' : 'running';
+  const iconName = scan.error ? 'alert' : scan.done ? 'check' : 'search';
+  const detail = scan.detail ? String(scan.detail) : '';
+  const doneActions = scan.done ? `
+    <div class="resource-scan-actions">
+      <button class="btn btn-primary btn-sm" type="button" data-action="scan-view-result">${icon('layers', 13)} 查看检索结果</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="scan-close-panel">收起</button>
+    </div>` : '';
+  const errorActions = scan.error ? `
+    <div class="resource-scan-actions">
+      <button class="btn btn-secondary btn-sm" type="button" data-action="scan-rescan">${icon('refresh', 13)} 重新检索</button>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="scan-close-panel">收起</button>
+    </div>` : '';
+
+  root.innerHTML = `<section class="resource-scan-card ${stateClass}" role="status" aria-live="polite">
+    <div class="resource-scan-head">
+      <span class="resource-scan-icon">${icon(iconName, 16)}</span>
+      <div class="resource-scan-copy">
+        <div class="resource-scan-title">
+          <strong>${scan.error ? '本机资源检索未完成' : scan.done ? '本机资源检索完成' : '正在检索本机资源'}</strong>
+          <span class="resource-scan-phase">${h(phaseLabel)}</span>
+        </div>
+        <p class="resource-scan-stage">${h(scan.error || scan.stage || '正在准备…')}</p>
+      </div>
+      <button class="resource-scan-close" type="button" data-action="scan-close-panel" aria-label="收起检索弹窗">${icon('x', 14)}</button>
+    </div>
+    <div class="resource-scan-bar"><span style="width:${percent}%"></span></div>
+    <div class="resource-scan-meta">
+      <span class="resource-scan-percent">${percent}%</span>
+      <span>${icon('box', 11)} ${Number(counts.versions) || 0} 个包体</span>
+      <span>${icon('layers', 11)} ${Number(counts.mods) || 0} 个模组</span>
+      <span>${icon('folder', 11)} ${Number(counts.roots) || 0} 个目录</span>
+    </div>
+    ${detail ? `<div class="resource-scan-detail" title="${h(detail)}">${h(detail)}</div>` : ''}
+    ${doneActions}
+    ${errorActions}
+  </section>`;
+  hydrateIcons(root);
+  syncScanPanelOffset();
+}
+
+function handleResourceScanProgress(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  const scan = state.resourceScan;
+  if (!scan.scanToken) scan.scanToken = `${Date.now()}`;
+  if (!scan.hidden) scan.visible = true;
+  scan.running = payload.phase !== 'done';
+  scan.done = payload.phase === 'done';
+  scan.error = '';
+  scan.percent = Number(payload.percent) || 0;
+  scan.phase = payload.phase || 'discover';
+  scan.phaseLabel = payload.phaseLabel || RESOURCE_SCAN_PHASE_LABELS[scan.phase] || '检索中';
+  scan.stage = payload.stage || scan.stage;
+  scan.detail = payload.detail || '';
+  scan.counts = {
+    roots: Number(payload.counts?.roots) || 0,
+    versions: Number(payload.counts?.versions) || 0,
+    mods: Number(payload.counts?.mods) || 0,
+  };
+  if (payload.durationMs) scan.durationMs = Number(payload.durationMs) || 0;
+
+  if (scan.phase === 'mods' && !scan.versionsPrompted) {
+    scan.versionsPrompted = true;
+    if (scan.counts.versions > 0) {
+      addScanPrompt({
+        id: `${scan.scanToken}-versions`,
+        title: '游戏包体检索成功',
+        message: `已发现 ${scan.counts.versions} 个游戏包体，继续检索模组…`,
+        type: 'success',
+      });
+    }
+  }
+  if (scan.phase === 'mods' && !scan.modsPrompted && scan.counts.mods > 0) {
+    scan.modsPrompted = true;
+    addScanPrompt({
+      id: `${scan.scanToken}-mods`,
+      title: '发现本机模组',
+      message: `已读取 ${scan.counts.mods} 个模组，仍在继续检索…`,
+      type: 'success',
+    });
+  }
+  renderResourceScan();
+}
+
+function finishResourceScan(value) {
+  const result = resourceScanResultFrom(value);
+  if (!result) return;
+  const key = String(result.scannedAt || '');
+  if (key && state.resourceScan.resultKey === key) return;
+  const scan = state.resourceScan;
+  scan.result = result;
+  scan.resultKey = key;
+  if (!scan.scanToken) scan.scanToken = `${Date.now()}`;
+  scan.running = false;
+  scan.done = true;
+  if (!scan.hidden) scan.visible = true;
+  scan.error = '';
+  scan.percent = 100;
+  scan.phase = 'done';
+  scan.phaseLabel = '检索完成';
+  scan.counts = {
+    roots: Number(result.stats?.roots) || 0,
+    versions: Number(result.stats?.versions) || 0,
+    mods: Number(result.stats?.mods) || 0,
+  };
+  scan.stage = `共发现 ${scan.counts.versions} 个游戏包体、${scan.counts.mods} 个模组`;
+  scan.detail = result.storagePath || '';
+  scan.durationMs = Number(result.durationMs) || 0;
+
+  if (state.boot?.resources) {
+    state.boot.resources.lastScan = {
+      scannedAt: result.scannedAt,
+      durationMs: result.durationMs,
+      appVersion: result.appVersion,
+      reason: result.reason,
+      stats: result.stats,
+    };
+    state.boot.resources.autoScanDue = false;
+    state.boot.resources.storagePath = result.storagePath || state.boot.resources.storagePath;
+  }
+
+  addScanPrompt({
+    id: `${scan.scanToken}-final`,
+    title: '本机资源检索完成',
+    message: `发现 ${scan.counts.versions} 个游戏包体、${scan.counts.mods} 个模组。点击查看本次检索详情。`,
+    type: 'success',
+    clickable: true,
+    persistent: true,
+  });
+  renderResourceScan();
+  if (state.route === 'settings' && !state.modal) renderSettingsRoute();
+}
+
+function failResourceScan(error) {
+  const scan = state.resourceScan;
+  scan.running = false;
+  scan.done = false;
+  scan.visible = true;
+  scan.error = cleanError(error);
+  scan.stage = '检索中断，请检查目录权限后重试';
+  renderResourceScan();
+  addScanPrompt({
+    id: 'resource-scan-error',
+    title: '本机资源检索未完成',
+    message: scan.error,
+    type: 'error',
+    persistent: true,
+  });
+}
+
+async function startResourceScan({ auto = false } = {}) {
+  if (!api) return;
+  if (state.resourceScan.running) {
+    state.resourceScan.visible = true;
+    renderResourceScan();
+    return;
+  }
+  const previous = state.resourceScan.result;
+  state.resourceScan = {
+    ...state.resourceScan,
+    visible: true,
+    hidden: false,
+    running: true,
+    done: false,
+    error: '',
+    percent: 0,
+    phase: 'discover',
+    phaseLabel: '定位游戏目录',
+    stage: '正在查找本机 Minecraft 目录…',
+    detail: '',
+    counts: { roots: 0, versions: 0, mods: 0 },
+    startedAt: Date.now(),
+    scanToken: `${Date.now()}`,
+    auto,
+    result: previous,
+    resultKey: '',
+    prompts: [],
+    versionsPrompted: false,
+    modsPrompted: false,
+  };
+  renderScanPrompts();
+  renderResourceScan();
+  try {
+    const response = await api.invoke('resources:scan', { reason: auto ? 'auto' : 'manual' });
+    if (response?.running) {
+      state.resourceScan.stage = '已有一次检索正在进行，请稍候…';
+      renderResourceScan();
+      return;
+    }
+    const result = resourceScanResultFrom(response);
+    if (result) {
+      finishResourceScan(result);
+      return;
+    }
+    failResourceScan(new Error('检索没有返回结果'));
+  } catch (err) {
+    failResourceScan(err);
+  }
+}
+
+function maybeAutoScanResources() {
+  const info = state.boot?.resources;
+  if (!info?.autoScanDue) return;
+  let attempts = 0;
+  const attempt = () => {
+    if (!state.boot || state.resourceScan.running) return;
+    // 首次启动的账号弹窗优先，避免检索弹窗被遮住；最多等待约 20 秒。
+    if (state.modal && attempts < 10) {
+      attempts += 1;
+      setTimeout(attempt, 2000);
+      return;
+    }
+    startResourceScan({ auto: true });
+  };
+  setTimeout(attempt, 1800);
+}
+
+function resourceScanSummaryText() {
+  const scan = state.resourceScan;
+  if (scan.running) {
+    return `正在检索：${scan.phaseLabel || '准备中'} ${Math.round(Number(scan.percent) || 0)}%`;
+  }
+  const last = state.boot?.resources?.lastScan;
+  if (!last?.scannedAt) {
+    return '首次安装或更新后会自动检索本机已下载的游戏包体和模组，结果只保存在本机。';
+  }
+  const versions = Number(last.stats?.versions) || 0;
+  const mods = Number(last.stats?.mods) || 0;
+  return `上次检索：${formatDate(last.scannedAt, true)} · ${versions} 个游戏包体 · ${mods} 个模组`;
+}
+
+function resourceScanLoaderLabel(loader) {
+  return loaderInfo(loader || 'vanilla').label;
+}
+
+function resourceScanGrouped(items, keyName) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = String(item[keyName] || '');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return groups;
+}
+
+function resourceScanRootHeader(root, count, bytes) {
+  return `<div class="scan-result-group-head">
+    <span class="scan-result-root-icon">${icon('folder', 14)}</span>
+    <div class="scan-result-root-copy">
+      <strong>${h(root?.label || root?.path || '游戏目录')}</strong>
+      <p title="${h(root?.path || '')}">${h(root?.path || '')}</p>
+    </div>
+    <span class="scan-result-root-count">${count} 个 · ${formatCacheSize(bytes || 0)}</span>
+    <button class="icon-btn" type="button" title="打开目录" data-action="scan-open-path" data-path="${h(root?.path || '')}">${icon('folder', 14)}</button>
+  </div>`;
+}
+
+function resourceScanModalBody(result, tab = 'versions') {
+  const versions = Array.isArray(result.versions) ? result.versions : [];
+  const mods = Array.isArray(result.mods) ? result.mods : [];
+  const roots = Array.isArray(result.roots) ? result.roots : [];
+  const stats = result.stats || {};
+  const rootMap = new Map(roots.map((root) => [root.path, root]));
+  const active = ['versions', 'mods', 'roots'].includes(tab) ? tab : 'versions';
+  const tabs = [
+    ['versions', `游戏包体 ${versions.length}`],
+    ['mods', `模组 ${mods.length}`],
+    ['roots', `检索目录 ${roots.length}`],
+  ];
+
+  let listHtml = '';
+  const limit = 240;
+  if (active === 'versions') {
+    if (!versions.length) {
+      listHtml = `<div class="scan-empty">${icon('box', 26)}<strong>没有发现游戏包体</strong><p>可以回到版本库下载原版或整合包。</p></div>`;
+    } else {
+      const groups = resourceScanGrouped(versions.slice(0, limit), 'gameRoot');
+      listHtml = [...groups.entries()].map(([rootPath, rows]) => {
+        const root = rootMap.get(rootPath) || { path: rootPath, label: rows[0]?.rootLabel || '游戏目录' };
+        const bytes = rows.reduce((sum, item) => sum + (Number(item.size) || 0), 0);
+        const items = rows.map((item) => `<div class="scan-result-row">
+          <span class="scan-result-item-icon">${icon('box', 15)}</span>
+          <div class="scan-result-item-main">
+            <div class="scan-result-item-title">
+              <strong>${h(item.versionId)}</strong>
+              <span class="scan-badge loader">${h(resourceScanLoaderLabel(item.loader))}</span>
+              <span class="scan-badge">${h(item.typeLabel || '版本')}</span>
+            </div>
+            <p>${h(item.source || '')}${item.inheritsFrom ? ` · 基于 ${h(item.inheritsFrom)}` : ''} · ${Number(item.size) ? formatCacheSize(item.size) : '继承版本'}${item.modsCount ? ` · ${item.modsCount} 个模组` : ''}</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" data-action="scan-open-path" data-path="${h(item.path)}">${icon('folder', 12)} 打开</button>
+        </div>`).join('');
+        return `<section class="scan-result-group">${resourceScanRootHeader(root, rows.length, bytes)}${items}</section>`;
+      }).join('');
+    }
+  } else if (active === 'mods') {
+    if (!mods.length) {
+      listHtml = `<div class="scan-empty">${icon('layers', 26)}<strong>没有发现模组</strong><p>整合包或 .minecraft/mods 中的 .jar 会显示在这里。</p></div>`;
+    } else {
+      const groups = resourceScanGrouped(mods.slice(0, limit), 'dir');
+      listHtml = [...groups.entries()].map(([dirPath, rows]) => {
+        const root = rootMap.get(rows[0]?.gameRoot) || { path: rows[0]?.gameRoot || dirPath, label: rows[0]?.rootLabel || '模组目录' };
+        const bytes = rows.reduce((sum, item) => sum + (Number(item.size) || 0), 0);
+        const items = rows.map((item) => `<div class="scan-result-row">
+          <span class="scan-result-item-icon mod">${icon('layers', 15)}</span>
+          <div class="scan-result-item-main">
+            <div class="scan-result-item-title">
+              <strong>${h(item.title || item.filename)}</strong>
+              ${item.version ? `<span class="scan-badge">${h(item.version)}</span>` : ''}
+              ${item.enabled ? '' : '<span class="scan-badge off">已禁用</span>'}
+            </div>
+            <p title="${h(item.path)}">${h(item.filename)} · ${formatCacheSize(item.size)}${item.modId ? ` · ${h(item.modId)}` : ''}</p>
+          </div>
+          <button class="btn btn-ghost btn-sm" type="button" data-action="scan-open-path" data-path="${h(item.path)}" data-reveal="1">${icon('folder', 12)} 定位</button>
+        </div>`).join('');
+        return `<section class="scan-result-group">${resourceScanRootHeader(root, rows.length, bytes)}${items}</section>`;
+      }).join('');
+    }
+  } else if (!roots.length) {
+    listHtml = `<div class="scan-empty">${icon('folder', 26)}<strong>没有发现游戏目录</strong><p>首次安装后可以在设置中手动重新检索。</p></div>`;
+  } else {
+    listHtml = roots.map((root) => `<div class="scan-result-row">
+      <span class="scan-result-item-icon">${icon('folder', 15)}</span>
+      <div class="scan-result-item-main">
+        <div class="scan-result-item-title"><strong>${h(root.label || '游戏目录')}</strong><span class="scan-badge">${h(root.source || '本地')}</span></div>
+        <p title="${h(root.path)}">${h(root.path)}</p>
+        <p>${Number(root.versions) || 0} 个包体 · ${Number(root.mods) || 0} 个模组 · ${formatCacheSize((Number(root.versionBytes) || 0) + (Number(root.modBytes) || 0))}</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" data-action="scan-open-path" data-path="${h(root.path)}">${icon('folder', 12)} 打开</button>
+    </div>`).join('');
+  }
+
+  const truncated = active === 'versions' ? versions.length > limit : active === 'mods' ? mods.length > limit : false;
+  return `<div class="scan-result-summary">
+    <div class="scan-summary-tile"><span>游戏包体</span><strong>${Number(stats.versions) || versions.length}</strong><small>个版本</small></div>
+    <div class="scan-summary-tile"><span>模组</span><strong>${Number(stats.mods) || mods.length}</strong><small>个 .jar</small></div>
+    <div class="scan-summary-tile"><span>游戏目录</span><strong>${Number(stats.roots) || roots.length}</strong><small>处位置</small></div>
+    <div class="scan-summary-tile"><span>检索用时</span><strong>${((Number(result.durationMs) || 0) / 1000).toFixed(1)}</strong><small>秒</small></div>
+  </div>
+  <div class="scan-result-note">${icon('info', 14)}<span>结果已保存在启动器数据目录，不会移动、修改或上传本机文件。${result.scannedAt ? ` 检索时间：${h(formatDate(result.scannedAt, true))}。` : ''}${result.stats?.discoveryTimedOut ? ' 磁盘目录过多，本次只检索了部分位置。' : ''}</span></div>
+  <div class="scan-result-tabs">${tabs.map(([key, label]) => `<button class="scan-result-tab ${active === key ? 'active' : ''}" type="button" data-action="scan-tab" data-tab="${key}">${h(label)}</button>`).join('')}</div>
+  <div class="scan-result-list">${listHtml}</div>
+  ${truncated ? `<p class="scan-result-more">列表较长，仅显示前 ${limit} 条；完整结果已保存到本机。</p>` : ''}
+  <p class="scan-result-path">${icon('save', 12)} <span>${h(result.storagePath || '')}</span></p>`;
+}
+
+function openResourceScanModal(result, tab = 'versions') {
+  const data = resourceScanResultFrom(result);
+  if (!data) return;
+  state.resourceScan.result = data;
+  state.resourceScan.modalTab = tab;
+  openModal({
+    title: '本机资源检索结果',
+    subtitle: '本次只读取本地目录与文件信息，不会移动、修改或上传任何资源。',
+    wide: true,
+    body: resourceScanModalBody(data, tab),
+    footer: `<button class="btn btn-ghost foot-left" type="button" data-action="scan-open-storage">${icon('folder', 13)} 存储位置</button>
+      <button class="btn btn-secondary" type="button" data-action="scan-rescan">${icon('refresh', 13)} 重新检索</button>
+      <button class="btn btn-primary" type="button" data-action="scan-close-modal">关闭</button>`,
+  });
+}
+
+async function viewResourceScanResult() {
+  let result = state.resourceScan.result;
+  if (!result && api) {
+    try {
+      result = await api.invoke('resources:latest');
+    } catch (err) {
+      toast('读取检索结果失败', cleanError(err), 'error');
+      return;
+    }
+  }
+  if (!result?.scannedAt) {
+    toast('还没有检索结果', '点击“检索游戏包体资源”先扫描一次本机资源', 'info');
+    return;
+  }
+  openResourceScanModal(result);
 }
 
 function setText(el, value) {
@@ -734,6 +1225,8 @@ function bindGlobalEvents() {
     api.on('playit:changed', () => {
       if (state.route === 'lan' && !state.playit.loading) refreshPlayit();
     });
+    api.on('resources:scan-progress', handleResourceScanProgress);
+    api.on('resources:scan-done', (payload) => finishResourceScan(payload));
     api.on('lan:update', (payload) => {
       const previous = state.lan.host?.status;
       const previousActive = Boolean(state.lan.host?.active);
@@ -872,6 +1365,7 @@ async function init() {
     if (!state.boot.accounts.accounts.length) {
       setTimeout(() => openAccountModal({ firstRun: true }), 650);
     }
+    maybeAutoScanResources();
     ensureVersions().catch(() => {});
   } catch (err) {
     state.bootError = err.message || String(err);
@@ -3729,6 +4223,13 @@ function renderSettingsRoute() {
           <div class="setting-info"><strong>缓存</strong><p id="cache-summary">正在计算缓存大小…</p><p id="cache-detail" class="faint" style="font-size:9px;margin-top:3px"></p></div>
           <div class="setting-control"><button class="btn btn-secondary btn-sm" data-action="clear-cache">${icon('trash', 13)} 清除当前缓存</button></div>
         </div>
+        <div class="setting-row">
+          <div class="setting-info"><strong>本机游戏资源</strong><p id="resource-scan-summary">${h(resourceScanSummaryText())}</p></div>
+          <div class="setting-control">
+            <button class="btn btn-secondary btn-sm" data-action="scan-resources" ${state.resourceScan.running ? 'disabled' : ''}>${state.resourceScan.running ? '<span class="spinner light"></span> 检索中' : icon('search', 13) + ' 检索游戏包体资源'}</button>
+            ${state.boot.resources?.lastScan ? `<button class="btn btn-ghost btn-sm" data-action="view-resource-scan">${icon('layers', 13)} 查看结果</button>` : ''}
+          </div>
+        </div>
       </section>
 
       <section class="panel settings-panel">
@@ -4772,6 +5273,52 @@ async function runAction(action, el, event) {
           if (input) input.value = '';
         }
         await loadModsSearch(false);
+        break;
+      case 'scan-resources':
+        await startResourceScan();
+        break;
+      case 'view-resource-scan':
+      case 'scan-view-result':
+        await viewResourceScanResult();
+        break;
+      case 'scan-prompt-open':
+        removeScanPrompt(el.dataset.prompt || '');
+        await viewResourceScanResult();
+        break;
+      case 'scan-prompt-close':
+        removeScanPrompt(el.dataset.prompt || '');
+        break;
+      case 'scan-close-panel':
+        state.resourceScan.visible = false;
+        state.resourceScan.hidden = true;
+        renderResourceScan();
+        break;
+      case 'scan-rescan':
+        closeModal();
+        await startResourceScan();
+        break;
+      case 'scan-tab':
+        state.resourceScan.modalTab = ['versions', 'mods', 'roots'].includes(el.dataset.tab) ? el.dataset.tab : 'versions';
+        if (state.resourceScan.result) {
+          setModalBody(resourceScanModalBody(state.resourceScan.result, state.resourceScan.modalTab));
+        }
+        break;
+      case 'scan-open-storage': {
+        const storage = state.resourceScan.result?.storagePath || state.boot.resources?.storagePath || '';
+        if (!storage) break;
+        await api.invoke('app:openPath', storage.replace(/[\\/][^\\/]+$/, ''));
+        break;
+      }
+      case 'scan-open-path':
+        if (el.dataset.path) {
+          await api.invoke('resources:openPath', {
+            path: el.dataset.path,
+            reveal: el.dataset.reveal === '1',
+          });
+        }
+        break;
+      case 'scan-close-modal':
+        closeModal();
         break;
       case 'settings-pick-dir':
         await chooseGameDir();
