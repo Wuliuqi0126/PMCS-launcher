@@ -118,6 +118,13 @@ const state = {
     roomSignature: '',
     hostSignature: '',
   },
+  offlineLan: {
+    status: null,
+    loading: false,
+    busy: '',
+    error: '',
+    serverResult: null,
+  },
   logModal: null,
   modal: null,
   bootError: '',
@@ -3114,6 +3121,157 @@ function lanHostStatusHtml() {
   </div>`;
 }
 
+function offlineLanHostInstance() {
+  return getLanHostInstance() || currentTargetInstance();
+}
+
+function offlineLanStatusChip(status) {
+  if (!status) return '<span class="chip">读取中</span>';
+  if (status.installed) return '<span class="chip green">已安装</span>';
+  if (!status.supported) return '<span class="chip amber">需要 Fabric</span>';
+  return '<span class="chip">未安装</span>';
+}
+
+function offlineLanModalBody() {
+  const instance = offlineLanHostInstance();
+  const data = state.offlineLan;
+  const status = data.status;
+  if (!instance) {
+    return `<div class="notice warn">${icon('alert', 16)}<span>还没有可用的主机实例。请先创建或选择一个实例，再回来修复联机验证。</span></div>`;
+  }
+  if (data.loading && !status) {
+    return `<div class="offline-lan-loading"><span class="spinner light"></span> 正在读取主机实例的模组状态…</div>`;
+  }
+  const installed = Boolean(status?.installed);
+  const supported = Boolean(status?.supported);
+  const server = data.serverResult;
+  return `<div class="offline-lan-modal">
+    <div class="offline-lan-head">
+      <span class="offline-lan-head-icon">${icon('shield', 18)}</span>
+      <div><strong>主机：${h(instance.name)}</strong><p>${h(instance.versionId)} · ${h(loaderInfo(instance.loader).label)} · 客机提示“无效会话”时使用</p></div>
+      ${offlineLanStatusChip(status)}
+    </div>
+    <div class="notice info">${icon('info', 16)}<span>这个提示说明网络已经连通，但主机服务器在验证正版会话。客机使用离线账号时，需要主机侧关闭正版验证。</span></div>
+    ${data.error ? `<div class="notice error">${icon('alert', 16)}<span>${h(data.error)}</span></div>` : ''}
+
+    <section class="offline-lan-option">
+      <div class="offline-lan-option-head">
+        <span class="offline-lan-number">01</span>
+        <div><strong>主机在游戏内「对局域网开放」</strong><p>给主机实例安装 OfflineLAN，在开放局域网时关闭在线验证。客机不需要安装。</p></div>
+      </div>
+      ${!supported ? `<div class="notice warn">${icon('alert', 15)}<span>当前实例是 ${h(loaderInfo(instance.loader).label)}，游戏内局域网修复目前只支持 Fabric。可以新建一个 Fabric 实例，或使用下面的独立服务端方式。</span></div>` : installed ? `
+        <div class="offline-lan-installed">${icon('check', 15)} <strong>OfflineLAN 已安装</strong>${status?.fabricApi ? ' · Fabric API 已就绪' : ''}${status?.versionNumber ? ` · v${h(status.versionNumber)}` : ''}</div>
+        <ol class="offline-lan-steps">
+          <li>完全退出主机游戏，重新启动实例。</li>
+          <li>进入世界后按 <b>Esc</b> → <b>对局域网开放</b>。</li>
+          <li>在 OfflineLAN 的选项里确认关闭正版验证，再点“创建局域网世界”。</li>
+          <li>客机重新加入；客机可以继续使用离线账号。</li>
+        </ol>` : `
+        <div class="offline-lan-actions">
+          <button class="btn btn-primary btn-sm" data-action="offline-lan-install" ${data.busy ? 'disabled' : ''}>${data.busy === 'install' ? '<span class="spinner"></span> 正在安装' : `${icon('download', 13)} 安装离线局域网模组`}</button>
+          <button class="btn btn-ghost btn-sm" data-action="offline-lan-refresh">${icon('refresh', 12)} 刷新状态</button>
+        </div>
+        <p class="offline-lan-hint">会安装 OfflineLAN 和它需要的 Fabric API；安装完成后需要重启游戏。模组只对主机生效。</p>`}
+    </section>
+
+    <section class="offline-lan-option">
+      <div class="offline-lan-option-head">
+        <span class="offline-lan-number">02</span>
+        <div><strong>主机使用独立服务端</strong><p>直接修改服务端的 <code>server.properties</code>，关闭正版验证和强制安全档案。</p></div>
+      </div>
+      <div class="offline-lan-actions">
+        <button class="btn btn-secondary btn-sm" data-action="offline-lan-patch-server" ${data.busy ? 'disabled' : ''}>${data.busy === 'patch' ? '<span class="spinner"></span> 正在修改' : `${icon('file', 13)} 选择服务端目录并关闭验证`}</button>
+      </div>
+      ${server ? `<div class="offline-lan-result">
+        <strong>${server.changed ? '已修改 server.properties' : 'server.properties 已经是离线配置'}</strong>
+        <p><code>online-mode=false</code> · <code>enforce-secure-profile=false</code></p>
+        <p class="offline-lan-path" title="${h(server.file)}">${h(server.file)}</p>
+        <p class="offline-lan-path" title="${h(server.backup)}">原文件备份：${h(server.backup)}</p>
+        <p>请完全停止服务端再重新启动；修改 <code>server.properties</code> 后不能用 <code>/reload</code> 生效。</p>
+      </div>` : `<p class="offline-lan-hint">选择包含 <code>server.properties</code> 和 <code>server.jar</code> 的服务端根目录。启动器会先备份原文件，再写入离线配置。</p>`}
+    </section>
+
+    <div class="notice warn">${icon('alert', 16)}<span>关闭正版验证后，知道地址的人可以用任意用户名进入。请只和熟人联机，不要长期把服务端暴露到公网。</span></div>
+  </div>`;
+}
+
+async function refreshOfflineLanStatus(instanceId = '') {
+  const instance = instanceId ? getInstance(instanceId) : offlineLanHostInstance();
+  if (!instance) {
+    state.offlineLan.error = '还没有可用的主机实例';
+    setModalBody(offlineLanModalBody());
+    return;
+  }
+  state.offlineLan.loading = true;
+  state.offlineLan.error = '';
+  setModalBody(offlineLanModalBody());
+  try {
+    state.offlineLan.status = await api.invoke('offlineLan:status', instance.id);
+  } catch (err) {
+    state.offlineLan.error = cleanError(err);
+  } finally {
+    state.offlineLan.loading = false;
+    setModalBody(offlineLanModalBody());
+  }
+}
+
+async function openOfflineLanFix() {
+  const instance = offlineLanHostInstance();
+  if (!instance) {
+    toast('还没有可用实例', '先创建或选择一个实例，再修复联机验证', 'info');
+    return;
+  }
+  state.offlineLan = { status: null, loading: true, busy: '', error: '', serverResult: null };
+  openModal({
+    title: '关闭主机正版验证',
+    subtitle: '修复客机加入时提示“登录失败：无效会话”',
+    wide: true,
+    body: offlineLanModalBody(),
+    footer: `<button class="btn btn-ghost foot-left" data-action="offline-lan-refresh">${icon('refresh', 13)} 刷新状态</button><button class="btn btn-primary" data-action="scan-close-modal">关闭</button>`,
+  });
+  await refreshOfflineLanStatus(instance.id);
+}
+
+async function installOfflineLan() {
+  const instance = offlineLanHostInstance();
+  if (!instance || state.offlineLan.busy) return;
+  state.offlineLan.busy = 'install';
+  state.offlineLan.error = '';
+  setModalBody(offlineLanModalBody());
+  try {
+    state.offlineLan.status = await api.invoke('offlineLan:install', instance.id);
+    toast('离线局域网模组已安装', '重启主机游戏，在“对局域网开放”界面关闭正版验证后再创建房间', 'success', 12000);
+  } catch (err) {
+    state.offlineLan.error = cleanError(err);
+    toast('安装离线局域网模组失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.offlineLan.busy = '';
+    setModalBody(offlineLanModalBody());
+  }
+}
+
+async function patchOfflineLanServer() {
+  if (state.offlineLan.busy) return;
+  const folder = await api.invoke('app:pickDirectory', {
+    title: '选择服务端根目录（包含 server.properties）',
+    defaultPath: state.boot?.config?.gameDir || '',
+  });
+  if (!folder) return;
+  state.offlineLan.busy = 'patch';
+  state.offlineLan.error = '';
+  setModalBody(offlineLanModalBody());
+  try {
+    state.offlineLan.serverResult = await api.invoke('offlineLan:patchServer', folder);
+    toast('服务端正版验证已关闭', '请停止并重新启动服务端，修改才会生效', 'success', 12000);
+  } catch (err) {
+    state.offlineLan.error = cleanError(err);
+    toast('修改服务端配置失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.offlineLan.busy = '';
+    setModalBody(offlineLanModalBody());
+  }
+}
+
 function lanRoomCompatible(room) {
   const guest = getLanGuestInstance();
   if (!guest || guest.status !== 'ready') return false;
@@ -3592,6 +3750,7 @@ function openTailscaleGuide() {
           <div><strong>Tailscale 显示待登录</strong><p>点击「登录 Tailscale」，先在浏览器完成授权，再刷新状态。</p></div>
           <div><strong>看不到 100.x 地址</strong><p>确认 Tailscale 已连接；Windows 防火墙允许 Tailscale 和 Java 专用网络访问。</p></div>
           <div><strong>客机连接超时</strong><p>确认主机世界已开放、端口正确、双方在同一个 tailnet；主机保持在线。</p></div>
+          <div><strong>客机提示“无效会话”</strong><p>网络已经通了，但主机服务器在验证正版。点击“创建房间”下方的“关闭主机正版验证”，或在服务端把 online-mode 改为 false。</p></div>
           <div><strong>版本不匹配</strong><p>Minecraft 版本、加载器和模组仍需一致；Tailscale 只负责网络连通。</p></div>
         </div>
       </section>
@@ -3962,6 +4121,7 @@ function renderLanRoute() {
             <li><span>3</span>选择游戏模式，点击 <b>创建局域网世界</b>。</li>
             <li><span>4</span>启动器会自动读取端口并广播房间，等待客机加入。</li>
           </ol>
+          <button class="lan-offline-fix" data-action="offline-lan-fix">${icon('shield', 14)} 客机提示“无效会话”？关闭主机正版验证</button>
           <button class="lan-guide-link" data-action="lan-guide">${icon('info', 13)} 第一次联机？查看完整步骤和防火墙排查</button>
           <div id="lan-host-status">${lanHostStatusHtml()}</div>
           <div class="notice info">${icon('info', 16)}<span>主机和客机必须使用相同的 Minecraft 版本与加载器（模组也需一致）。如果客机无法连接，请在 Windows 防火墙中允许 Java / Minecraft 的专用网络访问。</span></div>
@@ -5038,6 +5198,18 @@ async function runAction(action, el, event) {
         break;
       case 'lan-guide-copy':
         await copyLanGuide();
+        break;
+      case 'offline-lan-fix':
+        await openOfflineLanFix();
+        break;
+      case 'offline-lan-install':
+        await installOfflineLan();
+        break;
+      case 'offline-lan-patch-server':
+        await patchOfflineLanServer();
+        break;
+      case 'offline-lan-refresh':
+        await refreshOfflineLanStatus();
         break;
       case 'tailscale-install':
         await installTailscale();

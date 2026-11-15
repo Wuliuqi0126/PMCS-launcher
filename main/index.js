@@ -19,6 +19,7 @@ const { createTailscale } = require('./tailscale');
 const { createPlayit } = require('./playit');
 const { createBackups } = require('./backup');
 const { createResourceScanner } = require('./resource-scan');
+const { createOfflineLan } = require('./offline-lan');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -71,6 +72,7 @@ let tailscale = null;
 let playit = null;
 let backups = null;
 let resources = null;
+let offlineLan = null;
 let lan = null;
 let tray = null;
 let quitting = false;
@@ -565,6 +567,9 @@ function registerIpc() {
   ipcMain.handle('backups:create', async (_event, instanceId) => backups.create(String(instanceId || '')));
 
   ipcMain.handle('resources:latest', async () => resources.latest());
+  ipcMain.handle('offlineLan:status', async (_event, instanceId) => offlineLan.status(String(instanceId || '')));
+  ipcMain.handle('offlineLan:install', async (_event, instanceId) => offlineLan.install(String(instanceId || '')));
+  ipcMain.handle('offlineLan:patchServer', async (_event, folder) => offlineLan.patchServerProperties(String(folder || '')));
   ipcMain.handle('resources:scan', async (_event, payload) => {
     const reason = payload?.reason === 'auto' ? 'auto' : 'manual';
     const result = await resources.scan(reason);
@@ -627,6 +632,7 @@ app.whenReady().then(() => {
   });
   lan.start();
   mods = createMods({ store, tasks });
+  offlineLan = createOfflineLan({ store, mods });
   skins = createSkins({ store, getWindow: () => mainWindow });
   cacheManager = createCache({ store, app });
   guides = createGuides({ app, openExternal: (url) => shell.openExternal(url) });
