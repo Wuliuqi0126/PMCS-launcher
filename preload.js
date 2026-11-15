@@ -79,6 +79,9 @@ const INVOKE_CHANNELS = new Set([
   'resources:latest',
   'resources:scan',
   'resources:openPath',
+  'offlineLan:status',
+  'offlineLan:install',
+  'offlineLan:patchServer',
 ]);
 
 const EVENT_CHANNELS = new Set([
