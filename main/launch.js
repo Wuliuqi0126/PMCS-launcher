@@ -216,7 +216,7 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
         task.update({ stage: '补全运行依赖', percent: 15, detail: `${missing.length} 个库文件${assetsIncomplete ? ' · 资源不完整' : ''}` });
         await ensureRuntimeFiles(store, merged, task, store.instanceDir(instance));
       }
-      await ensureNatives(store, merged);
+      await ensureNatives(store, merged, task);
       const loggingPath = await ensureLoggingConfig(store, merged, task);
 
       let languageInfo = null;

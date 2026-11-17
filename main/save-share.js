@@ -478,7 +478,7 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
         const out = fs.createWriteStream(file);
         res.on('data', (chunk) => {
           received += chunk.length;
-          if (total) task.update({ percent: Math.min(95, 10 + Math.floor((received / total) * 80)), detail: `${(received / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB` });
+          if (total) task.update({ percent: Math.min(95, 10 + Math.floor((received / total) * 80)), detail: `${(received / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB`, downloaded: received, total });
         });
         res.on('error', reject);
         out.on('error', reject);
