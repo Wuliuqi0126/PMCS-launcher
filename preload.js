@@ -82,6 +82,11 @@ const INVOKE_CHANNELS = new Set([
   'offlineLan:status',
   'offlineLan:install',
   'offlineLan:patchServer',
+  'saves:list',
+  'saves:state',
+  'saves:shareStart',
+  'saves:shareStop',
+  'saves:download',
 ]);
 
 const EVENT_CHANNELS = new Set([
@@ -97,6 +102,7 @@ const EVENT_CHANNELS = new Set([
   'app:closeRequest',
   'resources:scan-progress',
   'resources:scan-done',
+  'saves:changed',
 ]);
 
 contextBridge.exposeInMainWorld('oasis', {
