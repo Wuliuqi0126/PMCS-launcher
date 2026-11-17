@@ -233,7 +233,7 @@ async function runNeoForgeInstaller(store, javaInfo, gameVersion, loaderVersion,
   if (!exists(profilesFile)) {
     const now = new Date().toISOString();
     writeJson(profilesFile, {
-      profiles: { ol: { name: 'OL我的世界启动器', type: 'custom', created: now, lastUsed: now, lastVersionId: gameVersion, icon: 'Grass' } },
+      profiles: { ol: { name: 'PMCS launcher', type: 'custom', created: now, lastUsed: now, lastVersionId: gameVersion, icon: 'Grass' } },
       settings: { enableSnapshots: false, enableAdvanced: false },
       version: 3,
     });
@@ -326,7 +326,7 @@ async function runForgeInstaller(store, javaInfo, gameVersion, loaderVersion, ta
     writeJson(profilesFile, {
       profiles: {
         ol: {
-          name: 'OL我的世界启动器',
+          name: 'PMCS launcher',
           type: 'custom',
           created: now,
           lastUsed: now,

@@ -270,7 +270,7 @@ function createPlayit({ onChange, openExternal, openGuide }) {
     lastError = '';
     const code = await runDesktop(['claim', 'generate'], 15000);
     if (!code || !/^[a-zA-Z0-9]+$/.test(code)) throw new Error('无法生成 playit 登录码');
-    const url = await runDesktop(['claim', 'url', code, '--name', 'OL启动器', '--type', 'self-managed'], 15000);
+    const url = await runDesktop(['claim', 'url', code, '--name', 'PMCS launcher', '--type', 'self-managed'], 15000);
     if (!/^https:\/\/playit\.gg\/claim\//i.test(url)) throw new Error('无法生成 playit 登录链接');
 
     claimInfo = { code, url };

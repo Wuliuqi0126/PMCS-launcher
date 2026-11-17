@@ -1,6 +1,6 @@
-# OL启动器 · OL Launcher
+# PMCS launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.9.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.10.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [OL启动器 1.9.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.9.0/OLLauncher-1.9.0-Setup.exe)
-- [OL启动器 1.9.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.9.0/OLLauncher-1.9.0-Portable.zip)
+- [PMCS launcher 1.10.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.10.0/PMCSLauncher-1.10.0-Setup.exe)
+- [PMCS launcher 1.10.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.10.0/PMCSLauncher-1.10.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -30,7 +30,7 @@
 - **安装即配置联机防火墙**：安装程序自动添加启动器程序、UDP 24454 和 Java 局域网 TCP 端口的专用网络防火墙规则；卸载时自动移除。
 - **本机游戏资源检索**：首次安装或更新后自动检索设备上已下载的游戏包体与模组，按“游戏包体 → 模组”顺序在右下角显示实时进度；分阶段成功提示和完成提示均可点击查看结果。设置页也提供“检索游戏包体资源”按钮，结果保存在 `resource-scan.json`，不会移动、修改或上传本地文件。
 - **局域网正版验证修复**：客机提示“无效会话”时，主机可在联机页一键安装 OfflineLAN（Fabric）关闭游戏内局域网验证，或选择独立服务端目录自动备份并修改 `server.properties`。
-- **托盘与关闭确认**：应用启动后显示系统托盘图标；关闭窗口时弹出上下两个单选项「最小化到托盘 / 退出 OL启动器」，并提供「记住该选项」和「之后可以在设置栏里更改」提示，底部为「暂不退出 / 退出启动器」。设置页的「关闭窗口时」可随时改回每次询问、最小化到托盘或直接退出。托盘菜单仍可重新显示主界面或彻底退出。
+- **托盘与关闭确认**：应用启动后显示系统托盘图标；关闭窗口时弹出上下两个单选项「最小化到托盘 / 退出 PMCS launcher」，并提供「记住该选项」和「之后可以在设置栏里更改」提示，底部为「暂不退出 / 退出启动器」。设置页的「关闭窗口时」可随时改回每次询问、最小化到托盘或直接退出。托盘菜单仍可重新显示主界面或彻底退出。
 - **可选卸载清理**：卸载程序提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」三个独立选项，默认保留存档与配置，并默认卸载 Tailscale；只删除程序文件时不会动 `游戏目录`。
 - **退出时清理关联进程**：关闭启动器会终止所有 Minecraft/Java 游戏进程、Tailscale 登录子进程和局域网服务，避免残留后台进程占用文件导致无法卸载。
 - **下载源测速**：自动并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror 三路速度，优先使用最快的源；设置中也可以手动锁定任意源。
@@ -45,7 +45,7 @@
 - **Tailscale 外网联机**：在局域网页面内安装/登录 Tailscale、读取 `100.x.x.x` 地址；Tailscale 官方 MSI 已内置在主安装包，首次安装无需单独下载。主机一键复制地址，客机粘贴后直接启动游戏。无需公网 IP 或端口转发。
 - **playit.gg 外网联机**：内置 playit 1.0.10 桌面端与守护进程，首次使用不用另外下载；浏览器完成绑定后自动启动，客机无需安装任何软件，直接连接 playit 分配的公网地址。
 - **游戏内中文**：启动前自动把实例 `options.txt` 的语言设为简体中文；1.12 及更早版本自动使用 `zh_CN`。Minecraft 原生自带简体中文，模组汉化资源包可放入实例 `resourcepacks` 目录。
-- **游戏内品牌名**：向游戏写入 `launcher_name` / `minecraft.launcher.brand`，在 F3 调试界面和崩溃报告中显示为「OL我的世界启动器」。
+- **游戏内品牌名**：向游戏写入 `launcher_name` / `minecraft.launcher.brand`，在 F3 调试界面和崩溃报告中显示为「PMCS launcher」。
 - **模组加载器**：
   - Fabric：从 FabricMC 官方元数据获取加载器版本并写入版本配置。
   - Forge：自动下载官方 Installer、准备 `launcher_profiles.json`、调用安装程序并解析生成的版本。
@@ -120,62 +120,62 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/OL启动器-1.9.0-安装程序.exe
+setup/PMCS launcher-1.10.0-安装程序.exe
 ```
 
-双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `OL launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
+双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `PMCS launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
 
 ```
-%LOCALAPPDATA%\Programs\OL launcher
+%LOCALAPPDATA%\Programs\PMCS launcher
 ```
 
 如果检测到磁盘上已有旧版安装，安装器会直接把默认路径改为原安装目录，并以覆盖更新模式运行：只覆盖程序文件，不修改存档、配置、模组和游戏资源。
 
-并自动创建桌面/开始菜单快捷方式，快捷方式名称为 **OL我的世界启动器**，安装后的主程序文件为：
+并自动创建桌面/开始菜单快捷方式，快捷方式名称为 **PMCS launcher**，安装后的主程序文件为：
 
 ``` 
-OL我的世界启动器.exe
+PMCS launcher.exe
 ```
 
-安装包文件名保持 **OL启动器-1.9.0-安装程序.exe** 不变。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名统一为 **PMCS launcher-1.10.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: 3849344835DBBC2F24C94335CDC3B9B4019CC76EAEB30DD08BA4F5F149D66FFE
+SHA256: EE2E5B68EFDF3E86BBBDA11B57BE79415874E71D04EB62BA856682760A8E1CD7
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
 >
 > 安装界面为 600×400 固定窗口并启用 DPI 缩放；安装完成后原「启动」按钮改为「完成」，点击只关闭安装器，程序从桌面/开始菜单快捷方式启动。
 
-卸载通过开始菜单或 Windows 应用的「卸载 OL我的世界启动器」完成；默认保留 `%APPDATA%\.oasis` 和 `D:\MC\游戏目录`，只有在卸载界面勾选「同时删除本地游戏资源」时才会清理；卸载界面默认勾选「同时卸载 Tailscale」。
+卸载通过开始菜单或 Windows 应用的「卸载 PMCS launcher」完成；默认保留 `%APPDATA%\.oasis` 和 `D:\MC\游戏目录`，只有在卸载界面勾选「同时删除本地游戏资源」时才会清理；卸载界面默认勾选「同时卸载 Tailscale」。
 
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/OL启动器-1.9.0-便携版.zip
+setup/PMCS launcher-1.10.0-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-1F45F7B6B593B3D98AEB7B0F653B9FEA1FB89DDA6A29A65DF6C0A90EF0DE22BC
+D71E834CAA56BD26A6547432B91068BBEA717794801A3CE0FFE2197168D3DD79
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
 
 ### 命名规范（后续固定）
 
-- 安装包文件名保持：`OL启动器-<版本>-安装程序.exe`
-- 安装后的主程序：`OL我的世界启动器.exe`
-- 桌面/开始菜单快捷方式：`OL我的世界启动器`
-- 卸载项显示名：`OL我的世界启动器 <版本>`
-- 便携版压缩包名保持：`OL启动器-<版本>-便携版.zip`
+- 安装包文件名保持：`PMCS launcher-<版本>-安装程序.exe`
+- 安装后的主程序：`PMCS launcher.exe`
+- 桌面/开始菜单快捷方式：`PMCS launcher`
+- 卸载项显示名：`PMCS launcher <版本>`
+- 便携版压缩包名保持：`PMCS launcher-<版本>-便携版.zip`
 
-![OL启动器像素图标](assets/icon-512.png)
+![PMCS launcher 像素图标](assets/icon-512.png)
 
 安装包使用自主设计的绿色像素风图标，源文件位于 `assets/icon.png`、`assets/icon.ico`；安装器侧边图仍保留在 `assets/installer-sidebar.bmp`，供可选的美化版使用。
 
@@ -206,8 +206,8 @@ npm install
 - `setup-builder/OLSetup.cs`：读取自身尾部 ZIP，直接解压到用户选择的目录，不经过 `%TEMP%`。
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
-- 安装后的主程序为 `OL我的世界启动器.exe`，快捷方式同名。
-- 安装包文件名保持 `OL启动器-1.9.0-安装程序.exe`。
+- 安装后的主程序为 `PMCS launcher.exe`，快捷方式同名。
+- 安装包文件名保持 `PMCS launcher-1.10.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -228,7 +228,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-OL启动器-1.9.0-安装程序.exe /S /DIR="D:\Games\OL我的世界启动器"
+PMCS launcher-1.10.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
 ```
 
 electron-builder 和缓存保留在：
@@ -252,7 +252,7 @@ E:\OLBuild\cache
 
 ### 游戏内中文 / 汉化包
 
-Minecraft Java 版本身内置简体中文，不需要额外下载完整汉化补丁。OL启动器会把所选语言写入实例目录下的 `options.txt`：
+Minecraft Java 版本身内置简体中文，不需要额外下载完整汉化补丁。PMCS launcher 会把所选语言写入实例目录下的 `options.txt`：
 
 - 1.13 及更新版本使用 `lang:zh_cn`。
 - 1.12 及更早版本自动改用 `lang:zh_CN`。
@@ -265,12 +265,12 @@ Minecraft Java 版本身内置简体中文，不需要额外下载完整汉化�
 启动器会向 Java 进程写入：
 
 ```
--Dminecraft.launcher.brand=OL我的世界启动器
+-Dminecraft.launcher.brand=PMCS launcher
 ```
 
-并同步设置版本参数里的 `launcher_name`。在 Minecraft 的 F3 调试界面、崩溃报告和部分日志中，启动器名称会显示为 **OL我的世界启动器**。
+并同步设置版本参数里的 `launcher_name`。在 Minecraft 的 F3 调试界面、崩溃报告和部分日志中，启动器名称会显示为 **PMCS launcher**。
 
-原版 Minecraft 的游戏窗口标题由游戏自身固定为 `Minecraft <版本号>`，不能通过启动参数修改；如果需要改窗口标题，需要额外的模组或窗口标题工具。启动器自己的窗口仍叫「OL启动器」。
+原版 Minecraft 的游戏窗口标题由游戏自身固定为 `Minecraft <版本号>`，不能通过启动参数修改；如果需要改窗口标题，需要额外的模组或窗口标题工具。启动器自己的窗口仍叫「PMCS launcher」。
 
 ### 局域网联机
 
@@ -283,7 +283,7 @@ Minecraft Java 版本身内置简体中文，不需要额外下载完整汉化�
 3. **主机在游戏内开放**：进入世界后按 `Esc` → 对局域网开放 → 选择游戏模式 → 创建局域网世界。
 4. 启动器会自动从游戏日志中读取端口，并在「房间已开放」卡片中显示 `本机IP:端口`；点击地址即可复制。
 5. **客机设备**：打开「局域网联机 → 加入房间」，选择相同版本/加载器的实例，等待自动发现房间后点击「加入」；也可以手动输入主机地址，格式为 `192.168.x.x:端口`。
-6. 客机也可以不使用OL启动器：原版 Minecraft 的「多人游戏 → 局域网」列表里能看到主机开放的世界，直接加入即可。
+6. 客机也可以不使用 PMCS launcher：原版 Minecraft 的「多人游戏 → 局域网」列表里能看到主机开放的世界，直接加入即可。
 
 说明：
 
@@ -378,7 +378,7 @@ playit.gg 是另一条不依赖公网 IP 的隧道方案，适合不想让客机
 └─ launcher_profiles.json  # 安装 Forge 时自动生成，供官方 Installer 使用
 ```
 
-启动器自身配置位于 Electron 的 `userData` 目录（通常为 `%APPDATA%\OL启动器`）。从旧版「绿洲启动器」升级时，首次启动会自动迁移旧配置和账号文件。
+启动器自身配置位于 Electron 的 `userData` 目录（通常为 `%APPDATA%\PMCS launcher`）。从旧版 `ol-launcher`、`OL启动器` 或「绿洲启动器」升级时，首次启动会自动迁移配置、账号和联机组件。
 
 ## 项目结构
 
@@ -433,7 +433,7 @@ scripts/           无头 UI 测试、图标生成
 
 - 使用无头 Chrome 对首页、版本库、模组市场、实例、设置、创建实例、账号、日志等界面完成渲染与交互截图，控制台无错误（`screenshots/`）。
 - 多任务进度卡片经过交错更新测试：任务顺序保持不变、首个卡片 DOM 节点不被重建、进度/阶段文本正确刷新，不再因每次进度事件重新播放入场动画。
-- 1.3.0 浅色 WinForms 安装器已验证：`TEMP/TMP` 指向不存在的目录、目标目录预置只读旧文件时，仍能安装并生成 `OL我的世界启动器.exe`；安装包包含带资源/配置/Tailscale 选项的 `Uninstall.exe`，并内置 Tailscale MSI；退出启动器时会调用游戏进程树清理。
+- 1.3.0 浅色 WinForms 安装器已验证：`TEMP/TMP` 指向不存在的目录、目标目录预置只读旧文件时，仍能安装并生成 `PMCS launcher.exe`；安装包包含带资源/配置/Tailscale 选项的 `Uninstall.exe`，并内置 Tailscale MSI；退出启动器时会调用游戏进程树清理。
 - 下载源测速接口已用真实 Mojang 资源采样验证，并完成界面/结果展示测试。排序会综合吞吐和首字节延迟；测速结果缓存 2 分钟。FastMinecraftMirror 目前部分子域可能返回 404 或证书异常，探测失败会自动跳过，不会阻塞其他源。FastMirror 主要是服务端核心镜像，CMCL 使用 BMCLAPI，二者没有作为独立客户端资源源接入。
 - 自动源下载链路已端到端验证：自动探测在官方/BMCLAPI/FMM 中选取最快源，下载 Gson JAR 并通过 SHA-1 校验；官方字段、资源对象、依赖库和客户端路径均会映射到镜像。
 - 局域网联机链路已验证：`level.dat` 名称解析、存档列表、游戏日志端口识别（`Started serving on <port>`）、UDP 24454 房间广播/发现、Quick Play 单人/多人参数与旧版 `--server/--port` 回退。

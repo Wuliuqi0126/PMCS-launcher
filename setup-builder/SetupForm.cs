@@ -30,8 +30,8 @@ namespace OLSetup
             isUpdate = !string.IsNullOrEmpty(installedPath);
             this.target = isUpdate ? installedPath : ResolveInstallPath(target);
             Text = isUpdate
-                ? "OL我的世界启动器 1.9.0 更新程序"
-                : "OL我的世界启动器 1.9.0 下载程序";
+                ? "PMCS launcher 1.10.0 更新程序"
+                : "PMCS launcher 1.10.0 下载程序";
             ClientSize = new Size(620, 430);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -43,7 +43,7 @@ namespace OLSetup
             AcceptButton = null;
 
             Label title = new Label();
-            title.Text = "OL我的世界启动器";
+            title.Text = "PMCS launcher";
             title.Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold);
             title.ForeColor = Color.FromArgb(32, 32, 32);
             title.AutoSize = true;
@@ -51,7 +51,7 @@ namespace OLSetup
             Controls.Add(title);
 
             subtitleLabel = new Label();
-            subtitleLabel.Text = "版本 1.9.0  ·  Minecraft Java 版启动器";
+            subtitleLabel.Text = "版本 1.10.0  ·  Minecraft Java 版启动器";
             subtitleLabel.Font = new Font("Microsoft YaHei UI", 9F);
             subtitleLabel.ForeColor = Color.FromArgb(100, 100, 100);
             subtitleLabel.AutoSize = true;
@@ -127,7 +127,7 @@ namespace OLSetup
             statusLabel = new Label();
             statusLabel.Text = isUpdate
                 ? "检测到原安装，点击「更新」覆盖程序文件；存档、配置和游戏资源会保留。"
-                : "选择父文件夹后，程序会安装到其下的 OL launcher 子文件夹。";
+                : "选择父文件夹后，程序会安装到其下的 PMCS launcher 子文件夹。";
             statusLabel.AutoEllipsis = false;
             statusLabel.ForeColor = Color.FromArgb(80, 80, 80);
             statusLabel.Location = new Point(20, 292);
@@ -173,12 +173,22 @@ namespace OLSetup
             RefreshMode();
         }
 
+        private static readonly string[] ExecutableNames =
+        {
+            "PMCS launcher.exe",
+            "OL我的世界启动器.exe",
+            "OL启动器.exe",
+        };
+
         private static bool IsInstalledDir(string dir)
         {
             try
             {
-                return !string.IsNullOrWhiteSpace(dir) &&
-                    File.Exists(Path.Combine(Path.GetFullPath(dir), "OL我的世界启动器.exe"));
+                if (string.IsNullOrWhiteSpace(dir)) return false;
+                string full = Path.GetFullPath(dir);
+                foreach (string name in ExecutableNames)
+                    if (File.Exists(Path.Combine(full, name))) return true;
+                return false;
             }
             catch { return false; }
         }
@@ -188,14 +198,16 @@ namespace OLSetup
             string full = Path.GetFullPath(parent).TrimEnd(Path.DirectorySeparatorChar);
             if (IsInstalledDir(full)) return full;
             string leaf = Path.GetFileName(full);
-            if (string.Equals(leaf, "OL launcher", StringComparison.OrdinalIgnoreCase)) return full;
-            return Path.Combine(full, "OL launcher");
+            if (string.Equals(leaf, "PMCS launcher", StringComparison.OrdinalIgnoreCase)) return full;
+            return Path.Combine(full, "PMCS launcher");
         }
 
         private static string FindInstalledPath()
         {
             string[] registryPaths =
             {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher",
                 @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher",
                 @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher",
             };
@@ -221,9 +233,12 @@ namespace OLSetup
             string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             string[] candidates =
             {
-                Path.Combine(local, "Programs", "OL我的世界启动器"),
+                Path.Combine(local, "Programs", "PMCS launcher"),
                 Path.Combine(local, "Programs", "OL launcher"),
+                Path.Combine(local, "Programs", "OL我的世界启动器"),
                 Path.Combine(local, "Programs", "OL启动器"),
+                Path.Combine(programFiles, "PMCS launcher"),
+                Path.Combine(programFiles, "OL launcher"),
                 Path.Combine(programFiles, "OL我的世界启动器"),
             };
             foreach (string candidate in candidates)
@@ -234,13 +249,13 @@ namespace OLSetup
         private void RefreshMode()
         {
             Text = isUpdate
-                ? "OL我的世界启动器 1.9.0 更新程序"
-                : "OL我的世界启动器 1.9.0 下载程序";
-            subtitleLabel.Text = "版本 1.9.0  ·  Minecraft Java 版启动器";
+                ? "PMCS launcher 1.10.0 更新程序"
+                : "PMCS launcher 1.10.0 下载程序";
+            subtitleLabel.Text = "版本 1.10.0  ·  Minecraft Java 版启动器";
             installButton.Text = isUpdate ? "更新" : "安装";
             statusLabel.Text = isUpdate
                 ? "检测到原安装，点击「更新」覆盖程序文件；存档、配置和游戏资源会保留。"
-                : "选择父文件夹后，程序会安装到其下的 OL launcher 子文件夹。";
+                : "选择父文件夹后，程序会安装到其下的 PMCS launcher 子文件夹。";
         }
 
         private void BrowseClick(object sender, EventArgs e)
@@ -248,7 +263,7 @@ namespace OLSetup
             if (installing || installed) return;
             using (FolderBrowserDialog dialog = new FolderBrowserDialog())
             {
-                dialog.Description = "选择父文件夹，程序将安装到其下的 OL launcher 子文件夹";
+                dialog.Description = "选择父文件夹，程序将安装到其下的 PMCS launcher 子文件夹";
                 dialog.SelectedPath = Path.GetDirectoryName(target) ?? target;
                 dialog.ShowNewFolderButton = true;
                 if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.SelectedPath))
@@ -298,10 +313,10 @@ namespace OLSetup
         {
             if (installing || installed) return;
             if (!NormalizeTarget()) return;
-            if (!isUpdate && Directory.Exists(target) && File.Exists(Path.Combine(target, "OL我的世界启动器.exe")))
+            if (!isUpdate && Directory.Exists(target) && IsInstalledDir(target))
             {
                 DialogResult answer = MessageBox.Show(this,
-                    "检测到该目录已安装 OL我的世界启动器。\n继续会覆盖程序文件，但会保留存档、配置和游戏资源。是否更新？",
+                    "检测到该目录已安装 PMCS launcher。\n继续会覆盖程序文件，但会保留存档、配置和游戏资源。是否更新？",
                     "覆盖更新", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (answer != DialogResult.Yes) return;
             }

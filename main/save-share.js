@@ -4,7 +4,7 @@
  * 局域网存档共享。
  *
  * 主机把选中的存档打包成 ZIP，通过本机 HTTP 服务提供下载；同时用 UDP
- * 广播让同一局域网里的 OL启动器自动发现共享。客机下载后解压到指定实例
+ * 广播让同一局域网里的 PMCS launcher 自动发现共享。客机下载后解压到指定实例
  * 的 saves 目录。所有传输都只在局域网内进行。
  */
 
@@ -244,7 +244,7 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
       hostId,
       port: SAVE_HTTP_PORT,
       token: active.token,
-      hostName: `${os.hostname()} · ${active.save.instanceName || 'OL启动器'}`,
+      hostName: `${os.hostname()} · ${active.save.instanceName || 'PMCS launcher'}`,
       addresses: localIPv4().map((item) => item.address),
       save: {
         id: active.save.id,
@@ -302,7 +302,7 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
       shares.set(key, {
         key,
         hostId: String(data.hostId),
-        hostName: String(data.hostName || 'OL启动器'),
+        hostName: String(data.hostName || 'PMCS launcher'),
         ip: addresses[0] || rinfo.address,
         addresses,
         port,

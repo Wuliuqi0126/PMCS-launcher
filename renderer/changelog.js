@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.10.0',
+    title: '品牌更名为 PMCS launcher',
+    current: true,
+    items: [
+      '项目正式更名为 PMCS launcher，界面、窗口标题、托盘、游戏日志和联机组件中的品牌同步更新。',
+      '安装程序、卸载程序、桌面快捷方式、开始菜单和发布包文件名全部改为 PMCS launcher。',
+      '新安装目录为 %LOCALAPPDATA%\\Programs\\PMCS launcher，主程序为 PMCS launcher.exe。',
+      '首次启动自动迁移旧版 ol-launcher / OL启动器 的配置、账号、联机组件和资源扫描结果，游戏目录、存档和实例不受影响。',
+      '更新安装会识别旧版安装目录并原地升级，同时清理旧版快捷方式、卸载注册表和防火墙规则。',
+    ],
+  },
+  {
     version: '1.9.0',
     title: '下载引擎提速与校验升级',
-    current: true,
     items: [
       '移除已失效/无用的 MCBBS 与 MC光速镜像，只保留 Mojang 官方、BMCLAPI、FastMinecraftMirror 三个下载源。',
       '游戏资源与依赖库并发从 100 提升到 256，HTTP 连接池提升到 512。',
@@ -57,7 +68,7 @@ export const CHANGELOG = [
       '右下角实时显示检索进度、当前目录和已发现数量；每个阶段成功时在进度弹窗上方弹出提示。',
       '全部完成后点击完成提示打开结果弹窗，按目录查看版本、加载器、大小、模组数量与文件位置。',
       '设置页新增“检索游戏包体资源”按钮，可随时重新检索；结果保存为本机 resource-scan.json。',
-      '自动识别官方 .minecraft、OL游戏目录、Prism/MultiMC/Modrinth 等实例，以及桌面、文档和磁盘中的自定义目录。',
+      '自动识别官方 .minecraft、PMCS launcher 游戏目录、Prism/MultiMC/Modrinth 等实例，以及桌面、文档和磁盘中的自定义目录。',
       '检索只读取目录与文件信息，不移动、不修改、不上传任何本地资源。',
     ],
   },
@@ -206,7 +217,7 @@ export const CHANGELOG = [
       '支持断点续传、镜像测速、动态切换和最终 SHA1 校验。',
       '内置 Tailscale MSI 与 playit.gg 组件，首次使用无需额外下载。',
       '卸载程序默认一并卸载 Tailscale，并保留用户数据选项。',
-      '安装器支持 OL launcher 子目录、覆盖更新和原路径检测。',
+      '安装器支持 PMCS launcher 子目录、覆盖更新和原路径检测。',
       '新增赞助作者页面、托盘与关闭确认。',
     ],
   },

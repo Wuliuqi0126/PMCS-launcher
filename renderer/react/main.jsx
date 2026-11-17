@@ -12,14 +12,14 @@ function Splash() {
       <div className="splash-inner">
         <div className="splash-logo-wrap">
           <span className="splash-ring" />
-          <img className="splash-logo" src="../assets/icon.png" alt="OL启动器" />
+          <img className="splash-logo" src="../assets/icon.png" alt="PMCS launcher" />
         </div>
-        <div className="splash-wordmark">OL<span>我的世界启动器</span></div>
-        <div className="splash-sub">OL LAUNCHER · PIXEL EDITION</div>
+        <div className="splash-wordmark">PMCS<span>launcher</span></div>
+        <div className="splash-sub">PMCS LAUNCHER · PIXEL EDITION</div>
         <div className="splash-bar"><span /></div>
         <div className="splash-status" id="splash-status">正在加载本地配置…</div>
       </div>
-      <div className="splash-footer">v1.3.0 · Windows x64</div>
+      <div className="splash-footer">PMCS launcher · Windows x64</div>
     </div>
   );
 }
@@ -40,9 +40,9 @@ function TitleBar() {
     <header className="titlebar" id="titlebar">
       <div className="titlebar-drag">
         <span className="titlebar-mark" id="titlebar-mark" />
-        <span className="titlebar-title">OL启动器</span>
+        <span className="titlebar-title">PMCS launcher</span>
         <span className="titlebar-sep" />
-        <span className="titlebar-sub">OL LAUNCHER</span>
+        <span className="titlebar-sub">PMCS LAUNCHER</span>
       </div>
       <div className="window-controls">
         <button className="window-btn" id="win-min" title="最小化" aria-label="最小化">
@@ -69,9 +69,9 @@ function Sidebar() {
   ];
   return (
     <aside className="sidebar">
-      <a className="brand" href="#/home" aria-label="OL启动器首页">
+      <a className="brand" href="#/home" aria-label="PMCS launcher 首页">
         <span className="brand-logo" id="brand-logo" />
-        <span className="brand-copy"><strong>OL启动器</strong><small>OL LAUNCHER</small></span>
+        <span className="brand-copy"><strong>PMCS launcher</strong><small>PMCS LAUNCHER</small></span>
       </a>
       <div className="sidebar-label">游戏</div>
       <nav className="nav">

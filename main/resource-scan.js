@@ -78,7 +78,7 @@ function driveLetters() {
 
 function sourceForPath(target) {
   const lower = String(target || '').toLowerCase();
-  if (lower.includes(`${path.sep}.oasis`) || lower.endsWith('.oasis')) return 'OL启动器';
+  if (lower.includes(`${path.sep}.oasis`) || lower.endsWith('.oasis')) return 'PMCS launcher';
   if (lower.includes('prismlauncher')) return 'Prism Launcher';
   if (lower.includes('multimc')) return 'MultiMC';
   if (lower.includes('com.modrinth.theseus') || lower.includes('modrinth')) return 'Modrinth App';
@@ -336,7 +336,7 @@ function createResourceScanner({ app, store, onProgress }) {
 
     // 启动器自己的目录永远优先，它是用户最可能已经在用的位置。
     for (const nested of candidateNestedRoots(store.gameDir)) {
-      addRoot(list, seen, nested, 'OL启动器游戏目录', 'OL启动器');
+      addRoot(list, seen, nested, 'PMCS launcher 游戏目录', 'PMCS launcher');
     }
     // OL 每个实例都有独立的 mods，实例目录本身也当作一个资源根。
     const olInstances = path.join(store.gameDir, 'instances');
@@ -347,14 +347,14 @@ function createResourceScanner({ app, store, onProgress }) {
         if (!entry.isDirectory()) continue;
         const instance = path.join(olInstances, entry.name);
         const meta = typeof store.getInstance === 'function' ? store.getInstance(entry.name) : null;
-        addRoot(list, seen, instance, `OL启动器实例 · ${meta?.name || entry.name}`, 'OL启动器');
+        addRoot(list, seen, instance, `PMCS launcher 实例 · ${meta?.name || entry.name}`, 'PMCS launcher');
       }
     }
 
     // 旧版 OL 数据目录（用户改过游戏目录后仍可能留有完整包体）。
-    for (const legacy of ['.oasis', 'oasis-launcher', 'OL启动器']) {
+    for (const legacy of ['.oasis', 'oasis-launcher', 'ol-launcher', 'OL启动器', 'PMCS launcher']) {
       for (const nested of candidateNestedRoots(path.join(appData, legacy))) {
-        addRoot(list, seen, nested, `OL启动器 · ${legacy}`, 'OL启动器');
+        addRoot(list, seen, nested, `PMCS launcher · ${legacy}`, 'PMCS launcher');
       }
     }
 

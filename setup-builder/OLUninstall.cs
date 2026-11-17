@@ -8,11 +8,11 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: System.Reflection.AssemblyTitle("OL我的世界启动器 卸载程序")]
-[assembly: System.Reflection.AssemblyProduct("OL我的世界启动器")]
-[assembly: System.Reflection.AssemblyCompany("OL Launcher")]
-[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.9.0.0")]
+[assembly: System.Reflection.AssemblyTitle("PMCS launcher 卸载程序")]
+[assembly: System.Reflection.AssemblyProduct("PMCS launcher")]
+[assembly: System.Reflection.AssemblyCompany("PMCS launcher")]
+[assembly: System.Reflection.AssemblyVersion("1.10.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.10.0.0")]
 
 namespace OLUninstall
 {
@@ -44,10 +44,13 @@ namespace OLUninstall
         {
             target = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory).TrimEnd(Path.DirectorySeparatorChar);
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            userData = Path.Combine(appData, "OL启动器");
-            gameDir = ReadGameDir(userData) ?? Path.Combine(appData, ".oasis");
+            userData = Path.Combine(appData, "PMCS launcher");
+            gameDir = ReadGameDir(userData)
+                ?? ReadGameDir(Path.Combine(appData, "ol-launcher"))
+                ?? ReadGameDir(Path.Combine(appData, "OL启动器"))
+                ?? Path.Combine(appData, ".oasis");
 
-            Text = "卸载 OL我的世界启动器";
+            Text = "卸载 PMCS launcher";
             ClientSize = new Size(590, 420);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -58,7 +61,7 @@ namespace OLUninstall
             Font = new Font("Microsoft YaHei UI", 9F);
 
             Label title = new Label();
-            title.Text = "卸载 OL我的世界启动器";
+            title.Text = "卸载 PMCS launcher";
             title.Font = new Font("Microsoft YaHei UI", 17F, FontStyle.Bold);
             title.AutoSize = true;
             title.Location = new Point(22, 20);
@@ -162,7 +165,7 @@ namespace OLUninstall
             if (running) return;
             string extra = deleteResources.Checked ? "\n\n本地游戏资源也会被删除，无法恢复。" : "\n\n本地游戏资源和存档会保留。";
             if (removeTailscale.Checked) extra += "\nTailscale 也会被卸载，其他 Tailscale 连接会断开。";
-            if (MessageBox.Show(this, "确定要卸载 OL我的世界启动器吗？" + extra, "确认卸载",
+            if (MessageBox.Show(this, "确定要卸载 PMCS launcher 吗？" + extra, "确认卸载",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
 
             running = true;
@@ -198,7 +201,7 @@ namespace OLUninstall
                     BeginInvoke((Action)delegate
                     {
                         status.Text = "卸载完成。";
-                        MessageBox.Show(this, "OL我的世界启动器已卸载。", "卸载完成",
+                        MessageBox.Show(this, "PMCS launcher 已卸载。", "卸载完成",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                         ScheduleSelfDelete();
                         Close();
@@ -317,7 +320,7 @@ namespace OLUninstall
 
         private static void KillAppProcesses()
         {
-            string[] names = { "OL我的世界启动器", "OL启动器" };
+            string[] names = { "PMCS launcher", "OL我的世界启动器", "OL启动器" };
             foreach (string name in names)
             {
                 foreach (Process process in Process.GetProcessesByName(name))
@@ -332,6 +335,12 @@ namespace OLUninstall
         {
             string[] names =
             {
+                "PMCS launcher Private",
+                "PMCS launcher LAN Discovery",
+                "PMCS launcher Save Share",
+                "PMCS launcher Save Discovery",
+                "PMCS launcher Java LAN",
+                "PMCS launcher Java 25565",
                 "OL Launcher Private",
                 "OL Launcher LAN Discovery",
                 "OL Launcher Save Share",
@@ -359,11 +368,12 @@ namespace OLUninstall
         private void RemoveShortcuts()
         {
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            TryDelete(Path.Combine(desktop, "PMCS launcher.lnk"));
             TryDelete(Path.Combine(desktop, "OL我的世界启动器.lnk"));
             TryDelete(Path.Combine(desktop, "OL启动器.lnk"));
 
             string programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
-            string[] groups = { "OL我的世界启动器", "OL启动器" };
+            string[] groups = { "PMCS launcher", "OL我的世界启动器", "OL启动器" };
             foreach (string group in groups)
             {
                 string folder = Path.Combine(programs, group);
@@ -376,12 +386,13 @@ namespace OLUninstall
             try
             {
                 Registry.CurrentUser.DeleteSubKeyTree(
-                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher", false);
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher", false);
             }
             catch { }
             try
             {
-                Registry.CurrentUser.DeleteSubKeyTree(@"Software\OL Launcher", false);
+                Registry.CurrentUser.DeleteSubKeyTree(
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher", false);
             }
             catch { }
         }
@@ -419,7 +430,7 @@ namespace OLUninstall
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
 
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            foreach (string legacy in new[] { "绿洲启动器", "oasis-launcher" })
+            foreach (string legacy in new[] { "ol-launcher", "OL启动器", "绿洲启动器", "oasis-launcher" })
             {
                 string path = Path.Combine(appData, legacy);
                 if (IsSafeDataDir(path) && Directory.Exists(path)) Directory.Delete(path, true);

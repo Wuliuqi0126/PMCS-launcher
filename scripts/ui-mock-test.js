@@ -105,7 +105,7 @@ function mockPayload() {
     source: index % 2 ? 'curseforge' : 'modrinth',
   }));
   return {
-    app: { version: '1.3.0', name: 'OL启动器', platform: 'win32', arch: 'x64', electron: '45.0.0' },
+    app: { version: '1.3.0', name: 'PMCS launcher', platform: 'win32', arch: 'x64', electron: '45.0.0' },
     config: {
       gameDir: 'C:\\Users\\zhang\\AppData\\Roaming\\.oasis',
       memoryMb: 6144,

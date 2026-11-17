@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate OL Launcher's pixel-art icon and NSIS installer sidebar."""
+"""Generate PMCS launcher's pixel-art icon and NSIS installer sidebar."""
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -134,7 +134,7 @@ def text3(text, cx, y, color, scale=2):
                                   x + c * scale + scale - 1, y + r * scale + scale - 1), fill=color)
         x += 4 * scale
 
-text3("OL LAUNCHER", W // 2, 148, (201, 255, 214), 3)
+text3("PMCS LAUNCHER", W // 2, 148, (201, 255, 214), 3)
 text3("MINECRAFT JAVA", W // 2, 178, (110, 231, 149), 1)
 text3("PIXEL EDITION", W // 2, 188, (74, 160, 104), 1)
 text3("VERSION 1.1.0", W // 2, 210, (143, 212, 164), 1)

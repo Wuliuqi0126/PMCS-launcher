@@ -7,7 +7,7 @@ const { applicableLibraries, artifactFor, ensureNatives, ensureRuntimeFiles, ens
 const { exists, ensureDir, readLogTail, readJson } = require('./util');
 const { applyGameLanguage } = require('./game-settings');
 
-const GAME_BRAND = 'OL我的世界启动器';
+const GAME_BRAND = 'PMCS launcher';
 
 function flattenArgumentList(list, features, replacements) {
   const out = [];
@@ -232,11 +232,11 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       logFile = path.join(store.gameDir, 'logs', `game-${instance.id}-${stamp}.log`);
       const fd = fs.openSync(logFile, 'a');
-      fs.writeSync(fd, `[OL我的世界启动器] ${new Date().toISOString()}\n`);
-      fs.writeSync(fd, `[OL我的世界启动器] Java: ${built.java}\n`);
-      fs.writeSync(fd, `[OL我的世界启动器] 内存: ${built.memory} MB\n`);
-      fs.writeSync(fd, `[OL我的世界启动器] 工作目录: ${store.instanceDir(instance)}\n`);
-      if (languageInfo?.code) fs.writeSync(fd, `[OL我的世界启动器] 游戏语言: ${languageInfo.code}\n`);
+      fs.writeSync(fd, `[PMCS launcher] ${new Date().toISOString()}\n`);
+      fs.writeSync(fd, `[PMCS launcher] Java: ${built.java}\n`);
+      fs.writeSync(fd, `[PMCS launcher] 内存: ${built.memory} MB\n`);
+      fs.writeSync(fd, `[PMCS launcher] 工作目录: ${store.instanceDir(instance)}\n`);
+      if (languageInfo?.code) fs.writeSync(fd, `[PMCS launcher] 游戏语言: ${languageInfo.code}\n`);
       fs.writeSync(fd, '\n');
       task.update({ stage: '启动游戏', percent: 92, detail: '正在创建游戏进程…' });
 
