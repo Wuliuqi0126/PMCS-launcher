@@ -136,6 +136,12 @@ const state = {
     targetInstanceId: '',
     loadedAt: 0,
   },
+  recommend: {
+    instanceId: '',
+    busy: '',
+    error: '',
+    javaMajor: 21,
+  },
   logModal: null,
   modal: null,
   bootError: '',
@@ -1125,6 +1131,10 @@ function bindGlobalEvents() {
       state.saveShare.targetInstanceId = event.target.value;
       return;
     }
+    if (event.target.id === 'recommend-instance') {
+      state.recommend.instanceId = event.target.value;
+      return;
+    }
     if (event.target.id === 'memory-range') {
       await saveConfig({ memoryMb: Number(event.target.value) });
     }
@@ -1525,6 +1535,132 @@ function heroPrimary(active) {
   return `<button class="btn btn-primary btn-lg" data-action="repair-instance" data-id="${h(active.id)}">${icon('refresh', 17)} 安装 / 修复实例</button>`;
 }
 
+function recommendFabricInstances() {
+  return (state.boot?.library?.instances || []).filter((item) => item.status === 'ready' && item.loader === 'fabric');
+}
+
+function recommendationsBody() {
+  const data = state.recommend;
+  const fabric = recommendFabricInstances();
+  const selected = fabric.find((item) => item.id === data.instanceId) || fabric[0] || null;
+  if (selected && data.instanceId !== selected.id) data.instanceId = selected.id;
+  return `<div class="recommend-modal">
+    <div class="recommend-hero">
+      <span class="recommend-hero-icon">${icon('star', 20)}</span>
+      <div><strong>让 OL启动器更好用</strong><p>这些是实际能改善联机、帧率和稳定性的建议，不需要一次全部开启。</p></div>
+    </div>
+
+    <div class="recommend-grid">
+      <section class="recommend-card">
+        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('shield', 16)}</span><div><strong>关闭主机正版验证</strong><p>客机提示“无效会话”时使用。Fabric 主机可一键安装 OfflineLAN；独立服务端可直接修改 server.properties。</p></div></div>
+        <div class="recommend-card-actions"><button class="btn btn-primary btn-sm" data-action="recommend-offline-lan">${icon('shield', 13)} 打开修复工具</button></div>
+      </section>
+
+      <section class="recommend-card">
+        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('activity', 16)}</span><div><strong>安装性能优化模组</strong><p>一键安装 Sodium、Lithium、FerriteCore，通常能明显提升帧率并降低内存占用。仅支持 Fabric 实例。</p></div></div>
+        ${fabric.length ? `<div class="recommend-instance-row">
+          <div class="select-wrap"><select class="select" id="recommend-instance">${fabric.map((item) => `<option value="${h(item.id)}" ${item.id === selected.id ? 'selected' : ''}>${h(item.name)} · ${h(item.versionId)}</option>`).join('')}</select><span class="select-arrow">${icon('chevronDown', 13)}</span></div>
+          <button class="btn btn-primary btn-sm" data-action="recommend-install-perf" ${data.busy ? 'disabled' : ''}>${data.busy === 'perf' ? '<span class="spinner"></span> 正在下载' : `${icon('download', 13)} 一键安装`}</button>
+        </div>
+        <div class="recommend-tags"><span>Sodium</span><span>Lithium</span><span>FerriteCore</span></div>` : `<div class="recommend-empty">还没有已就绪的 Fabric 实例。可以新建一个 Fabric 实例，或跳过这项。</div>`}
+      </section>
+
+      <section class="recommend-card">
+        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('cpu', 16)}</span><div><strong>准备 Java 运行时</strong><p>启动器会自动检测 Java；缺失或版本不符时，可以在这里一键下载 Temurin Java 21。</p></div></div>
+        <div class="recommend-card-actions"><button class="btn btn-secondary btn-sm" data-action="recommend-download-java" ${data.busy ? 'disabled' : ''}>${data.busy === 'java' ? '<span class="spinner"></span> 正在下载' : `${icon('download', 13)} 下载 Java 21`}</button><button class="btn btn-ghost btn-sm" data-action="recommend-open-settings">${icon('settings', 13)} 打开设置</button></div>
+      </section>
+
+      <section class="recommend-card">
+        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('save', 16)}</span><div><strong>局域网共享存档</strong><p>把存档直接发给同一 Wi-Fi 下的朋友，或从朋友那里接收存档；不需要 U 盘或网盘。</p></div></div>
+        <div class="recommend-card-actions"><button class="btn btn-secondary btn-sm" data-action="recommend-open-lan">${icon('wifi', 13)} 打开存档共享</button></div>
+      </section>
+    </div>
+
+    <div class="recommend-tips">
+      <strong>${icon('sparkles', 14)} 额外建议</strong>
+      <ul>
+        <li>大型整合包建议在设置里分配 <b>6–8 GB</b> 内存，不要超过电脑物理内存的一半。</li>
+        <li>联机双方使用<b>相同的 Minecraft 版本、加载器和模组</b>；只装客户端模组时也要保持一致。</li>
+        <li>主机联机时保持游戏和启动器运行；Windows 防火墙选择“专用网络”。</li>
+        <li>关闭占用显卡/网络的录屏、加速器和悬浮窗，能减少卡顿和联机超时。</li>
+      </ul>
+    </div>
+    ${data.error ? `<div class="notice error">${icon('alert', 15)}<span>${h(data.error)}</span></div>` : ''}
+  </div>`;
+}
+
+function openRecommendations() {
+  const fabric = recommendFabricInstances();
+  state.recommend.instanceId = fabric.find((item) => item.id === state.recommend.instanceId)?.id || fabric[0]?.id || '';
+  state.recommend.busy = '';
+  state.recommend.error = '';
+  openModal({
+    title: '推荐设置',
+    subtitle: '按需选择，不会自动修改你的游戏或账号',
+    wide: true,
+    body: recommendationsBody(),
+    footer: `<button class="btn btn-ghost foot-left" data-action="recommend-open-settings">${icon('settings', 13)} 全部设置</button><button class="btn btn-primary" data-action="scan-close-modal">关闭</button>`,
+  });
+}
+
+async function installPerformanceRecommendations() {
+  const data = state.recommend;
+  if (data.busy) return;
+  const instance = getInstance(data.instanceId) || recommendFabricInstances()[0];
+  if (!instance || instance.loader !== 'fabric' || instance.status !== 'ready') {
+    toast('需要 Fabric 实例', '性能优化模组目前只支持已就绪的 Fabric 实例', 'info');
+    return;
+  }
+  const projects = [
+    ['AANobbMI', 'Sodium'],
+    ['gvQqBUqZ', 'Lithium'],
+    ['uXXizFIs', 'FerriteCore'],
+  ];
+  data.busy = 'perf';
+  data.error = '';
+  setModalBody(recommendationsBody());
+  const errors = [];
+  for (const [projectId, name] of projects) {
+    try {
+      await api.invoke('mods:install', { instanceId: instance.id, projectId, source: 'modrinth', mirror: 'mcim', module: 'mods' });
+    } catch (err) {
+      errors.push(`${name}: ${cleanError(err)}`);
+    }
+  }
+  data.busy = '';
+  if (errors.length) {
+    data.error = errors.join('；');
+    toast('部分优化模组安装失败', data.error, 'error', 10000);
+  } else {
+    toast('性能优化模组已安装', `${instance.name} · Sodium / Lithium / FerriteCore；重启游戏后生效`, 'success', 10000);
+  }
+  setModalBody(recommendationsBody());
+}
+
+async function downloadJavaRecommendation() {
+  const data = state.recommend;
+  if (data.busy) return;
+  data.busy = 'java';
+  data.error = '';
+  setModalBody(recommendationsBody());
+  try {
+    const result = await api.invoke('java:ensure', 21);
+    toast('Java 21 已就绪', result?.path || '启动器会自动使用它', 'success', 8000);
+    state.javaDetect = null;
+  } catch (err) {
+    data.error = cleanError(err);
+    toast('Java 下载失败', data.error, 'error', 9000);
+  } finally {
+    data.busy = '';
+    setModalBody(recommendationsBody());
+  }
+}
+
+function closeRecommendAndGo(hash) {
+  closeModal();
+  if (location.hash !== hash) location.hash = hash;
+}
+
 function renderHomeRoute() {
   const account = getAccount();
   const active = getActiveInstance();
@@ -1592,7 +1728,10 @@ function renderHomeRoute() {
         <span class="home-version-copy"><small>OL启动器 · 当前版本</small><strong>v${h(state.boot.app.version)}</strong></span>
         <span class="home-version-state"><i></i>本地版本</span>
       </div>
-      <button class="home-announcement" type="button" data-action="open-announcements">${icon('bell', 14)} 公告 <span class="home-announcement-dot"></span></button>
+      <div class="home-meta-actions">
+        <button class="home-recommend" type="button" data-action="open-recommendations">${icon('star', 14)} 推荐</button>
+        <button class="home-announcement" type="button" data-action="open-announcements">${icon('bell', 14)} 公告 <span class="home-announcement-dot"></span></button>
+      </div>
     </div>
     <section class="home-hero">
       <div class="home-hero-copy">
@@ -5390,6 +5529,26 @@ async function runAction(action, el, event) {
         break;
       case 'open-announcements':
         openAnnouncements();
+        break;
+      case 'open-recommendations':
+        openRecommendations();
+        break;
+      case 'recommend-install-perf':
+        await installPerformanceRecommendations();
+        break;
+      case 'recommend-download-java':
+        await downloadJavaRecommendation();
+        break;
+      case 'recommend-open-settings':
+        closeRecommendAndGo('#/settings');
+        break;
+      case 'recommend-open-lan':
+        closeRecommendAndGo('#/lan');
+        setTimeout(() => document.querySelector('#save-share-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 500);
+        break;
+      case 'recommend-offline-lan':
+        closeModal();
+        await openOfflineLanFix();
         break;
       case 'close-dialog-confirm':
         await confirmCloseDialog();
