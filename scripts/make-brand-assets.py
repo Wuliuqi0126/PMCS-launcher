@@ -55,13 +55,13 @@ for (x, y) in [(15, 31), (21, 38), (51, 33), (44, 41), (37, 47)]:
 for poly in (top, left, right):
     d.line(poly + [poly[0]], fill=(5, 16, 9, 255), width=1)
 
-bx0, by0, bx1, by1 = 13, 43, 51, 60
+bx0, by0, bx1, by1 = 10, 38, 54, 61
 d.rectangle((bx0, by0, bx1, by1), fill=(5, 14, 8, 255), outline=(44, 107, 67, 255))
 d.line((bx0 + 1, by0 + 1, bx1 - 1, by0 + 1), fill=(23, 70, 42, 255))
 
+# PMCS monogram: a large pixel P, with a subtle block-shadow.
 FONT = {
-    "O": ["011110", "100001", "100001", "100001", "100001", "100001", "011110"],
-    "L": ["100000", "100000", "100000", "100000", "100000", "100000", "111111"],
+    "P": ["111110", "100011", "100011", "111110", "100000", "100000", "100000"],
 }
 
 def glyph7(ch, x, y, color, scale=2):
@@ -71,10 +71,9 @@ def glyph7(ch, x, y, color, scale=2):
                 d.rectangle((x + c * scale, y + r * scale,
                              x + c * scale + scale - 1, y + r * scale + scale - 1), fill=color)
 
-for ch, x in [("O", 18), ("L", 33)]:
-    glyph7(ch, x + 1, 45, (17, 66, 40, 255))
-for ch, x, color in [("O", 18, (196, 255, 209, 255)), ("L", 33, (112, 234, 152, 255))]:
-    glyph7(ch, x, 44, color)
+glyph7("P", 22, 40, (17, 66, 40, 255), 3)
+glyph7("P", 21, 39, (232, 255, 241, 255), 3)
+# A mint pixel notch keeps the mark connected to the old pixel-block language.
 for (x, y) in [(7, 10), (9, 8), (11, 12), (52, 9), (54, 12)]:
     d.rectangle((x, y, x + 1, y + 1), fill=(112, 234, 152, 210))
 
@@ -137,7 +136,7 @@ def text3(text, cx, y, color, scale=2):
 text3("PMCS LAUNCHER", W // 2, 148, (201, 255, 214), 3)
 text3("MINECRAFT JAVA", W // 2, 178, (110, 231, 149), 1)
 text3("PIXEL EDITION", W // 2, 188, (74, 160, 104), 1)
-text3("VERSION 1.1.0", W // 2, 210, (143, 212, 164), 1)
+text3("VERSION 1.11.0", W // 2, 210, (143, 212, 164), 1)
 for y in (232, 236):
     sd.line((24, y, W - 24, y), fill=(33, 86, 55))
 side.paste(icon512.resize((44, 44), Image.Resampling.NEAREST), (60, 248))

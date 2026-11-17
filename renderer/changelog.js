@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.11.0',
+    title: '全新 PMCS 图标',
+    current: true,
+    items: [
+      '重新设计品牌图标：保留草方块与像素风，将旧 OL 字样替换为 PMCS 的 P 字符号。',
+      '应用图标、窗口图标、桌面快捷方式、安装器图标和安装器侧边图全部同步替换。',
+      'ICO 包含 16–256 多尺寸，任务栏、桌面和资源管理器均使用新图标。',
+      '启动器界面和安装器继续显示完整的 PMCS launcher 名称。',
+    ],
+  },
+  {
     version: '1.10.0',
     title: '品牌更名为 PMCS launcher',
-    current: true,
     items: [
       '项目正式更名为 PMCS launcher，界面、窗口标题、托盘、游戏日志和联机组件中的品牌同步更新。',
       '安装程序、卸载程序、桌面快捷方式、开始菜单和发布包文件名全部改为 PMCS launcher。',
