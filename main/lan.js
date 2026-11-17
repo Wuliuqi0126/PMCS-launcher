@@ -482,4 +482,4 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
   };
 }
 
-module.exports = { createLanService, DISCOVERY_PORT, parseLanPort };
+module.exports = { createLanService, DISCOVERY_PORT, parseLanPort, readLevelName };

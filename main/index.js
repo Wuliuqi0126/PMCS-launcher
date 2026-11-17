@@ -20,6 +20,7 @@ const { createPlayit } = require('./playit');
 const { createBackups } = require('./backup');
 const { createResourceScanner } = require('./resource-scan');
 const { createOfflineLan } = require('./offline-lan');
+const { createSaveShare } = require('./save-share');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -73,6 +74,7 @@ let playit = null;
 let backups = null;
 let resources = null;
 let offlineLan = null;
+let saveShare = null;
 let lan = null;
 let tray = null;
 let quitting = false;
@@ -570,6 +572,11 @@ function registerIpc() {
   ipcMain.handle('offlineLan:status', async (_event, instanceId) => offlineLan.status(String(instanceId || '')));
   ipcMain.handle('offlineLan:install', async (_event, instanceId) => offlineLan.install(String(instanceId || '')));
   ipcMain.handle('offlineLan:patchServer', async (_event, folder) => offlineLan.patchServerProperties(String(folder || '')));
+  ipcMain.handle('saves:list', async () => saveShare.listSaves());
+  ipcMain.handle('saves:state', async () => saveShare.state());
+  ipcMain.handle('saves:shareStart', async (_event, payload) => saveShare.startHost(payload || {}));
+  ipcMain.handle('saves:shareStop', async () => saveShare.stopHost());
+  ipcMain.handle('saves:download', async (_event, payload) => saveShare.download(payload || {}));
   ipcMain.handle('resources:scan', async (_event, payload) => {
     const reason = payload?.reason === 'auto' ? 'auto' : 'manual';
     const result = await resources.scan(reason);
@@ -633,6 +640,13 @@ app.whenReady().then(() => {
   lan.start();
   mods = createMods({ store, tasks });
   offlineLan = createOfflineLan({ store, mods });
+  saveShare = createSaveShare({
+    app,
+    store,
+    tasks,
+    onUpdate: (payload) => broadcast('saves:changed', payload),
+  });
+  saveShare.start();
   skins = createSkins({ store, getWindow: () => mainWindow });
   cacheManager = createCache({ store, app });
   guides = createGuides({ app, openExternal: (url) => shell.openExternal(url) });
@@ -696,5 +710,6 @@ app.on('before-quit', () => {
   try { launcher?.killAll(); } catch (_) { /* ignore */ }
   try { tailscale?.dispose(); } catch (_) { /* ignore */ }
   try { playit?.dispose(); } catch (_) { /* ignore */ }
+  try { saveShare?.dispose(); } catch (_) { /* ignore */ }
   try { lan?.dispose(); } catch (_) { /* ignore */ }
 });

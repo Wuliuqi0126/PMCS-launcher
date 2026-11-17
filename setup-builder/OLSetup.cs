@@ -15,9 +15,9 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("OL启动器安装程序")]
 [assembly: AssemblyProduct("OL我的世界启动器")]
 [assembly: AssemblyCompany("OL Launcher")]
-[assembly: AssemblyDescription("OL我的世界启动器 1.6.0 安装程序")]
-[assembly: AssemblyVersion("1.6.0.0")]
-[assembly: AssemblyFileVersion("1.6.0.0")]
+[assembly: AssemblyDescription("OL我的世界启动器 1.7.0 安装程序")]
+[assembly: AssemblyVersion("1.7.0.0")]
+[assembly: AssemblyFileVersion("1.7.0.0")]
 
 namespace OLSetup
 {
@@ -148,7 +148,7 @@ namespace OLSetup
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher"))
                 {
                     key.SetValue("DisplayName", "OL我的世界启动器");
-                    key.SetValue("DisplayVersion", "1.6.0");
+                    key.SetValue("DisplayVersion", "1.7.0");
                     key.SetValue("Publisher", "OL Launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);
@@ -167,6 +167,8 @@ namespace OLSetup
             {
                 "name=\"OL Launcher Private\" dir=in action=allow program=\"" + exe + "\" profile=private,domain enable=yes",
                 "name=\"OL Launcher LAN Discovery\" dir=in action=allow protocol=UDP localport=24454 profile=private,domain enable=yes",
+                "name=\"OL Launcher Save Share\" dir=in action=allow protocol=TCP localport=24455 profile=private,domain enable=yes",
+                "name=\"OL Launcher Save Discovery\" dir=in action=allow protocol=UDP localport=24456 profile=private,domain enable=yes",
                 "name=\"OL Launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
                 "name=\"OL Launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
             };

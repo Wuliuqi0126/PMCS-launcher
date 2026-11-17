@@ -11,8 +11,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("OL我的世界启动器 卸载程序")]
 [assembly: System.Reflection.AssemblyProduct("OL我的世界启动器")]
 [assembly: System.Reflection.AssemblyCompany("OL Launcher")]
-[assembly: System.Reflection.AssemblyVersion("1.6.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.6.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.7.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.7.0.0")]
 
 namespace OLUninstall
 {
@@ -334,6 +334,8 @@ namespace OLUninstall
             {
                 "OL Launcher Private",
                 "OL Launcher LAN Discovery",
+                "OL Launcher Save Share",
+                "OL Launcher Save Discovery",
                 "OL Launcher Java LAN",
                 "OL Launcher Java 25565",
             };

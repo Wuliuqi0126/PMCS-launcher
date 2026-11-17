@@ -125,6 +125,17 @@ const state = {
     error: '',
     serverResult: null,
   },
+  saveShare: {
+    state: null,
+    saves: [],
+    loading: false,
+    busy: '',
+    error: '',
+    hostInstanceId: '',
+    saveId: '',
+    targetInstanceId: '',
+    loadedAt: 0,
+  },
   logModal: null,
   modal: null,
   bootError: '',
@@ -1106,6 +1117,14 @@ function bindGlobalEvents() {
   });
 
   document.addEventListener('change', async (event) => {
+    if (event.target.id === 'save-share-save') {
+      state.saveShare.saveId = event.target.value;
+      return;
+    }
+    if (event.target.id === 'save-share-target') {
+      state.saveShare.targetInstanceId = event.target.value;
+      return;
+    }
     if (event.target.id === 'memory-range') {
       await saveConfig({ memoryMb: Number(event.target.value) });
     }
@@ -1234,6 +1253,10 @@ function bindGlobalEvents() {
     });
     api.on('resources:scan-progress', handleResourceScanProgress);
     api.on('resources:scan-done', (payload) => finishResourceScan(payload));
+    api.on('saves:changed', (payload) => {
+      state.saveShare.state = payload;
+      if (state.route === 'lan') paintSaveSharePanel();
+    });
     api.on('lan:update', (payload) => {
       const previous = state.lan.host?.status;
       const previousActive = Boolean(state.lan.host?.active);
@@ -3272,6 +3295,222 @@ async function patchOfflineLanServer() {
   }
 }
 
+function saveShareTargetInstance() {
+  const list = state.boot?.library?.instances || [];
+  return list.find((item) => item.id === state.saveShare.targetInstanceId && item.status === 'ready')
+    || getLanGuestInstance()
+    || list.find((item) => item.id === state.boot?.library?.activeInstanceId && item.status === 'ready')
+    || list.find((item) => item.status === 'ready')
+    || null;
+}
+
+function saveShareSaveOptions() {
+  const saves = state.saveShare.saves || [];
+  return saves.map((save) => {
+    const label = [save.instanceName, save.name, timeAgo(save.lastPlayed), formatCacheSize(save.size)]
+      .filter(Boolean).join(' · ');
+    return `<option value="${h(save.path)}" ${save.path === state.saveShare.saveId ? 'selected' : ''}>${h(label)}</option>`;
+  }).join('');
+}
+
+function saveSharePanelHtml() {
+  const data = state.saveShare;
+  const status = data.state;
+  const sharing = Boolean(status?.active && status.share);
+  const shares = Array.isArray(status?.shares) ? status.shares : [];
+  const saves = data.saves || [];
+  const target = saveShareTargetInstance();
+  const targetOptions = (state.boot?.library?.instances || [])
+    .filter((item) => item.status === 'ready')
+    .map((item) => `<option value="${h(item.id)}" ${item.id === target?.id ? 'selected' : ''}>${h(item.name)} · ${h(item.versionId)}</option>`)
+    .join('');
+  const active = status?.share;
+  return `<section class="panel save-share-panel" id="save-share-panel">
+    <div class="settings-head">
+      <span class="head-icon">${icon('save', 16)}</span>
+      <div><h3>局域网共享存档</h3><p>把一段存档直接发给同一局域网里的玩家，或接收别人共享的存档</p></div>
+      <span class="chip ${sharing ? 'green' : ''}" style="margin-left:auto">${sharing ? '共享中' : `识别到 ${saves.length} 个存档`}</span>
+      <button class="btn btn-ghost btn-sm" data-action="save-share-refresh" ${data.loading ? 'disabled' : ''}>${data.loading ? '<span class="spinner"></span>' : `${icon('refresh', 12)} 刷新`}</button>
+    </div>
+
+    <div class="save-share-body">
+      <div class="save-share-grid">
+        <section class="save-share-column">
+          <div class="save-share-column-head">${icon('arrowUpRight', 14)}<strong>共享我的存档</strong><span>主机</span></div>
+          ${sharing ? `<div class="save-share-active">
+            ${active.save?.icon ? `<img class="save-share-icon" src="${h(active.save.icon)}" alt="">` : `<span class="save-share-icon placeholder">${icon('save', 18)}</span>`}
+            <div class="save-share-active-copy">
+              <strong>${h(active.save?.name || '存档')}</strong>
+              <p>${h(active.save?.instanceName || '游戏目录')} · ${formatCacheSize(active.save?.size || 0)}</p>
+            </div>
+            <span class="chip green">共享中</span>
+          </div>
+          <div class="save-share-address">
+            ${active.addresses?.length ? `<code>${h(active.addresses[0])}</code><button class="icon-btn" data-action="lan-copy" data-text="${h(active.addresses[0])}" title="复制共享地址">${icon('copy', 14)}</button>` : '<span class="save-share-hint">正在获取本机地址…</span>'}
+          </div>
+          <p class="save-share-hint">同一 Wi-Fi/热点下的 OL启动器会自动发现这段存档；客机也可以从下方列表选择并下载。共享前建议先退出该世界，避免复制到正在写入的存档文件。</p>
+          <div class="save-share-actions"><button class="btn btn-danger btn-sm" data-action="save-share-stop">${icon('stop', 12)} 停止共享</button></div>` : `<div class="save-share-form">
+            <label for="save-share-save">选择要共享的存档</label>
+            ${saves.length ? `<div class="select-wrap"><select class="select" id="save-share-save">${saveShareSaveOptions()}</select><span class="select-arrow">${icon('chevronDown', 13)}</span></div>` : `<div class="save-share-empty">${data.loading ? '<span class="spinner light"></span> 正在识别本机存档…' : '没有识别到存档。先进入一次世界，或检查实例的 saves 目录。'}</div>`}
+            <button class="btn btn-primary btn-sm" data-action="save-share-start" ${!saves.length || data.busy ? 'disabled' : ''}>${data.busy === 'start' ? '<span class="spinner"></span> 正在启动共享' : `${icon('wifi', 13)} 开始共享存档`}</button>
+            <p class="save-share-hint">共享期间请保持启动器运行；关闭启动器会自动停止共享。</p>
+          </div>`}
+        </section>
+
+        <section class="save-share-column">
+          <div class="save-share-column-head">${icon('download', 14)}<strong>接收共享存档</strong><span>客机</span></div>
+          ${shares.length ? `<div class="save-share-discovered">${shares.map((share) => `<div class="save-share-row">
+            <span class="save-share-row-icon">${icon('save', 16)}</span>
+            <div class="save-share-row-copy">
+              <strong>${h(share.save?.name || '未命名存档')}</strong>
+              <p>${h(share.hostName || 'OL启动器')} · ${formatCacheSize(share.save?.size || 0)}${share.save?.lastPlayed ? ` · ${timeAgo(share.save.lastPlayed)}` : ''}</p>
+            </div>
+            <button class="btn btn-primary btn-sm" data-action="save-share-download" data-key="${h(share.key)}" ${data.busy ? 'disabled' : ''}>${data.busy === 'download' ? '<span class="spinner"></span>' : `${icon('download', 12)} 下载`}</button>
+          </div>`).join('')}</div>` : `<div class="save-share-empty">${state.saveShare.loading ? '<span class="spinner light"></span> 正在扫描局域网共享…' : '暂时没有发现共享存档。请确认主机已开始共享，并且两台设备在同一个局域网。'}</div>`}
+          <div class="save-share-target">
+            <label for="save-share-target">下载后导入到</label>
+            ${targetOptions ? `<div class="select-wrap"><select class="select" id="save-share-target">${targetOptions}</select><span class="select-arrow">${icon('chevronDown', 13)}</span></div>` : '<span class="save-share-hint">还没有已就绪的实例</span>'}
+          </div>
+          <p class="save-share-hint">下载会显示在右下角任务卡片；导入时如果同名存档已存在，会自动添加序号，不会覆盖原存档。</p>
+        </section>
+      </div>
+      ${data.error ? `<div class="notice error">${icon('alert', 15)}<span>${h(data.error)}</span></div>` : ''}
+      <div class="save-share-note">${icon('info', 14)}<span>存档共享只在当前局域网内广播和传输，不经过外网。需要允许 Windows 防火墙的 TCP 24455 与 UDP 24456；不要在同名存档上强制覆盖。</span></div>
+    </div>
+  </section>`;
+}
+
+function saveShareSignature() {
+  const data = state.saveShare;
+  return JSON.stringify({
+    active: Boolean(data.state?.active),
+    share: data.state?.share?.save?.path || data.state?.share?.save?.id || '',
+    shares: (data.state?.shares || []).map((item) => `${item.key}:${item.save?.name}`),
+    saves: (data.saves || []).map((item) => `${item.path}:${item.name}`),
+    saveId: data.saveId,
+    target: data.targetInstanceId,
+    busy: data.busy,
+    error: data.error,
+  });
+}
+
+function paintSaveSharePanel(force = false) {
+  const panel = $('#save-share-panel');
+  if (!panel) return;
+  const signature = saveShareSignature();
+  if (!force && panel.dataset.signature === signature) return;
+  panel.outerHTML = saveSharePanelHtml();
+  const next = $('#save-share-panel');
+  if (next) next.dataset.signature = signature;
+  hydrateIcons($('#view'));
+}
+
+async function loadSaveShareSaves(force = false) {
+  const data = state.saveShare;
+  if (data.loading) return;
+  if (!force && data.loadedAt && Date.now() - data.loadedAt < 12000) return;
+  data.loading = true;
+  try {
+    data.saves = await api.invoke('saves:list') || [];
+    data.loadedAt = Date.now();
+    if (!data.saves.some((item) => item.path === data.saveId)) data.saveId = data.saves[0]?.path || '';
+    const target = saveShareTargetInstance();
+    if (target) data.targetInstanceId = target.id;
+    data.error = '';
+  } catch (err) {
+    data.error = cleanError(err);
+  } finally {
+    data.loading = false;
+    paintSaveSharePanel(true);
+  }
+}
+
+async function refreshSaveShareState() {
+  if (state.saveShare.loading) return;
+  state.saveShare.loading = true;
+  try {
+    state.saveShare.state = await api.invoke('saves:state');
+    state.saveShare.error = '';
+  } catch (err) {
+    state.saveShare.error = cleanError(err);
+  } finally {
+    state.saveShare.loading = false;
+    if (state.route === 'lan') paintSaveSharePanel();
+  }
+}
+
+async function startSaveShare() {
+  const data = state.saveShare;
+  if (data.busy) return;
+  const selected = $('#save-share-save')?.value || data.saveId;
+  const save = data.saves.find((item) => item.path === selected);
+  if (!save) {
+    toast('请选择要共享的存档', '启动器还没有识别到存档', 'info');
+    return;
+  }
+  data.busy = 'start';
+  data.error = '';
+  paintSaveSharePanel(true);
+  try {
+    data.state = await api.invoke('saves:shareStart', {
+      instanceId: save.instanceId,
+      saveId: save.id,
+      savePath: save.path,
+    });
+    data.saveId = save.path;
+    toast('存档共享已开始', '同一局域网的客机会自动发现；保持启动器运行', 'success', 8000);
+  } catch (err) {
+    data.error = cleanError(err);
+    toast('开始共享失败', data.error, 'error', 9000);
+  } finally {
+    data.busy = '';
+    paintSaveSharePanel(true);
+  }
+}
+
+async function stopSaveShare() {
+  const data = state.saveShare;
+  if (data.busy) return;
+  data.busy = 'stop';
+  paintSaveSharePanel(true);
+  try {
+    data.state = await api.invoke('saves:shareStop');
+    toast('已停止共享存档', '', 'info');
+  } catch (err) {
+    data.error = cleanError(err);
+    toast('停止共享失败', data.error, 'error');
+  } finally {
+    data.busy = '';
+    paintSaveSharePanel(true);
+  }
+}
+
+async function downloadSharedSave(key) {
+  const data = state.saveShare;
+  if (data.busy) return;
+  const target = saveShareTargetInstance();
+  if (!target) {
+    toast('请先选择导入实例', '需要一个已经安装完成的实例', 'info');
+    return;
+  }
+  data.targetInstanceId = target.id;
+  data.busy = 'download';
+  data.error = '';
+  paintSaveSharePanel(true);
+  try {
+    const result = await api.invoke('saves:download', { instanceId: target.id, key });
+    toast('共享存档已导入', `${result.worldName || result.name} · ${target.name}`, 'success', 9000);
+    await loadSaveShareSaves(true);
+    await refreshSaveShareState();
+  } catch (err) {
+    data.error = cleanError(err);
+    toast('下载共享存档失败', data.error, 'error', 9000);
+  } finally {
+    data.busy = '';
+    paintSaveSharePanel(true);
+  }
+}
+
 function lanRoomCompatible(room) {
   const guest = getLanGuestInstance();
   if (!guest || guest.status !== 'ready') return false;
@@ -4037,6 +4276,7 @@ function startIntegrationWatch() {
     if (state.route !== 'lan') return;
     if (state.tailscale.status?.installed && !state.tailscale.loading) refreshTailscale();
     if (state.playit.status?.installed && !state.playit.loading) refreshPlayit();
+    refreshSaveShareState();
   }, 2500);
 }
 
@@ -4151,6 +4391,7 @@ function renderLanRoute() {
         </div>
       </section>
     </div>`}
+    ${saveSharePanelHtml()}
     ${tailscalePanelHtml()}
     ${playitPanelHtml()}
   </div>`;
@@ -4161,6 +4402,8 @@ function renderLanRoute() {
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
   if (!state.lan.initialized) refreshLanState();
+  loadSaveShareSaves().then(() => refreshSaveShareState());
+  refreshSaveShareState();
   startLanScan();
   startIntegrationWatch();
   if (host && state.lan.worldsInstanceId !== host.id && !state.lan.worldsLoading) {
@@ -5210,6 +5453,21 @@ async function runAction(action, el, event) {
         break;
       case 'offline-lan-refresh':
         await refreshOfflineLanStatus();
+        break;
+      case 'save-share-refresh':
+        await loadSaveShareSaves(true);
+        await refreshSaveShareState();
+        paintSaveSharePanel(true);
+        toast('存档列表已刷新', `识别到 ${state.saveShare.saves.length} 个存档`, 'success', 2500);
+        break;
+      case 'save-share-start':
+        await startSaveShare();
+        break;
+      case 'save-share-stop':
+        await stopSaveShare();
+        break;
+      case 'save-share-download':
+        await downloadSharedSave(el.dataset.key || '');
         break;
       case 'tailscale-install':
         await installTailscale();
