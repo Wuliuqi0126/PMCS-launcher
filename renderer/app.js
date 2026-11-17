@@ -115,6 +115,8 @@ const state = {
     fallbackPort: '',
     hostBusy: false,
     joinBusy: false,
+    preflight: null,
+    preflightBusy: false,
     roomSignature: '',
     hostSignature: '',
   },
@@ -3681,10 +3683,7 @@ async function downloadSharedSave(key) {
 
 function lanRoomCompatible(room) {
   const guest = getLanGuestInstance();
-  if (!guest || guest.status !== 'ready') return false;
-  if (room.version && guest.versionId !== room.version) return false;
-  if (room.loader && guest.loader !== room.loader) return false;
-  return true;
+  return Boolean(guest && guest.status === 'ready');
 }
 
 function lanRoomsHtml() {
@@ -3712,8 +3711,9 @@ function lanRoomsHtml() {
         <code>${h(room.ip)}:${h(room.port)}</code>
       </div>
       <div class="lan-room-action">
-        ${guest && !compatible ? `<span class="chip red" title="主机与当前实例版本或加载器不一致">需要 ${h(room.version || '相同版本')} ${h(loaderInfo(room.loader).label)}</span>` : ''}
-        <button class="btn btn-sm ${compatible ? 'btn-primary' : 'btn-secondary'}" data-action="lan-join-room" data-host="${h(room.ip)}" data-port="${h(room.port)}" ${compatible && !state.lan.joinBusy ? '' : 'disabled'}>${state.lan.joinBusy ? '<span class="spinner"></span>' : `${icon('play', 12)} 加入`}</button>
+        ${room.modCount ? `<span class="chip" title="主机启用的模组数量">${room.modCount} 个模组</span>` : ''}
+        ${!room.hasConfig && !room.configOversize ? `<span class="chip red" title="旧版主机没有提供模组清单">仅版本检查</span>` : ''}
+        <button class="btn btn-sm ${compatible ? 'btn-primary' : 'btn-secondary'}" data-action="lan-join-room" data-key="${h(room.key)}" data-host="${h(room.ip)}" data-port="${h(room.port)}" ${compatible && !state.lan.joinBusy && !state.lan.preflightBusy ? '' : 'disabled'}>${state.lan.joinBusy || state.lan.preflightBusy ? '<span class="spinner"></span>' : `${icon('play', 12)} 检查并加入`}</button>
       </div>
     </div>`;
   }).join('')}</div>`;
@@ -3721,10 +3721,10 @@ function lanRoomsHtml() {
 
 function lanRoomsSignature() {
   return JSON.stringify({
-    rooms: (state.lan.rooms || []).map((room) => `${room.key}:${room.name}:${room.version}:${room.loader}`),
+    rooms: (state.lan.rooms || []).map((room) => `${room.key}:${room.name}:${room.version}:${room.loader}:${room.modCount || 0}:${room.hasConfig ? 1 : 0}`),
     guest: getLanGuestInstance()?.id || '',
     error: state.lan.discoveryError,
-    busy: state.lan.joinBusy,
+    busy: `${state.lan.joinBusy}:${state.lan.preflightBusy}`,
   });
 }
 
@@ -4661,21 +4661,196 @@ async function useLanPort() {
   }
 }
 
-async function joinLanRoom(host, port) {
-  if (state.lan.joinBusy) return;
+function lanPreflightLoaderLabel(loader) {
+  return loaderInfo(loader || 'vanilla').label || loader || '原版';
+}
+
+function lanPreflightItemHtml(item, severity) {
+  const badge = severity === 'blocking' ? '必须处理' : severity === 'warning' ? '警告' : '提示';
+  const iconName = severity === 'blocking' ? 'alert' : 'info';
+  return `<div class="lan-preflight-item ${severity}">
+    <span class="lan-preflight-dot">${icon(iconName, 13)}</span>
+    <div class="lan-preflight-copy">
+      <strong>${h(item.title || '配置差异')}<span class="chip ${severity === 'blocking' ? 'red' : severity === 'warning' ? 'amber' : 'blue'}">${badge}</span></strong>
+      <p>${h(item.message || '')}</p>
+    </div>
+  </div>`;
+}
+
+function lanPreflightHtml(check) {
+  const busy = check.busy || '';
+  const modMissing = (check.blocking || []).filter((item) => item.action === 'download-mod');
+  const manualMissing = (check.blocking || []).filter((item) => item.action === 'manual-mod');
+  const needsInstance = (check.blocking || []).some((item) => item.action === 'create-instance');
+  const ready = check.canJoin && !busy;
+  return `<div class="lan-preflight">
+    <div class="lan-preflight-hero ${check.canJoin ? 'ok' : 'blocked'}">
+      <span class="lan-preflight-hero-icon">${icon(check.canJoin ? 'check' : 'alert', 19)}</span>
+      <div>
+        <strong>${check.canJoin ? '可以进入房间' : '需要先补齐配置'}</strong>
+        <p>${check.canJoin ? '发现一些不影响进入的差异，确认后仍可加入。' : '下面标记为“必须处理”的内容需要先下载或调整。'}</p>
+      </div>
+    </div>
+    <div class="lan-preflight-compare">
+      <div><small>主机</small><strong>${h(check.host?.instanceName || check.host?.name || '房间')}</strong><span>${h(check.host?.version || '未知版本')} · ${h(lanPreflightLoaderLabel(check.host?.loader))}${check.host?.modCount ? ` · ${check.host.modCount} 个模组` : ''}</span></div>
+      <span class="lan-preflight-vs">VS</span>
+      <div><small>本机实例</small><strong>${h(check.local?.name || '')}</strong><span>${h(check.local?.version || '')} · ${h(lanPreflightLoaderLabel(check.local?.loader))}${check.local?.modCount ? ` · ${check.local.modCount} 个模组` : ''}</span></div>
+    </div>
+    ${(check.blocking || []).length ? `<div class="lan-preflight-section">
+      <div class="lan-preflight-title">必须处理 <span>${check.blocking.length}</span></div>
+      ${check.blocking.map((item) => lanPreflightItemHtml(item, 'blocking')).join('')}
+    </div>` : ''}
+    ${(check.warnings || []).length ? `<div class="lan-preflight-section">
+      <div class="lan-preflight-title warning">警告 <span>${check.warnings.length}</span></div>
+      ${check.warnings.slice(0, 8).map((item) => lanPreflightItemHtml(item, 'warning')).join('')}
+      ${check.warnings.length > 8 ? `<div class="lan-preflight-more">还有 ${check.warnings.length - 8} 条警告未展开</div>` : ''}
+    </div>` : ''}
+    ${(check.info || []).length ? `<div class="lan-preflight-section">
+      <div class="lan-preflight-title info">提示 <span>${check.info.length}</span></div>
+      ${check.info.slice(0, 6).map((item) => lanPreflightItemHtml(item, 'info')).join('')}
+      ${check.info.length > 6 ? `<div class="lan-preflight-more">还有 ${check.info.length - 6} 条提示未展开</div>` : ''}
+    </div>` : ''}
+    ${check.error ? `<div class="notice error">${icon('alert', 14)}<span>${h(check.error)}</span></div>` : ''}
+    ${busy ? `<div class="lan-preflight-busy"><span class="spinner"></span><div><strong>${busy === 'create' ? '正在创建匹配实例…' : '正在下载缺失内容…'}</strong><p>下载进度可以在右下角任务卡片查看，完成后会自动重新检测。</p></div></div>` : ''}
+    <div class="lan-preflight-actions">
+      ${ready ? `<button class="btn btn-primary" data-action="lan-preflight-join">${icon('play', 13)} 仍然加入房间</button>` : ''}
+      ${modMissing.length && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-download">${icon('download', 13)} 下载缺失内容${modMissing.length ? `（${modMissing.length}）` : ''}</button>` : ''}
+      ${needsInstance && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-create">${icon('download', 13)} 创建匹配实例并下载</button>` : ''}
+      ${manualMissing.length && !busy ? `<button class="btn btn-secondary" data-action="lan-preflight-open-mods">${icon('folder', 13)} 打开本机 mods 目录</button>` : ''}
+      <button class="btn btn-ghost" data-action="scan-close-modal" ${busy ? 'disabled' : ''}>取消</button>
+    </div>
+    <p class="lan-preflight-footnote">资源包、光影包、额外的客户端模组等差异只作为提示，不会阻止进入。</p>
+  </div>`;
+}
+
+async function inspectLanRoom(roomKey, host, port) {
+  if (state.lan.preflightBusy) return;
   const instance = getLanGuestInstance();
   if (!instance) return toast('请选择加入实例', '', 'error');
+  state.lan.preflightBusy = true;
+  paintLanRooms(true);
+  try {
+    const check = await api.invoke('lan:preflight', { roomKey, instanceId: instance.id });
+    state.lan.preflight = { ...check, roomKey, address: host, port: Number(port), busy: '', error: '' };
+    openModal({
+      title: '加入房间前检查',
+      subtitle: '对比主机与本机的版本、加载器和模组',
+      wide: true,
+      body: lanPreflightHtml(state.lan.preflight),
+      footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
+    });
+  } catch (err) {
+    toast('配置检查失败', err.message || String(err), 'error', 9000);
+  } finally {
+    state.lan.preflightBusy = false;
+    paintLanRooms(true);
+  }
+}
+
+async function performLanJoin(check) {
+  if (!check || state.lan.joinBusy) return;
   state.lan.joinBusy = true;
   paintLanRooms(true);
   try {
-    await api.invoke('lan:join', { instanceId: instance.id, host, port: Number(port) });
-    toast('正在加入房间', `${host}:${port}`, 'success', 5000);
+    await api.invoke('lan:join', {
+      instanceId: check.local.id,
+      host: check.address,
+      port: Number(check.port),
+      roomKey: check.roomKey,
+      force: true,
+    });
+    closeModal();
+    toast('正在加入房间', `${check.address}:${check.port}`, 'success', 5000);
   } catch (err) {
-    toast('加入失败', err.message || String(err), 'error', 9000);
+    check.error = err.message || String(err);
+    setModalBody(lanPreflightHtml(check));
+    toast('加入失败', check.error, 'error', 9000);
   } finally {
     state.lan.joinBusy = false;
     paintLanRooms(true);
   }
+}
+
+async function downloadLanPreflight() {
+  const check = state.lan.preflight;
+  if (!check || check.busy) return;
+  const items = check.blocking.filter((item) => item.action === 'download-mod' && item.mod?.projectId);
+  if (!items.length) return;
+  check.busy = 'download';
+  check.error = '';
+  setModalBody(lanPreflightHtml(check));
+  const errors = [];
+  for (const item of items) {
+    try {
+      await api.invoke('mods:install', {
+        instanceId: check.local.id,
+        projectId: item.mod.projectId,
+        source: item.mod.source || 'modrinth',
+        module: 'mods',
+      });
+      if (item.kind === 'mod-disabled') {
+        try {
+          await api.invoke('components:toggle', { instanceId: check.local.id, kind: 'mods', filename: item.mod.filename, enabled: true });
+        } catch (_) { /* preflight will report it again */ }
+      }
+    } catch (err) {
+      errors.push(`${item.title}: ${cleanError(err)}`);
+    }
+  }
+  check.busy = '';
+  if (errors.length) check.error = errors.join('；');
+  try {
+    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: check.local.id });
+    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error };
+    setModalBody(lanPreflightHtml(state.lan.preflight));
+  } catch (err) {
+    check.error = cleanError(err);
+    setModalBody(lanPreflightHtml(check));
+  }
+}
+
+async function waitForLanInstance(instanceId, timeoutMs = 8 * 60 * 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const boot = await api.invoke('app:bootstrap');
+    const instance = (boot.library?.instances || []).find((item) => item.id === instanceId);
+    if (instance?.status === 'ready') return instance;
+    if (instance?.status === 'error') throw new Error(instance.lastError || '匹配实例安装失败，请到实例管理修复');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+  throw new Error('匹配实例安装超时，请到实例管理查看进度');
+}
+
+async function createLanMatchingInstance() {
+  const check = state.lan.preflight;
+  if (!check || check.busy) return;
+  const host = check.host || {};
+  check.busy = 'create';
+  check.error = '';
+  setModalBody(lanPreflightHtml(check));
+  try {
+    const name = `PMCS · ${host.version || 'Minecraft'} ${lanPreflightLoaderLabel(host.loader)}`;
+    const instance = await api.invoke('instances:create', {
+      name,
+      versionId: host.version,
+      loader: host.loader || 'vanilla',
+      loaderVersion: host.loaderVersion || '',
+    });
+    state.lan.guestInstanceId = instance.id;
+    await waitForLanInstance(instance.id);
+    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: instance.id });
+    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: '' };
+    setModalBody(lanPreflightHtml(state.lan.preflight));
+    toast('匹配实例已就绪', `${instance.name}`, 'success', 6000);
+  } catch (err) {
+    check.error = cleanError(err);
+    check.busy = '';
+    setModalBody(lanPreflightHtml(check));
+  }
+}
+
+async function joinLanRoom(roomKey, host, port) {
+  await inspectLanRoom(roomKey, host, port);
 }
 
 async function joinLanManual() {
@@ -5729,8 +5904,22 @@ async function runAction(action, el, event) {
         break;
       }
       case 'lan-join-room':
-        await joinLanRoom(el.dataset.host, Number(el.dataset.port));
+        await joinLanRoom(el.dataset.key, el.dataset.host, Number(el.dataset.port));
         break;
+      case 'lan-preflight-join':
+        await performLanJoin(state.lan.preflight);
+        break;
+      case 'lan-preflight-download':
+        await downloadLanPreflight();
+        break;
+      case 'lan-preflight-create':
+        await createLanMatchingInstance();
+        break;
+      case 'lan-preflight-open-mods': {
+        const check = state.lan.preflight;
+        if (check?.local?.id) await api.invoke('instances:openFolder', { id: check.local.id, sub: 'mods' });
+        break;
+      }
       case 'lan-join-manual':
         await joinLanManual();
         break;

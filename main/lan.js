@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
+const { hashFile, readJson } = require('./util');
 
 const DISCOVERY_PORT = 24454;
 const MAGIC = 'OL_LAN_V1';
@@ -144,6 +145,149 @@ function parseLanPort(lines) {
   return null;
 }
 
+const CONTENT_MANIFEST = '.oasis-mods.json';
+const MAX_SYNC_MODS = 180;
+
+function packNames(dir) {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.zip$/i.test(entry.name))
+      .map((entry) => entry.name)
+      .slice(0, 120);
+  } catch (_) {
+    return [];
+  }
+}
+
+async function instanceConfig(instance, instanceDir, includeDisabled = false) {
+  const modsDir = path.join(instanceDir, 'mods');
+  const manifest = readJson(path.join(modsDir, CONTENT_MANIFEST), { mods: {} }) || { mods: {} };
+  let entries = [];
+  try {
+    entries = fs.readdirSync(modsDir, { withFileTypes: true }).filter((entry) => entry.isFile() && /\.jar(\.disabled)?$/i.test(entry.name));
+  } catch (_) { /* no mods */ }
+  const mods = [];
+  for (const entry of entries) {
+    const enabled = !entry.name.endsWith('.disabled');
+    if (!includeDisabled && !enabled) continue;
+    const filename = enabled ? entry.name : entry.name.slice(0, -'.disabled'.length);
+    const full = path.join(modsDir, entry.name);
+    const meta = manifest.mods?.[entry.name] || manifest.mods?.[filename] || {};
+    let sha1 = '';
+    let size = 0;
+    try {
+      sha1 = await hashFile(full, 'sha1');
+      size = fs.statSync(full).size;
+    } catch (_) { /* keep partial metadata */ }
+    mods.push({
+      filename,
+      enabled,
+      sha1,
+      size,
+      projectId: meta.projectId ? String(meta.projectId) : '',
+      source: meta.source === 'curseforge' ? 'curseforge' : meta.source === 'modrinth' ? 'modrinth' : '',
+      versionId: meta.versionId ? String(meta.versionId) : '',
+      versionNumber: meta.versionNumber || '',
+      title: meta.title || filename,
+    });
+    if (mods.length >= MAX_SYNC_MODS) break;
+  }
+  return {
+    mods,
+    modsTruncated: entries.length > MAX_SYNC_MODS,
+    resourcepacks: packNames(path.join(instanceDir, 'resourcepacks')),
+    shaderpacks: packNames(path.join(instanceDir, 'shaderpacks')),
+  };
+}
+
+function modMatchKey(mod) {
+  if (mod.projectId) return `p:${mod.projectId}`;
+  if (mod.sha1) return `s:${mod.sha1}`;
+  return `f:${String(mod.filename || '').toLowerCase()}`;
+}
+
+function compareInstanceConfig(hostConfig, localConfig, instance) {
+  const blocking = [];
+  const warnings = [];
+  const info = [];
+  const hostMods = Array.isArray(hostConfig?.mods) ? hostConfig.mods : [];
+  const localMods = Array.isArray(localConfig?.mods) ? localConfig.mods : [];
+  const localByProject = new Map();
+  const localBySha = new Map();
+  const localByName = new Map();
+  for (const mod of localMods) {
+    if (mod.projectId) localByProject.set(String(mod.projectId), mod);
+    if (mod.sha1) localBySha.set(mod.sha1, mod);
+    localByName.set(String(mod.filename || '').toLowerCase(), mod);
+  }
+  const matched = new Set();
+  const missingMods = [];
+  for (const mod of hostMods) {
+    if (!mod.enabled) continue;
+    const match = (mod.projectId && localByProject.get(String(mod.projectId)))
+      || (mod.sha1 && localBySha.get(mod.sha1))
+      || localByName.get(String(mod.filename || '').toLowerCase());
+    if (match) {
+      matched.add(match);
+      if (!match.enabled) {
+        blocking.push({
+          kind: 'mod-disabled',
+          title: mod.title || mod.filename,
+          message: '主机已启用该模组，但本机把它禁用了',
+          mod,
+          downloadable: Boolean(mod.projectId),
+          action: 'download-mod',
+        });
+      } else if (mod.sha1 && match.sha1 && mod.sha1 !== match.sha1) {
+        blocking.push({
+          kind: 'mod-version',
+          title: mod.title || mod.filename,
+          message: `模组版本不一致：主机 ${mod.versionNumber || mod.filename}`,
+          mod,
+          downloadable: Boolean(mod.projectId),
+          action: 'download-mod',
+        });
+      }
+      continue;
+    }
+    const item = {
+      kind: mod.projectId ? 'mod-missing' : 'mod-manual',
+      title: mod.title || mod.filename,
+      message: mod.projectId ? `缺少主机模组 ${mod.filename}` : `缺少手动安装的模组 ${mod.filename}，无法自动下载`,
+      mod,
+      downloadable: Boolean(mod.projectId),
+      action: mod.projectId ? 'download-mod' : 'manual-mod',
+    };
+    blocking.push(item);
+    if (mod.projectId) missingMods.push(mod);
+  }
+  for (const mod of localMods) {
+    if (!mod.enabled || matched.has(mod)) continue;
+    warnings.push({
+      kind: 'mod-extra',
+      title: mod.title || mod.filename,
+      message: '本机多出的模组；如果它只影响客户端，通常仍可进入',
+    });
+  }
+  const hostPacks = new Set(hostConfig?.resourcepacks || []);
+  const localPacks = new Set(localConfig?.resourcepacks || []);
+  for (const name of hostPacks) {
+    if (!localPacks.has(name)) info.push({ kind: 'resourcepack', title: name, message: '主机使用但本机没有的资源包（仅影响画面）' });
+  }
+  const hostShaders = new Set(hostConfig?.shaderpacks || []);
+  const localShaders = new Set(localConfig?.shaderpacks || []);
+  for (const name of hostShaders) {
+    if (!localShaders.has(name)) info.push({ kind: 'shader', title: name, message: '主机使用但本机没有的光影包（仅影响画面）' });
+  }
+  if (!hostConfig) {
+    warnings.push({ kind: 'config-missing', title: '主机未提供模组清单', message: '只能检查版本和加载器；如进入后掉线，请让主机更新启动器' });
+  }
+  if (hostConfig?.modsTruncated) {
+    warnings.push({ kind: 'config-truncated', title: '主机模组数量较多', message: `仅检查前 ${MAX_SYNC_MODS} 个模组，未列出的模组可能仍然缺失` });
+  }
+  return { blocking, warnings, info, missingMods };
+}
+
 function createLanService({ store, launcher, onUpdate, onActiveChange }) {
   const hostId = crypto.randomBytes(8).toString('hex');
   const rooms = new Map();
@@ -191,6 +335,9 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
         version: room.version || '',
         loader: room.loader || 'vanilla',
         loaderVersion: room.loaderVersion || '',
+        modCount: room.config?.mods?.length || 0,
+        hasConfig: Boolean(room.config),
+        configOversize: Boolean(room.configOversize),
         seenAt: room.seenAt,
       })),
       host: publicHost(),
@@ -241,6 +388,8 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
         version: data.version || '',
         loader: data.loader || 'vanilla',
         loaderVersion: data.loaderVersion || '',
+        config: data.config && typeof data.config === 'object' ? data.config : null,
+        configOversize: Boolean(data.configOversize),
         seenAt: Date.now(),
       });
       emitSoon();
@@ -267,6 +416,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       version: host.version,
       loader: host.loader,
       loaderVersion: host.loaderVersion || '',
+      config: host.config || null,
       ts: Date.now(),
     };
   }
@@ -274,7 +424,12 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
   function sendBeacon() {
     const payload = roomPayload();
     if (!payload || !sender) return;
-    const buffer = Buffer.from(JSON.stringify(payload));
+    let buffer = Buffer.from(JSON.stringify(payload));
+    if (buffer.length > 58000) {
+      payload.config = null;
+      payload.configOversize = true;
+      buffer = Buffer.from(JSON.stringify(payload));
+    }
     const targets = new Set(['255.255.255.255']);
     for (const item of addresses()) {
       if (item.broadcast) targets.add(item.broadcast);
@@ -350,6 +505,10 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       if (!fs.existsSync(worldDir)) throw new Error('选择的存档不存在');
       worldName = readLevelName(path.join(worldDir, 'level.dat')) || worldName;
     }
+    let config = null;
+    try {
+      config = await instanceConfig(instance, store.instanceDir(instance), false);
+    } catch (_) { /* the room can still advertise version/loader */ }
     host = {
       active: true,
       status: 'starting',
@@ -358,6 +517,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       version: instance.versionId,
       loader: instance.loader,
       loaderVersion: instance.loaderVersion || '',
+      config,
       worldId: worldId || '',
       worldName: worldName || '未指定存档',
       port: null,
@@ -401,7 +561,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     return state();
   }
 
-  async function join({ instanceId, host: address, port }) {
+  async function join({ instanceId, host: address, port, roomKey, force = false }) {
     const instance = store.getInstance(String(instanceId || ''));
     if (!instance) throw new Error('请选择要加入的实例');
     if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
@@ -411,8 +571,88 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     }
     const portNumber = Number(port);
     if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) throw new Error('端口无效');
+    if (roomKey && !force) {
+      const check = await preflight({ roomKey, instanceId: instance.id });
+      if (!check.canJoin) throw new Error('本机与房间配置不一致，请先完成缺失内容下载');
+    }
     await launcher.launch(instance.id, { quickPlayMultiplayer: `${hostName}:${portNumber}` });
     return true;
+  }
+
+  async function preflight({ roomKey, instanceId }) {
+    const room = rooms.get(String(roomKey || ''));
+    if (!room) throw new Error('房间已过期，请刷新局域网列表后重试');
+    const instance = store.getInstance(String(instanceId || ''));
+    if (!instance) throw new Error('请选择要加入的实例');
+    if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
+    const localConfig = await instanceConfig(instance, store.instanceDir(instance), true);
+    const compared = compareInstanceConfig(room.config, localConfig, instance);
+    const blocking = [...compared.blocking];
+    const warnings = [...compared.warnings];
+    const info = [...compared.info];
+    if (room.version && instance.versionId !== room.version) {
+      blocking.unshift({
+        kind: 'version',
+        title: '游戏版本不一致',
+        message: `房间是 ${room.version}，当前实例是 ${instance.versionId}`,
+        action: 'create-instance',
+        requiredVersion: room.version,
+        requiredLoader: room.loader,
+        requiredLoaderVersion: room.loaderVersion,
+      });
+    }
+    if (room.loader && instance.loader !== room.loader) {
+      blocking.unshift({
+        kind: 'loader',
+        title: '模组加载器不一致',
+        message: `房间使用 ${room.loader}，当前实例使用 ${instance.loader}`,
+        action: 'create-instance',
+        requiredVersion: room.version,
+        requiredLoader: room.loader,
+        requiredLoaderVersion: room.loaderVersion,
+      });
+    }
+    if (room.loaderVersion && instance.loaderVersion && room.loaderVersion !== instance.loaderVersion) {
+      warnings.push({
+        kind: 'loader-version',
+        title: '加载器版本不同',
+        message: `主机 ${room.loaderVersion}，本机 ${instance.loaderVersion}；通常可以进入，异常时请对齐版本`,
+      });
+    }
+    if (room.configOversize) {
+      warnings.push({ kind: 'config-truncated', title: '主机配置过大', message: '主机未能广播完整模组清单，只校验版本和加载器' });
+    }
+    const seen = new Set();
+    const uniqueBlocking = blocking.filter((item) => {
+      const key = `${item.kind}:${item.title}:${item.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return {
+      canJoin: uniqueBlocking.length === 0,
+      blocking: uniqueBlocking,
+      warnings,
+      info,
+      missingMods: compared.missingMods,
+      host: {
+        name: room.name,
+        instanceName: room.instanceName,
+        version: room.version,
+        loader: room.loader,
+        loaderVersion: room.loaderVersion,
+        modCount: room.config?.mods?.length || 0,
+        hasConfig: Boolean(room.config),
+      },
+      local: {
+        id: instance.id,
+        name: instance.name,
+        version: instance.versionId,
+        loader: instance.loader,
+        loaderVersion: instance.loaderVersion || '',
+        modCount: localConfig.mods.filter((mod) => mod.enabled).length,
+      },
+    };
   }
 
   function listWorlds(instanceId) {
@@ -477,9 +717,10 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     stopHost,
     setPort,
     join,
+    preflight,
     listWorlds,
     hostId,
   };
 }
 
-module.exports = { createLanService, DISCOVERY_PORT, parseLanPort, readLevelName };
+module.exports = { createLanService, DISCOVERY_PORT, parseLanPort, readLevelName, instanceConfig, compareInstanceConfig };

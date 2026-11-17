@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 const { ensureDir, hashFileAlgorithms, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'PMCSLauncher/1.12.0 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'PMCSLauncher/1.13.0 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
   https: new https.Agent({ keepAlive: true, maxSockets: 512 }),
   http: new http.Agent({ keepAlive: true, maxSockets: 512 }),

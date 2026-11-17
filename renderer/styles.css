@@ -987,6 +987,44 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 @keyframes lanPulse { 0% { transform: scale(.82); opacity: .7; } 100% { transform: scale(1.18); opacity: 0; } }
 .lan-scan-empty strong { font-size: 11.5px; font-weight: 600; }
 .lan-scan-empty p { margin: 6px 0 0; color: var(--muted-2); font-size: 9.5px; line-height: 1.65; max-width: 300px; }
+.lan-preflight { display: flex; flex-direction: column; gap: 11px; }
+.lan-preflight-hero { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 11px; border: 1px solid; }
+.lan-preflight-hero.ok { border-color: rgba(110, 231, 149, .24); background: rgba(110, 231, 149, .07); }
+.lan-preflight-hero.blocked { border-color: rgba(240, 124, 114, .25); background: rgba(240, 124, 114, .07); }
+.lan-preflight-hero-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; background: rgba(255, 255, 255, .05); }
+.lan-preflight-hero.ok .lan-preflight-hero-icon { color: var(--accent); }
+.lan-preflight-hero.blocked .lan-preflight-hero-icon { color: #ff9c94; }
+.lan-preflight-hero strong { display: block; font-size: 11.5px; }
+.lan-preflight-hero p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.lan-preflight-compare { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, .014); }
+.lan-preflight-compare > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lan-preflight-compare small { color: var(--muted-2); font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.lan-preflight-compare strong { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lan-preflight-compare span:not(.lan-preflight-vs) { color: var(--muted); font-size: 8.5px; }
+.lan-preflight-vs { flex: 0 0 auto; color: var(--muted-2); font-family: var(--font-mono); font-size: 8px; }
+.lan-preflight-section { display: flex; flex-direction: column; gap: 5px; }
+.lan-preflight-title { display: flex; align-items: center; gap: 6px; color: #ff9c94; font-size: 9px; font-weight: 650; letter-spacing: .03em; }
+.lan-preflight-title.warning { color: var(--amber); }
+.lan-preflight-title.info { color: var(--blue); }
+.lan-preflight-title span { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.06); font-family: var(--font-mono); font-size: 7.5px; }
+.lan-preflight-item { display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.012); }
+.lan-preflight-item.blocking { border-color: rgba(240,124,114,.16); }
+.lan-preflight-item.warning { border-color: rgba(240,198,106,.12); }
+.lan-preflight-item.info { border-color: rgba(127,183,255,.12); }
+.lan-preflight-dot { flex: 0 0 auto; margin-top: 1px; }
+.lan-preflight-item.blocking .lan-preflight-dot { color: #ff9c94; }
+.lan-preflight-item.warning .lan-preflight-dot { color: var(--amber); }
+.lan-preflight-item.info .lan-preflight-dot { color: var(--blue); }
+.lan-preflight-copy { min-width: 0; }
+.lan-preflight-copy strong { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 9.5px; }
+.lan-preflight-copy p { margin: 3px 0 0; color: var(--muted); font-size: 8.5px; line-height: 1.55; word-break: break-word; }
+.lan-preflight-more { padding-left: 2px; color: var(--muted-2); font-size: 8px; }
+.lan-preflight-busy { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(110,231,149,.18); border-radius: 9px; background: rgba(110,231,149,.05); }
+.lan-preflight-busy strong { display: block; font-size: 9.5px; }
+.lan-preflight-busy p { margin: 3px 0 0; color: var(--muted); font-size: 8.5px; }
+.lan-preflight-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 2px; }
+.lan-preflight-footnote { margin: 0; color: var(--muted-2); font-size: 8px; line-height: 1.6; }
+
 .lan-room-list { display: flex; flex-direction: column; gap: 7px; }
 .lan-room {
   display: flex; align-items: center; gap: 10px; padding: 11px 12px;

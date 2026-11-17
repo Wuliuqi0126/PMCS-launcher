@@ -484,6 +484,7 @@ function registerIpc() {
   ipcMain.handle('lan:stopHost', async () => lan.stopHost());
   ipcMain.handle('lan:setPort', async (_event, port) => lan.setPort(port));
   ipcMain.handle('lan:join', async (_event, payload) => lan.join(payload || {}));
+  ipcMain.handle('lan:preflight', async (_event, payload) => lan.preflight(payload || {}));
 
   ipcMain.handle('accounts:list', async () => accounts.list());
   ipcMain.handle('accounts:addOffline', async (_event, name) => accounts.addOffline(name));

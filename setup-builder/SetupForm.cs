@@ -30,8 +30,8 @@ namespace OLSetup
             isUpdate = !string.IsNullOrEmpty(installedPath);
             this.target = isUpdate ? installedPath : ResolveInstallPath(target);
             Text = isUpdate
-                ? "PMCS launcher 1.12.0 更新程序"
-                : "PMCS launcher 1.12.0 下载程序";
+                ? "PMCS launcher 1.13.0 更新程序"
+                : "PMCS launcher 1.13.0 下载程序";
             ClientSize = new Size(620, 430);
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -51,7 +51,7 @@ namespace OLSetup
             Controls.Add(title);
 
             subtitleLabel = new Label();
-            subtitleLabel.Text = "版本 1.12.0  ·  Minecraft Java 版启动器";
+            subtitleLabel.Text = "版本 1.13.0  ·  Minecraft Java 版启动器";
             subtitleLabel.Font = new Font("Microsoft YaHei UI", 9F);
             subtitleLabel.ForeColor = Color.FromArgb(100, 100, 100);
             subtitleLabel.AutoSize = true;
@@ -249,9 +249,9 @@ namespace OLSetup
         private void RefreshMode()
         {
             Text = isUpdate
-                ? "PMCS launcher 1.12.0 更新程序"
-                : "PMCS launcher 1.12.0 下载程序";
-            subtitleLabel.Text = "版本 1.12.0  ·  Minecraft Java 版启动器";
+                ? "PMCS launcher 1.13.0 更新程序"
+                : "PMCS launcher 1.13.0 下载程序";
+            subtitleLabel.Text = "版本 1.13.0  ·  Minecraft Java 版启动器";
             installButton.Text = isUpdate ? "更新" : "安装";
             statusLabel.Text = isUpdate
                 ? "检测到原安装，点击「更新」覆盖程序文件；存档、配置和游戏资源会保留。"
