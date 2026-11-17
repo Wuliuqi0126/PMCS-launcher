@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.9.0',
+    title: '下载引擎提速与校验升级',
+    current: true,
+    items: [
+      '移除已失效/无用的 MCBBS 与 MC光速镜像，只保留 Mojang 官方、BMCLAPI、FastMinecraftMirror 三个下载源。',
+      '游戏资源与依赖库并发从 100 提升到 256，HTTP 连接池提升到 512。',
+      '大文件分片阈值降到 4 MB，分片线程从最多 16 提升到 64，Java、客户端和模组下载同步提速。',
+      '哈希校验升级为优先 SHA-512、其次 SHA-256；Mojang 只提供 SHA-1 的资源继续校验 SHA-1，所有可用哈希一次读取完成。',
+      '模组下载同时校验 Modrinth 提供的 SHA-512 与 SHA-1，测速与设置页同步精简为三源。',
+    ],
+  },
+  {
     version: '1.8.0',
     title: '主页推荐设置',
-    current: true,
     items: [
       '主页公告按钮旁新增“推荐”按钮，集中展示能明显改善游玩体验的建议。',
       '推荐弹窗包含关闭主机正版验证、安装 Sodium / Lithium / FerriteCore 性能优化模组、下载 Java 21、局域网共享存档。',

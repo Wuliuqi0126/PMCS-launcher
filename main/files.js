@@ -11,7 +11,7 @@ const OS_NAME = process.platform === 'win32' ? 'windows' : process.platform === 
 const OS_ARCH = process.arch === 'arm64' ? 'arm64' : process.arch === 'ia32' ? 'x86' : 'x86_64';
 const BIT_ARCH = process.arch === 'ia32' ? '32' : '64';
 const ASSET_URL = 'https://resources.download.minecraft.net';
-const DOWNLOAD_THREADS = 100;
+const DOWNLOAD_THREADS = 256;
 
 function featureSet() {
   return {

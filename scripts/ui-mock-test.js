@@ -116,8 +116,8 @@ function mockPayload() {
       showGameLog: true,
       msClientId: '',
     },
-    sourceActive: 'hkmc',
-    sourceLabel: 'MC光速镜像（EO）',
+    sourceActive: 'fmm',
+    sourceLabel: 'FastMinecraftMirror',
     accounts: {
       accounts: [
         { id: 'acc_1', type: 'offline', name: 'Steve', uuid: '00000000000000000000000000000001', createdAt: new Date(now - 86400000 * 10).toISOString(), lastLogin: null, expired: false },
@@ -330,17 +330,15 @@ async function main() {
             sources: {
               official: { ok: true, bytes: 1572864, elapsedMs: 6120, firstByteMs: 980, bytesPerSecond: 257000, timedOut: false },
               bmclapi: { ok: false, bytes: 450000, elapsedMs: 12000, firstByteMs: 1390, bytesPerSecond: 38000, timedOut: true },
-              fmm: { ok: false, bytes: 0, elapsedMs: 8000, firstByteMs: null, bytesPerSecond: 0, timedOut: true },
-              mcbbs: { ok: false, bytes: 0, elapsedMs: 6000, firstByteMs: null, bytesPerSecond: 0, timedOut: true },
-              hkmc: { ok: true, bytes: 2097152, elapsedMs: 2210, firstByteMs: 640, bytesPerSecond: 948000, timedOut: false },
+              fmm: { ok: true, bytes: 2097152, elapsedMs: 2210, firstByteMs: 640, bytesPerSecond: 948000, timedOut: false },
             },
             ranking: [
-              { source: 'hkmc', bytesPerSecond: 948000, bytes: 2097152 },
+              { source: 'fmm', bytesPerSecond: 948000, bytes: 2097152 },
               { source: 'official', bytesPerSecond: 257000, bytes: 1572864 },
             ],
-            recommended: 'hkmc',
-            active: 'hkmc',
-            activeLabel: 'MC光速镜像（EO）',
+            recommended: 'fmm',
+            active: 'fmm',
+            activeLabel: 'FastMinecraftMirror',
             current: 'auto',
             testedAt: Date.now(),
           };
@@ -457,7 +455,7 @@ async function main() {
   await page.evaluate(() => { location.hash = '#/settings'; });
   await page.waitForSelector('[data-action="settings-test-source"]');
   await page.click('[data-action="settings-test-source"]');
-  await page.waitForFunction(() => document.querySelector('.source-test-summary')?.textContent.includes('MC光速'), { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector('.source-test-summary')?.textContent.includes('FastMinecraftMirror'), { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 400));
   await page.screenshot({ path: path.join(OUT, 'settings-source-test.png') });
 

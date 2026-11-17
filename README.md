@@ -1,6 +1,6 @@
 # OL启动器 · OL Launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.8.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.9.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [OL启动器 1.8.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.8.0/OLLauncher-1.8.0-Setup.exe)
-- [OL启动器 1.8.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.8.0/OLLauncher-1.8.0-Portable.zip)
+- [OL启动器 1.9.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.9.0/OLLauncher-1.9.0-Setup.exe)
+- [OL启动器 1.9.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.9.0/OLLauncher-1.9.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -33,11 +33,11 @@
 - **托盘与关闭确认**：应用启动后显示系统托盘图标；关闭窗口时弹出上下两个单选项「最小化到托盘 / 退出 OL启动器」，并提供「记住该选项」和「之后可以在设置栏里更改」提示，底部为「暂不退出 / 退出启动器」。设置页的「关闭窗口时」可随时改回每次询问、最小化到托盘或直接退出。托盘菜单仍可重新显示主界面或彻底退出。
 - **可选卸载清理**：卸载程序提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」三个独立选项，默认保留存档与配置，并默认卸载 Tailscale；只删除程序文件时不会动 `游戏目录`。
 - **退出时清理关联进程**：关闭启动器会终止所有 Minecraft/Java 游戏进程、Tailscale 登录子进程和局域网服务，避免残留后台进程占用文件导致无法卸载。
-- **下载源测速**：自动并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror、MCBBS、MC光速镜像（EO 线路）五路速度，优先使用最快的源；设置中也可以手动锁定任意源。
-- **百线程并发下载**：游戏资源与依赖库各 100 路并行，针对 Minecraft 大量小文件减少网络等待；支持 HTTP Keep-Alive、超时重试和 `.part` 断点续传。
-- **大文件分片加速**：客户端 JAR、Java、Forge 安装器等 ≥8 MB 文件自动切成 8–16 个 Range 分片并发，优先使用测速排名靠前的镜像，最后合并并做 SHA1 校验；不支持 Range 的源自动回退单连接。
+- **下载源测速**：自动并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror 三路速度，优先使用最快的源；设置中也可以手动锁定任意源。
+- **256 线程并发下载**：游戏资源与依赖库各 256 路并行，针对 Minecraft 大量小文件减少网络等待；支持 HTTP Keep-Alive、超时重试和 `.part` 断点续传。
+- **大文件分片加速**：客户端 JAR、Java、模组等 ≥4 MB 文件自动切成最多 64 个 Range 分片并发，优先使用测速排名靠前的镜像，最后合并并做多重哈希校验；不支持 Range 的源自动回退单连接。
 - **智能动态调度**：下载中实时监测速度，当前源连续低于阈值时自动中止并切换到其他镜像；已下载的分片通过 Range 继续，不从头重下。
-- **完整文件校验**：最终文件统一做 SHA1/大小校验，即使中途来自不同镜像也保证完整性；支持 BMCLAPI、FastMinecraftMirror、MCBBS 与 MC光速镜像；FastMinecraftMirror 还覆盖 Forge、Fabric、OptiFine、LiteLoader 的镜像路径。
+- **完整文件校验**：优先校验 SHA-512，其次 SHA-256；Mojang 元数据只提供 SHA-1 的资源仍校验 SHA-1。所有可用哈希会一次读取完成校验，任何一项不匹配都会自动回退到下一个源。
 - **多实例管理**：每个实例拥有独立的存档、模组、配置与日志；共享 `versions`、`libraries`、`assets`，节省磁盘空间。
 - **局域网联机**：主机选择实例和存档后自动进入世界，在游戏内「对局域网开放」后自动检测端口；同一 Wi-Fi/热点下的设备通过启动器自动发现房间并一键加入，也支持手动输入 `IP:端口`。内置完整联机指引和故障排查。
 - **局域网共享存档**：自动识别本机所有实例、游戏目录和其他启动器目录中的存档；主机选择存档后通过局域网 HTTP 共享，客机自动发现并下载导入到指定实例，同名存档自动追加序号，不覆盖原存档。
@@ -55,7 +55,7 @@
 - **离线与微软账号**：离线账号开箱即用；微软账号使用 OAuth 2.0 设备代码流，刷新令牌通过 Electron `safeStorage` 加密存储在本机。
 - **启动与日志**：自动构建 classpath 与 JVM/游戏参数，支持旧版 `minecraftArguments`、资源虚拟化、natives 解压、日志配置；实时查看游戏输出。
 - **任务进度**：安装版本、安装实例、下载 Java、启动游戏都有右下角进度卡片和错误提示；多任务按创建顺序稳定排列，进度更新只修改对应字段，不会反复重建卡片。
-- **下载源**：自动测速（默认）/ Mojang 官方 / BMCLAPI / FastMinecraftMirror / MCBBS / MC光速镜像；第三方镜像只缓存 Mojang 文件，所有文件仍做 SHA1 校验，模组仍走 Modrinth 官方 CDN。
+- **下载源**：自动测速（默认）/ Mojang 官方 / BMCLAPI / FastMinecraftMirror；第三方镜像只缓存 Mojang 文件，所有文件仍做 SHA-512 / SHA-256 / SHA-1 校验，模组仍走 Modrinth 官方 CDN。
 
 | 版本库 | 模组市场 |
 | --- | --- |
@@ -120,7 +120,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/OL启动器-1.8.0-安装程序.exe
+setup/OL启动器-1.9.0-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `OL launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -137,14 +137,14 @@ setup/OL启动器-1.8.0-安装程序.exe
 OL我的世界启动器.exe
 ```
 
-安装包文件名保持 **OL启动器-1.8.0-安装程序.exe** 不变。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名保持 **OL启动器-1.9.0-安装程序.exe** 不变。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: F4088BA40D2FBCC24D26C87C79B3D1E8A6695D22544F88A77ACD232B5D8B1DD0
+SHA256: 3849344835DBBC2F24C94335CDC3B9B4019CC76EAEB30DD08BA4F5F149D66FFE
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
@@ -156,13 +156,13 @@ SHA256: F4088BA40D2FBCC24D26C87C79B3D1E8A6695D22544F88A77ACD232B5D8B1DD0
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/OL启动器-1.8.0-便携版.zip
+setup/OL启动器-1.9.0-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-99FA52CE6ECC0D00AF08BD56A11D4FA108F70D0E9FE517458C42AD7F6756AB72
+1F45F7B6B593B3D98AEB7B0F653B9FEA1FB89DDA6A29A65DF6C0A90EF0DE22BC
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
@@ -181,7 +181,7 @@ setup/OL启动器-1.8.0-便携版.zip
 
 > **关于 SmartScreen：** 当前没有受信任的代码签名证书，因此无法从技术上保证“不出现拦截”。安装包/程序第一次运行时仍可能显示“Windows 已保护你的电脑”，点击「更多信息 → 仍要运行」即可。要彻底消除提示，需要购买受信任的代码签名证书（或上架 Microsoft Store）；自签名证书无效。一键安装器已经彻底移除 NSIS，因此 `Error writing temporary file` 不会再有，但 SmartScreen 是签名信誉问题，属于另一件事。
 >
-> 系统要求：Windows 10/11 x64。启动游戏需要能访问 Mojang 文件服务；下载源默认自动测速，也可以手动选择官方、BMCLAPI、FastMinecraftMirror、MCBBS 或 MC光速镜像。
+> 系统要求：Windows 10/11 x64。启动游戏需要能访问 Mojang 文件服务；下载源默认自动测速，也可以手动选择官方、BMCLAPI 或 FastMinecraftMirror。
 
 ## 从源码运行
 
@@ -207,7 +207,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `OL我的世界启动器.exe`，快捷方式同名。
-- 安装包文件名保持 `OL启动器-1.8.0-安装程序.exe`。
+- 安装包文件名保持 `OL启动器-1.9.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -228,7 +228,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-OL启动器-1.8.0-安装程序.exe /S /DIR="D:\Games\OL我的世界启动器"
+OL启动器-1.9.0-安装程序.exe /S /DIR="D:\Games\OL我的世界启动器"
 ```
 
 electron-builder 和缓存保留在：
@@ -346,8 +346,8 @@ playit.gg 是另一条不依赖公网 IP 的隧道方案，适合不想让客机
 
 ### 下载很慢怎么办
 
-1. 默认使用「自动测速」：启动器和每次下载前会并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror、MCBBS、MC光速镜像（EO 线路），选择实际最快的源，并在 2 分钟内复用测速结果（延迟与吞吐综合排序）。
-2. 打开「设置 → 下载源」，点击「测速」可以立即比较五路速度，并手动锁定某个源。
+1. 默认使用「自动测速」：启动器和每次下载前会并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror，选择实际最快的源，并在 2 分钟内复用测速结果（延迟与吞吐综合排序）。
+2. 打开「设置 → 下载源」，点击「测速」可以立即比较三路速度，并手动锁定某个源。
 3. 如果卡在 Java 下载：Java 来自 Eclipse Adoptium，和 Mojang 下载源无关。可以安装系统 Java 后在设置里选择 `java.exe`，避免重复下载。
 4. Forge Installer 和 Modrinth 文件分别来自 MinecraftForge 与 Modrinth CDN，不走 Mojang 镜像；这两部分慢时只能更换网络环境。
 5. 已经下载且校验通过的文件会自动跳过。中断后重新安装/修复即可接着补齐，不会从头下载。
@@ -420,12 +420,12 @@ scripts/           无头 UI 测试、图标生成
 ## 已知限制
 
 - 当前仅提供 Windows x64 安装包；代码中的部分路径处理已考虑 macOS/Linux，但未做平台打包验证。
-- 加载器支持原版、Fabric、Forge；暂未加入 NeoForge、Quilt。
+- 加载器支持原版、Fabric、Forge、NeoForge、Quilt。
 - 微软登录依赖 Azure 应用配置与微软服务可用性，无法在离线环境使用。
 - 局域网联机依赖 Minecraft 自带「对局域网开放」，主机需要在游戏内完成这一步；安装程序会自动添加专用网络防火墙规则，但公用网络、AP 隔离或 VPN 仍可能阻止发现，此时改用手动地址。
 - 游戏内中文通过设置 `options.txt` 实现；Minecraft 本身和原版界面会显示中文，第三方模组是否中文取决于作者是否提供汉化资源包。
 - 实例模组设置通过 `.disabled` 后缀启停文件；光影包和资源包启用后仍需在游戏内对应菜单选择，且实例运行中不能切换（避免文件占用）。
-- MC光速镜像（`mirror.hkmc.online`，EO 线路）是社区第三方缓存，只镜像 Mojang 文件，可能限速或失效；启动器不会提供盗版客户端，也不会绕过正版验证。下载仍会校验 SHA1，失败会自动回退到下一个源。来源说明：[NodeLoc MC光速镜像](https://www.nodeloc.com/t/topic/103161)。
+- 第三方镜像只缓存 Mojang 文件，可能限速或失效；启动器不会提供盗版客户端，也不会绕过正版验证。下载仍会校验可用哈希，失败会自动回退到下一个源。
 - 首次下载完整资源体积较大（例如 1.20.1 约 620 MB），速度取决于网络。启动器会跳过已存在且校验通过的文件。
 - 安装包未签名，Windows SmartScreen 可能提示“未识别的应用”，可点击“更多信息 → 仍要运行”。
 
@@ -435,7 +435,7 @@ scripts/           无头 UI 测试、图标生成
 - 多任务进度卡片经过交错更新测试：任务顺序保持不变、首个卡片 DOM 节点不被重建、进度/阶段文本正确刷新，不再因每次进度事件重新播放入场动画。
 - 1.3.0 浅色 WinForms 安装器已验证：`TEMP/TMP` 指向不存在的目录、目标目录预置只读旧文件时，仍能安装并生成 `OL我的世界启动器.exe`；安装包包含带资源/配置/Tailscale 选项的 `Uninstall.exe`，并内置 Tailscale MSI；退出启动器时会调用游戏进程树清理。
 - 下载源测速接口已用真实 Mojang 资源采样验证，并完成界面/结果展示测试。排序会综合吞吐和首字节延迟；测速结果缓存 2 分钟。FastMinecraftMirror 目前部分子域可能返回 404 或证书异常，探测失败会自动跳过，不会阻塞其他源。FastMirror 主要是服务端核心镜像，CMCL 使用 BMCLAPI，二者没有作为独立客户端资源源接入。
-- 自动源下载链路已端到端验证：自动探测选中 `hkmc` 后，通过镜像下载 Gson JAR 并通过 SHA1 校验；官方字段、资源对象、依赖库和客户端路径均会映射到镜像。
+- 自动源下载链路已端到端验证：自动探测在官方/BMCLAPI/FMM 中选取最快源，下载 Gson JAR 并通过 SHA-1 校验；官方字段、资源对象、依赖库和客户端路径均会映射到镜像。
 - 局域网联机链路已验证：`level.dat` 名称解析、存档列表、游戏日志端口识别（`Started serving on <port>`）、UDP 24454 房间广播/发现、Quick Play 单人/多人参数与旧版 `--server/--port` 回退。
 - 游戏语言写入已验证：1.12 及更早映射为 `zh_CN`，1.13+ 映射为 `zh_cn`，保留 `options.txt` 其他设置并替换旧 `lang` 行。
 - 局域网完整指引弹窗已通过无头 UI 测试，包含主机、客机、防火墙、AP 隔离、版本/模组不一致和端口变化排查，并支持复制文字版。
