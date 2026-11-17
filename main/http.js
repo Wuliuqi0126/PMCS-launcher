@@ -6,12 +6,12 @@ const http = require('http');
 const https = require('https');
 const zlib = require('zlib');
 const crypto = require('crypto');
-const { ensureDir, verifyFile, wait } = require('./util');
+const { ensureDir, hashFileAlgorithms, verifyFile, wait } = require('./util');
 
-const USER_AGENT = 'OLLauncher/1.8.0 (Minecraft launcher; +https://www.minecraft.net/)';
+const USER_AGENT = 'OLLauncher/1.9.0 (Minecraft launcher; +https://www.minecraft.net/)';
 const agents = {
-  https: new https.Agent({ keepAlive: true, maxSockets: 128 }),
-  http: new http.Agent({ keepAlive: true, maxSockets: 128 }),
+  https: new https.Agent({ keepAlive: true, maxSockets: 512 }),
+  http: new http.Agent({ keepAlive: true, maxSockets: 512 }),
 };
 
 const SOURCE_DEFS = {
@@ -26,12 +26,6 @@ const SOURCE_DEFS = {
     host: 'bmclapi2.bangbang93.com',
     assetBase: 'https://bmclapi2.bangbang93.com/assets',
     manifest: 'https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json',
-  },
-  mcbbs: {
-    label: 'MCBBS 镜像',
-    host: 'download.mcbbs.net',
-    assetBase: 'https://download.mcbbs.net/assets',
-    manifest: 'https://download.mcbbs.net/mc/game/version_manifest_v2.json',
   },
   fmm: {
     label: 'FastMinecraftMirror',
@@ -55,19 +49,13 @@ const SOURCE_DEFS = {
       'optifine.net': 'optifine.fastmcmirror.org',
     },
   },
-  hkmc: {
-    label: 'MC光速镜像（EO）',
-    host: 'mirror.hkmc.online',
-    assetBase: 'https://mirror.hkmc.online/assets',
-    manifest: 'https://mirror.hkmc.online/mc/game/version_manifest_v2.json',
-  },
 };
-const SOURCE_IDS = ['official', 'bmclapi', 'fmm', 'mcbbs', 'hkmc'];
+const SOURCE_IDS = ['official', 'bmclapi', 'fmm'];
 const TEST_HASH = '868c7a7c4d9358d631fa2f9abfc6bbf05d88292d';
 const TEST_ASSET_PATH = `${TEST_HASH.slice(0, 2)}/${TEST_HASH}`;
 const AUTO_PROBE_TTL = 2 * 60 * 1000;
-const SEGMENT_THRESHOLD = 8 * 1024 * 1024;
-const SEGMENT_MAX = 16;
+const SEGMENT_THRESHOLD = 4 * 1024 * 1024;
+const SEGMENT_MAX = 64;
 
 let downloadSource = 'official';
 let activeSource = 'official';
@@ -86,8 +74,8 @@ function setDownloadSource(source) {
     activeSource = source;
     return;
   }
-  downloadSource = 'official';
-  activeSource = 'official';
+  downloadSource = 'auto';
+  activeSource = sourceRanking[0]?.source || 'official';
 }
 
 function getDownloadSource() {
@@ -158,8 +146,7 @@ async function probeSources(options = {}) {
   const timeout = Math.max(3000, Number(options.timeout) || 6000);
   const results = {};
   const ranking = [];
-  // Probe in parallel so unreachable mirrors (for example the retired MCBBS
-  // endpoint) cannot delay the whole source decision.
+  // Probe in parallel so one unreachable mirror cannot delay the whole source decision.
   const measured = await Promise.all(SOURCE_IDS.map(async (source) => {
     const result = await measureDownload(testAssetUrl(source), { maxBytes, timeout });
     return { source, result };
@@ -516,9 +503,9 @@ async function downloadFile(urls, destination, options = {}) {
       if (url && !candidates.includes(url)) candidates.push(url);
     }
   }
-  const { sha1, sha256, size, onProgress, retries = 2, timeout = 45000, signal } = options;
+  const { sha1, sha256, sha512, size, onProgress, retries = 2, timeout = 45000, signal } = options;
   if (signal?.aborted) throw new Error('任务已停止');
-  if (await verifyFile(destination, { sha1, sha256, size })) {
+  if (await verifyFile(destination, { sha1, sha256, sha512, size })) {
     if (onProgress) onProgress({ downloaded: size || 0, total: size || 0, skipped: true });
     return { skipped: true, path: destination, size: size || 0 };
   }
@@ -543,13 +530,7 @@ async function downloadFile(urls, destination, options = {}) {
         onProgress,
         timeout: Math.max(timeout, 120000),
       });
-      if (sha1 || sha256) {
-        const actual = await hashFile(temp, sha256 ? 'sha256' : 'sha1');
-        const expected = sha256 ? String(sha256).toLowerCase() : String(sha1).toLowerCase();
-        if (actual !== expected) {
-          throw new Error(`文件校验失败 (${sha256 ? 'SHA256' : 'SHA1'} 不匹配)`);
-        }
-      }
+      await verifyDownloaded(temp, { sha1, sha256, sha512 });
       try { fs.renameSync(temp, destination); } catch (err) {
         if (err.code !== 'EEXIST' && err.code !== 'EPERM') throw err;
         try { fs.unlinkSync(destination); } catch (_) { /* ignore */ }
@@ -574,13 +555,7 @@ async function downloadFile(urls, destination, options = {}) {
           resume: true,
           minSpeed: options.minSpeed != null ? Number(options.minSpeed) : (Number(size) >= 256 * 1024 ? 64 * 1024 : 0),
         });
-        if (sha1 || sha256) {
-          const actual = await hashFile(temp, sha256 ? 'sha256' : 'sha1');
-          const expected = sha256 ? String(sha256).toLowerCase() : String(sha1).toLowerCase();
-          if (actual !== expected) {
-            throw new Error(`文件校验失败 (${sha256 ? 'SHA256' : 'SHA1'} 不匹配)`);
-          }
-        }
+        await verifyDownloaded(temp, { sha1, sha256, sha512 });
         try { fs.renameSync(temp, destination); } catch (err) {
           if (err.code !== 'EEXIST' && err.code !== 'EPERM') throw err;
           try { fs.unlinkSync(destination); } catch (_) { /* ignore */ }
@@ -589,7 +564,7 @@ async function downloadFile(urls, destination, options = {}) {
         return { ...result, path: destination };
       } catch (err) {
         lastError = err;
-        if (/SHA1|SHA256|校验/.test(String(err.message))) {
+        if (/SHA1|SHA256|SHA512|校验/.test(String(err.message))) {
           try { fs.unlinkSync(temp); } catch (_) { /* ignore */ }
         }
         if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429) {
@@ -611,6 +586,20 @@ function hashFile(file, algorithm = 'sha1') {
     stream.on('data', (chunk) => hash.update(chunk));
     stream.on('end', () => resolve(hash.digest('hex')));
   });
+}
+
+async function verifyDownloaded(file, { sha1, sha256, sha512 } = {}) {
+  const expected = [
+    ['sha512', sha512],
+    ['sha256', sha256],
+    ['sha1', sha1],
+  ].filter(([, value]) => value);
+  if (!expected.length) return;
+  const actual = await hashFileAlgorithms(file, expected.map(([algorithm]) => algorithm));
+  const failed = expected.filter(([algorithm, value]) => actual[algorithm] !== String(value).toLowerCase());
+  if (failed.length) {
+    throw new Error(`文件校验失败 (${failed.map(([algorithm]) => algorithm.toUpperCase()).join('/')} 不匹配)`);
+  }
 }
 
 function downloadOnce(url, destination, options = {}) {

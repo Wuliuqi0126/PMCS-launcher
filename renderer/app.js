@@ -1057,9 +1057,7 @@ function renderShell() {
   $('#footer-source').textContent = sourceMode === 'auto'
     ? '自动选择最快源'
       : sourceMode === 'bmclapi' ? 'BMCLAPI 镜像'
-      : sourceMode === 'fmm' ? 'FastMinecraftMirror'
-      : sourceMode === 'mcbbs' ? 'MCBBS 镜像'
-        : sourceMode === 'hkmc' ? 'MC光速镜像' : 'Mojang 官方源';
+      : sourceMode === 'fmm' ? 'FastMinecraftMirror' : 'Mojang 官方源';
   const navInstanceBadge = $('#nav-instance-badge');
   if (navInstanceBadge) {
     const count = state.boot.library.instances.length;
@@ -4681,11 +4679,11 @@ async function copyLanText(text) {
 
 function sourceTestSummary() {
   const test = state.sourceTest;
-  if (!test) return '自动模式会并行测试官方、BMCLAPI、FastMinecraftMirror、MCBBS、MC光速五个下载源，选择最快的源，约需 10–20 秒。';
+  if (!test) return '自动模式会并行测试官方、BMCLAPI、FastMinecraftMirror 三个下载源，选择最快的源，约需 6–12 秒。';
   if (test.loading) return '正在测试下载速度，请稍候…';
   if (test.error) return `测速失败：${test.error}`;
   const sources = test.sources || test;
-  const labels = { official: '官方', bmclapi: 'BMCLAPI', fmm: 'FastMinecraftMirror', mcbbs: 'MCBBS', hkmc: 'MC光速' };
+  const labels = { official: '官方', bmclapi: 'BMCLAPI', fmm: 'FastMinecraftMirror' };
   const recommended = labels[test.recommended] || '官方';
   const parts = Object.keys(labels).map((key) => `${labels[key]} ${sourceSpeedText(sources[key])}`);
   return `${parts.join(' · ')} · 建议：${recommended}${test.current === 'auto' ? ` · 当前自动使用：${test.activeLabel || recommended}` : ''}`;
@@ -4806,7 +4804,7 @@ function renderSettingsRoute() {
       <section class="panel settings-panel">
         <div class="settings-head"><span class="head-icon">${icon('globe', 16)}</span><div><h3>下载源</h3><p>自动测速，优先使用更快的源</p></div></div>
         <div class="setting-row">
-          <div class="setting-info"><strong>文件下载源</strong><p>自动模式会在启动/下载前测速；第三方镜像只缓存 Mojang 文件，仍会做 SHA1 校验。</p></div>
+          <div class="setting-info"><strong>文件下载源</strong><p>自动模式会在启动/下载前测速；第三方镜像只缓存 Mojang 文件，仍会做 SHA-512/SHA-256/SHA-1 校验。</p></div>
           <div class="setting-control">
             <div class="source-control">
               <div class="source-options">
@@ -4821,12 +4819,6 @@ function renderSettingsRoute() {
                 </button>
                 <button class="source-option ${config.downloadSource === 'fmm' ? 'active' : ''}" data-action="settings-source" data-source="fmm">
                   <strong>${icon('globe', 12)} FastMinecraftMirror</strong><span>Mojang / Forge / Fabric</span>
-                </button>
-                <button class="source-option ${config.downloadSource === 'mcbbs' ? 'active' : ''}" data-action="settings-source" data-source="mcbbs">
-                  <strong>${icon('globe', 12)} MCBBS 镜像</strong><span>BMCLAPI 兼容源</span>
-                </button>
-                <button class="source-option ${config.downloadSource === 'hkmc' ? 'active' : ''}" data-action="settings-source" data-source="hkmc">
-                  <strong>${icon('radio', 12)} MC光速镜像</strong><span>EO 线路 · 第三方缓存</span>
                 </button>
               </div>
               <div class="source-test">
@@ -4944,9 +4936,9 @@ async function testDownloadSources() {
     if (!usable) {
       toast('测速失败', '三个下载源都无法正常连接，请检查网络或代理设置', 'error', 8000);
     } else {
-      const names = { official: 'Mojang 官方', bmclapi: 'BMCLAPI 镜像', fmm: 'FastMinecraftMirror', mcbbs: 'MCBBS 镜像', hkmc: 'MC光速镜像' };
+      const names = { official: 'Mojang 官方', bmclapi: 'BMCLAPI 镜像', fmm: 'FastMinecraftMirror' };
       const label = names[result.recommended] || 'Mojang 官方';
-      toast('下载源测速完成', `建议使用 ${label} · 官方 ${sourceSpeedText(sources.official)} / BMCLAPI ${sourceSpeedText(sources.bmclapi)} / FMM ${sourceSpeedText(sources.fmm)} / MCBBS ${sourceSpeedText(sources.mcbbs)} / MC光速 ${sourceSpeedText(sources.hkmc)}`, 'info', 9000);
+      toast('下载源测速完成', `建议使用 ${label} · 官方 ${sourceSpeedText(sources.official)} / BMCLAPI ${sourceSpeedText(sources.bmclapi)} / FMM ${sourceSpeedText(sources.fmm)}`, 'info', 9000);
     }
   } catch (err) {
     state.sourceTest = { error: err.message || String(err) };
@@ -4956,7 +4948,7 @@ async function testDownloadSources() {
 }
 
 async function applyDownloadSource(source) {
-  const allowed = ['auto', 'official', 'bmclapi', 'fmm', 'mcbbs', 'hkmc'];
+  const allowed = ['auto', 'official', 'bmclapi', 'fmm'];
   const next = allowed.includes(source) ? source : 'auto';
   await saveConfig({ downloadSource: next });
   if (state.sourceTest && !state.sourceTest.loading) state.sourceTest.current = next;
@@ -4964,7 +4956,8 @@ async function applyDownloadSource(source) {
   const messages = {
     auto: '下载前会自动测速，优先使用最快的源',
     official: '后续下载将使用 Mojang 官方源',
-    hkmc: '后续下载将优先使用 MC光速镜像（EO 线路）',
+    bmclapi: '后续下载将使用 BMCLAPI 镜像',
+    fmm: '后续下载将使用 FastMinecraftMirror',
   };
   toast('下载源已切换', messages[next], 'info');
 }
@@ -5928,7 +5921,7 @@ async function runAction(action, el, event) {
         toast('已恢复自动检测 Java', '', 'info');
         break;
       case 'settings-source': {
-        const source = ['auto', 'official', 'bmclapi', 'fmm', 'mcbbs', 'hkmc'].includes(el.dataset.source) ? el.dataset.source : 'auto';
+        const source = ['auto', 'official', 'bmclapi', 'fmm'].includes(el.dataset.source) ? el.dataset.source : 'auto';
         await applyDownloadSource(source);
         break;
       }

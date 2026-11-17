@@ -200,7 +200,7 @@ async function ensureJava(store, requiredMajor, task) {
     if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 0, detail: '测速选择 Java 加速节点…' });
     const candidates = javaCandidateUrls(asset.url);
     const ranked = await rankJavaCandidates(candidates);
-    if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 1, detail: `Temurin JRE · ${asset.size ? `${(asset.size / 1048576).toFixed(1)} MB · ` : ''}16 线程分段` });
+    if (task) task.update({ stage: `下载 Java ${downloadMajor} 运行时`, percent: 1, detail: `Temurin JRE · ${asset.size ? `${(asset.size / 1048576).toFixed(1)} MB · ` : ''}64 线程分段` });
     await downloadFile(ranked, zipFile, {
       size: asset.size || undefined,
       sha256: asset.sha256 || undefined,
@@ -214,7 +214,7 @@ async function ensureJava(store, requiredMajor, task) {
         if (task) task.update({
           stage: `下载 Java ${downloadMajor} 运行时`,
           percent: Math.min(95, p.percent || 0),
-          detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB · 16 线程` : '正在下载…',
+          detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB · 64 线程` : '正在下载…',
         });
       },
     });

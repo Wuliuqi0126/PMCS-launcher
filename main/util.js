@@ -64,6 +64,20 @@ function hashFile(file, algorithm = 'sha1') {
   });
 }
 
+function hashFileAlgorithms(file, algorithms = []) {
+  const unique = [...new Set(algorithms.filter(Boolean).map((item) => String(item).toLowerCase()))];
+  if (!unique.length) return Promise.resolve({});
+  return new Promise((resolve, reject) => {
+    const hashes = Object.fromEntries(unique.map((algorithm) => [algorithm, crypto.createHash(algorithm)]));
+    const stream = fs.createReadStream(file);
+    stream.on('error', reject);
+    stream.on('data', (chunk) => {
+      for (const hash of Object.values(hashes)) hash.update(chunk);
+    });
+    stream.on('end', () => resolve(Object.fromEntries(Object.entries(hashes).map(([key, hash]) => [key, hash.digest('hex')]))));
+  });
+}
+
 function sha1File(file) {
   return hashFile(file, 'sha1');
 }
@@ -72,16 +86,25 @@ function sha256File(file) {
   return hashFile(file, 'sha256');
 }
 
-async function verifyFile(file, { size, sha1, sha256 } = {}) {
+function sha512File(file) {
+  return hashFile(file, 'sha512');
+}
+
+async function verifyFile(file, { size, sha1, sha256, sha512 } = {}) {
   if (!exists(file)) return false;
   if (typeof size === 'number' && size >= 0 && fileSize(file) !== size) return false;
-  if (sha1) {
-    try { return (await sha1File(file)) === sha1.toLowerCase(); } catch (_) { return false; }
+  const expected = [
+    ['sha512', sha512],
+    ['sha256', sha256],
+    ['sha1', sha1],
+  ].filter(([, value]) => value);
+  if (!expected.length) return true;
+  try {
+    const actual = await hashFileAlgorithms(file, expected.map(([algorithm]) => algorithm));
+    return expected.every(([algorithm, value]) => actual[algorithm] === String(value).toLowerCase());
+  } catch (_) {
+    return false;
   }
-  if (sha256) {
-    try { return (await sha256File(file)) === sha256.toLowerCase(); } catch (_) { return false; }
-  }
-  return true;
 }
 
 function randomId(prefix = '') {
@@ -211,8 +234,10 @@ module.exports = {
   fileSize,
   exists,
   hashFile,
+  hashFileAlgorithms,
   sha1File,
   sha256File,
+  sha512File,
   verifyFile,
   randomId,
   md5,

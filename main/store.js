@@ -34,6 +34,9 @@ class Store {
       if (!rawConfig.downloadSource || rawConfig.downloadSource === 'official') this.config.downloadSource = 'auto';
       this.config.sourceModeVersion = 2;
     }
+    if (!['auto', 'official', 'bmclapi', 'fmm'].includes(this.config.downloadSource)) {
+      this.config.downloadSource = 'auto';
+    }
     if (!this.config.gameDir) {
       this.config.gameDir = path.join(app.getPath('appData'), '.oasis');
     }

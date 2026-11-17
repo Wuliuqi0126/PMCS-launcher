@@ -288,6 +288,8 @@ function createMods({ store, tasks }) {
     const remoteUrls = [...new Set([mirrorFileUrl(file.url, mirror), file.url].filter(Boolean))];
     await downloadFile(remoteUrls, destination, {
       sha1: file.hashes?.sha1,
+      sha512: file.hashes?.sha512,
+      sha256: file.hashes?.sha256,
       size: file.size,
       timeout: 120000,
       retries: 2,
