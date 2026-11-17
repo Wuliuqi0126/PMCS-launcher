@@ -1686,6 +1686,15 @@ body.scan-open .task-stack {
 .home-version-copy strong { color: #9fe8b3; font-family: var(--font-mono); font-size: 13px; font-weight: 500; }
 .home-version-state { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; color: #779180; font-size: 8.5px; }
 .home-version-state i { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 7px rgba(115,230,154,.7); }
+.home-meta-actions { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.home-recommend {
+  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px;
+  border: 1px solid rgba(110, 231, 149, .22); border-radius: 9px;
+  background: linear-gradient(135deg, rgba(110, 231, 149, .12), rgba(110, 231, 149, .04));
+  color: var(--accent); font: inherit; font-size: 10px; cursor: pointer;
+  transition: background .18s, border-color .18s, transform .18s;
+}
+.home-recommend:hover { background: rgba(110, 231, 149, .16); border-color: rgba(110, 231, 149, .4); transform: translateY(-1px); }
 .home-announcement {
   position: relative; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px;
   border: 1px solid rgba(233, 196, 106, .17); border-radius: 9px;
@@ -1697,6 +1706,56 @@ body.scan-open .task-stack {
   position: absolute; right: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%;
   background: #e9c46a; border: 2px solid var(--bg); box-shadow: 0 0 8px rgba(233,196,106,.6);
 }
+/* ==== RECOMMENDATIONS ==== */
+.recommend-modal { display: flex; flex-direction: column; gap: 12px; }
+.recommend-hero {
+  display: flex; align-items: flex-start; gap: 11px; padding: 13px 14px; border-radius: 12px;
+  border: 1px solid rgba(110, 231, 149, .17); background: linear-gradient(130deg, rgba(110, 231, 149, .09), rgba(255, 255, 255, .015));
+}
+.recommend-hero-icon {
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px; display: grid; place-items: center;
+  background: rgba(110, 231, 149, .12); color: var(--accent);
+}
+.recommend-hero strong { display: block; font-size: 12px; font-weight: 650; }
+.recommend-hero p { margin: 4px 0 0; color: var(--muted); font-size: 9.5px; line-height: 1.6; }
+.recommend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.recommend-card {
+  padding: 12px; border: 1px solid var(--line); border-radius: 11px;
+  background: rgba(255, 255, 255, .014); display: flex; flex-direction: column; gap: 9px;
+}
+.recommend-card-head { display: flex; align-items: flex-start; gap: 8px; }
+.recommend-card-icon {
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: 8px; display: grid; place-items: center;
+  background: rgba(110, 231, 149, .08); color: var(--accent);
+}
+.recommend-card-head div { min-width: 0; }
+.recommend-card-head strong { display: block; font-size: 10.5px; font-weight: 650; }
+.recommend-card-head p { margin: 4px 0 0; color: var(--muted); font-size: 8.8px; line-height: 1.6; }
+.recommend-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.recommend-instance-row { display: flex; gap: 6px; align-items: center; }
+.recommend-instance-row .select-wrap { flex: 1; min-width: 0; }
+.recommend-instance-row .select { width: 100%; }
+.recommend-instance-row .btn { flex: 0 0 auto; }
+.recommend-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.recommend-tags span {
+  padding: 2px 6px; border-radius: 5px; background: rgba(127, 183, 255, .07);
+  color: #9dc3ee; font-family: var(--font-mono); font-size: 7.5px;
+}
+.recommend-empty {
+  padding: 9px 10px; border: 1px dashed var(--line); border-radius: 8px;
+  color: var(--muted-2); font-size: 8.8px; line-height: 1.6;
+}
+.recommend-tips {
+  padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .018);
+}
+.recommend-tips > strong { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 9.5px; }
+.recommend-tips ul { margin: 7px 0 0; padding-left: 18px; color: var(--muted); font-size: 9px; line-height: 1.75; }
+.recommend-tips b { color: var(--text-soft); }
+@media (max-width: 900px) {
+  .recommend-grid { grid-template-columns: 1fr; }
+}
+
 .settings-version-notice {
   display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 20px;
   border: 1px solid rgba(173,239,193,.13); border-radius: 15px;
