@@ -238,6 +238,8 @@ function createTailscale({ app, tasks, onChange, openExternal, openGuide, cliPat
             stage: '下载 Tailscale 官方安装包',
             percent: 4 + Math.round((p.percent || 0) * 0.7),
             detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB` : `${((p.downloaded || 0) / 1048576).toFixed(1)} MB`,
+            downloaded: p.downloaded,
+            total: p.total,
           }),
         });
         const actual = await sha256File(file);

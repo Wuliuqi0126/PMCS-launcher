@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const AdmZip = require('adm-zip');
 const { downloadFile, mapLimit } = require('./http');
-const { ensureDir, exists, fileSize, formatBytes, readJson, verifyFile } = require('./util');
+const { ensureDir, exists, fileSize, readJson, verifyFile } = require('./util');
 
 const OS_NAME = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'osx' : 'linux';
 const OS_ARCH = process.arch === 'arm64' ? 'arm64' : process.arch === 'ia32' ? 'x86' : 'x86_64';
@@ -116,7 +116,19 @@ async function ensureLibraries(store, merged, task) {
   }
   let done = 0;
   const total = jobs.length;
+  const totalBytes = jobs.reduce((sum, { art }) => sum + (Number(art.size) || 0), 0);
+  const progress = new Map();
   let lastUpdate = 0;
+  let lastBytesUpdate = 0;
+  const reportBytes = (force = false) => {
+    if (!task || totalBytes <= 0) return;
+    const now = Date.now();
+    if (!force && now - lastBytesUpdate < 150) return;
+    lastBytesUpdate = now;
+    let downloaded = 0;
+    for (const value of progress.values()) downloaded += value;
+    task.update({ downloaded: Math.min(downloaded, totalBytes), total: totalBytes });
+  };
   ensureDir(path.join(store.gameDir, 'libraries'));
   const errors = [];
   await mapLimit(jobs, DOWNLOAD_THREADS, async ({ art }) => {
@@ -127,11 +139,17 @@ async function ensureLibraries(store, merged, task) {
           size: art.size,
           sha1: art.sha1,
           retries: 2,
+          onProgress: (p) => {
+            progress.set(art.path, Math.min(Number(art.size) || p.total || 0, p.downloaded || 0));
+            reportBytes();
+          },
         });
       }
+      if (Number(art.size) > 0) progress.set(art.path, art.size);
     } catch (err) {
       errors.push(`${art.path}: ${err.message}`);
     }
+    reportBytes();
     done += 1;
     if (task) {
       const now = Date.now();
@@ -146,7 +164,7 @@ async function ensureLibraries(store, merged, task) {
     }
   });
   if (errors.length) throw new Error(`依赖库下载失败：${errors.slice(0, 3).join('；')}`);
-  if (task) task.update({ stage: '依赖库就绪', percent: 100, detail: `${total} 个文件` });
+  if (task) task.update({ stage: '依赖库就绪', percent: 100, detail: `${total} 个文件`, downloaded: totalBytes, total: totalBytes });
   return libraries;
 }
 
@@ -163,7 +181,7 @@ async function downloadAssetIndex(store, merged, task) {
       sha1: index.sha1,
       retries: 2,
       onProgress: (p) => {
-        if (task) task.update({ stage: '获取资源索引', percent: 2 + (p.percent || 0) * 0.03, detail: index.id });
+        if (task) task.update({ stage: '获取资源索引', percent: 2 + (p.percent || 0) * 0.03, detail: index.id, downloaded: p.downloaded, total: p.total });
       },
     });
   }
@@ -175,10 +193,21 @@ async function ensureAssets(store, merged, task, instanceDir = '') {
   if (!index) return { total: 0 };
   const objects = Object.entries(index.objects || {});
   const total = objects.length;
+  const totalBytes = objects.reduce((sum, [, meta]) => sum + (Number(meta.size) || 0), 0);
+  const progress = new Map();
   let done = 0;
-  let bytes = 0;
   let lastUpdate = 0;
+  let lastBytesUpdate = 0;
   const errors = [];
+  const reportBytes = (force = false) => {
+    if (!task || totalBytes <= 0) return;
+    const now = Date.now();
+    if (!force && now - lastBytesUpdate < 150) return;
+    lastBytesUpdate = now;
+    let downloaded = 0;
+    for (const value of progress.values()) downloaded += value;
+    task.update({ downloaded: Math.min(downloaded, totalBytes), total: totalBytes });
+  };
   if (task) task.update({ stage: '下载游戏资源', percent: 0, detail: `0 / ${total} 个资源` });
   const assetRoot = path.join(store.gameDir, 'assets', 'objects');
   ensureDir(assetRoot);
@@ -191,12 +220,17 @@ async function ensureAssets(store, merged, task, instanceDir = '') {
           size: meta.size,
           retries: 2,
           timeout: 60000,
+          onProgress: (p) => {
+            progress.set(meta.hash, Math.min(Number(meta.size) || p.total || 0, p.downloaded || 0));
+            reportBytes();
+          },
         });
-        bytes += Number(meta.size) || 0;
       }
+      if (Number(meta.size) > 0) progress.set(meta.hash, meta.size);
     } catch (err) {
       errors.push(`${name}: ${err.message}`);
     }
+    reportBytes();
     done += 1;
     if (task) {
       const now = Date.now();
@@ -205,7 +239,7 @@ async function ensureAssets(store, merged, task, instanceDir = '') {
         task.update({
           stage: '下载游戏资源',
           percent: total ? Math.min(100, done / total * 100) : 100,
-          detail: `${done} / ${total} 个资源${bytes ? ` · 新增 ${formatBytes(bytes)}` : ''}`,
+          detail: `${done} / ${total} 个资源`,
         });
       }
     }
@@ -229,11 +263,11 @@ async function ensureAssets(store, merged, task, instanceDir = '') {
       } catch (_) { /* non-fatal */ }
     }
   }
-  if (task) task.update({ stage: '资源就绪', percent: 100, detail: `${total} 个资源` });
+  if (task) task.update({ stage: '资源就绪', percent: 100, detail: `${total} 个资源`, downloaded: totalBytes, total: totalBytes });
   return { total };
 }
 
-async function ensureNatives(store, merged) {
+async function ensureNatives(store, merged, task) {
   const nativeDir = path.join(store.gameDir, 'versions', merged.id, 'natives');
   fs.rmSync(nativeDir, { recursive: true, force: true });
   ensureDir(nativeDir);
@@ -245,7 +279,15 @@ async function ensureNatives(store, merged) {
     if (!ant?.path) continue;
     const destination = path.join(store.gameDir, 'libraries', ant.path);
     if (!(await verifyFile(destination, { size: ant.size, sha1: ant.sha1 }))) {
-      await downloadFile(ant.url, destination, { size: ant.size, sha1: ant.sha1, retries: 2 });
+      if (task) task.update({ stage: '下载系统依赖', percent: 96, detail: path.basename(destination) });
+      await downloadFile(ant.url, destination, {
+        size: ant.size,
+        sha1: ant.sha1,
+        retries: 2,
+        onProgress: (p) => {
+          if (task) task.update({ stage: '下载系统依赖', percent: 96, detail: path.basename(destination), downloaded: p.downloaded, total: p.total });
+        },
+      });
     }
     try {
       const zip = new AdmZip(destination);
@@ -278,6 +320,9 @@ async function ensureLoggingConfig(store, merged, task) {
       size: client.file.size,
       sha1: client.file.sha1,
       retries: 2,
+      onProgress: (p) => {
+        if (task) task.update({ stage: '获取日志配置', percent: 92 + (p.percent || 0) * 0.02, detail: client.file.id || '', downloaded: p.downloaded, total: p.total });
+      },
     });
   }
   return file;

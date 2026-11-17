@@ -1,6 +1,6 @@
 # PMCS launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.11.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.12.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [PMCS launcher 1.11.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.11.0/PMCSLauncher-1.11.0-Setup.exe)
-- [PMCS launcher 1.11.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.11.0/PMCSLauncher-1.11.0-Portable.zip)
+- [PMCS launcher 1.12.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.12.0/PMCSLauncher-1.12.0-Setup.exe)
+- [PMCS launcher 1.12.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.12.0/PMCSLauncher-1.12.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -35,6 +35,7 @@
 - **退出时清理关联进程**：关闭启动器会终止所有 Minecraft/Java 游戏进程、Tailscale 登录子进程和局域网服务，避免残留后台进程占用文件导致无法卸载。
 - **下载源测速**：自动并行测试 Mojang 官方、BMCLAPI、FastMinecraftMirror 三路速度，优先使用最快的源；设置中也可以手动锁定任意源。
 - **256 线程并发下载**：游戏资源与依赖库各 256 路并行，针对 Minecraft 大量小文件减少网络等待；支持 HTTP Keep-Alive、超时重试和 `.part` 断点续传。
+- **全量下载速度显示**：任务卡片统一显示实时速度、已下载 / 总大小和预计剩余时间，覆盖游戏核心、依赖库、资源文件、Java、Forge / NeoForge、模组、Tailscale 与共享存档。
 - **大文件分片加速**：客户端 JAR、Java、模组等 ≥4 MB 文件自动切成最多 64 个 Range 分片并发，优先使用测速排名靠前的镜像，最后合并并做多重哈希校验；不支持 Range 的源自动回退单连接。
 - **智能动态调度**：下载中实时监测速度，当前源连续低于阈值时自动中止并切换到其他镜像；已下载的分片通过 Range 继续，不从头重下。
 - **完整文件校验**：优先校验 SHA-512，其次 SHA-256；Mojang 元数据只提供 SHA-1 的资源仍校验 SHA-1。所有可用哈希会一次读取完成校验，任何一项不匹配都会自动回退到下一个源。
@@ -120,7 +121,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/PMCS launcher-1.11.0-安装程序.exe
+setup/PMCS launcher-1.12.0-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `PMCS launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -137,14 +138,14 @@ setup/PMCS launcher-1.11.0-安装程序.exe
 PMCS launcher.exe
 ```
 
-安装包文件名统一为 **PMCS launcher-1.11.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名统一为 **PMCS launcher-1.12.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: 8B64852F9770ADE28082E2C991382C5FA0BB3544078E0679E5BF29A5CEF13A3E
+SHA256: EAD009A0438EE59E679455A59C6CAEAB5008808B31CF7D1BCE1D0F83D8B98619
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
@@ -156,13 +157,13 @@ SHA256: 8B64852F9770ADE28082E2C991382C5FA0BB3544078E0679E5BF29A5CEF13A3E
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/PMCS launcher-1.11.0-便携版.zip
+setup/PMCS launcher-1.12.0-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-E039941964C99D98D8945785FBEB07B502EA4D12A696190084469DD4DED99EFB
+42C41998E3AD66C3A8A61194E9E711265F8404BD59DE59A34ED66B2A243021A5
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
@@ -207,7 +208,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `PMCS launcher.exe`，快捷方式同名。
-- 安装包文件名保持 `PMCS launcher-1.11.0-安装程序.exe`。
+- 安装包文件名保持 `PMCS launcher-1.12.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -228,7 +229,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-PMCS launcher-1.11.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
+PMCS launcher-1.12.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
 ```
 
 electron-builder 和缓存保留在：

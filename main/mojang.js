@@ -105,9 +105,10 @@ function createMojang(store) {
     const urls = [entry.url];
     await downloadFile(urls, destination, {
       sha1: entry.sha1,
+      size: entry.size,
       retries: 2,
       onProgress: (p) => {
-        if (task && !silent) task.update({ stage: '获取版本信息', percent: 8 + (p.percent || 0) * 0.12, detail: versionId });
+        if (task && !silent) task.update({ stage: '获取版本信息', percent: 8 + (p.percent || 0) * 0.12, detail: versionId, downloaded: p.downloaded, total: p.total });
       },
     });
     const json = readJson(destination, null);
@@ -126,7 +127,7 @@ function createMojang(store) {
       size: client.size,
       timeout: 120000,
       onProgress: (p) => {
-        if (task) task.update({ stage: '下载游戏核心', percent: 15 + (p.percent || 0) * 0.15, detail: p.skipped ? '已存在，跳过下载' : client.size ? `${(client.size / 1048576).toFixed(1)} MB` : '' });
+        if (task) task.update({ stage: '下载游戏核心', percent: 15 + (p.percent || 0) * 0.15, detail: p.skipped ? '已存在，跳过下载' : client.size ? `${(client.size / 1048576).toFixed(1)} MB` : '', downloaded: p.downloaded, total: p.total });
       },
     });
     return destination;

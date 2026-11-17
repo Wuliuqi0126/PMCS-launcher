@@ -24,7 +24,7 @@ function createInstaller({ store, tasks, mojang, java, onChange }) {
       const merged = mojang.mergeVersions([json]);
       await ensureRuntimeFiles(store, merged, task, store.gameDir);
       task.update({ stage: '解压本地运行库', percent: 95, detail: '' });
-      await ensureNatives(store, merged);
+      await ensureNatives(store, merged, task);
       task.done({ stage: '安装完成', detail: versionId });
       notify();
       return { ok: true, versionId };
@@ -119,7 +119,7 @@ function createInstaller({ store, tasks, mojang, java, onChange }) {
     task.update({ stage: '检查依赖库与资源', percent: 75, detail: `${merged.libraries.length} 个库` });
     await ensureRuntimeFiles(store, merged, task, store.instanceDir(instance));
     task.update({ stage: '解压本地运行库', percent: 96, detail: '' });
-    await ensureNatives(store, merged);
+    await ensureNatives(store, merged, task);
     return { profileId, loaderVersion, merged };
   }
 

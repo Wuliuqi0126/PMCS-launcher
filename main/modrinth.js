@@ -274,7 +274,7 @@ function createMods({ store, tasks }) {
     }
   }
 
-  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null) {
+  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null, task = null) {
     if (depth > 5) return [];
     const source = version.source === 'curseforge' ? 'curseforge' : 'modrinth';
     const projectKey = `${source}:${version.project_id}`;
@@ -296,6 +296,15 @@ function createMods({ store, tasks }) {
       minSpeed: 0,
       segmentThreshold: 256 * 1024,
       signal,
+      onProgress: (p) => {
+        if (task) task.update({
+          stage: `下载${module === 'shaders' ? '光影' : '模组'}文件`,
+          percent: 20 + (p.percent || 0) * 0.55,
+          detail: filename,
+          downloaded: p.downloaded,
+          total: p.total,
+        });
+      },
     });
     const info = source === 'curseforge'
       ? await curseForgeProjectInfo(version.project_id)
@@ -331,7 +340,7 @@ function createMods({ store, tasks }) {
       }
       if (!depVersion) continue;
       depVersion.source = source;
-      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module, signal);
+      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module, signal, task);
       installed.push(...nested);
     }
     return installed;
@@ -354,7 +363,7 @@ function createMods({ store, tasks }) {
       version.source = source;
       const manifest = readManifest(instance, module);
       task.update({ stage: `下载${module === 'shaders' ? '光影' : '模组'}文件`, percent: 20, detail: version.version_number || version.name || '' });
-      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal);
+      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal, task);
       task.done({ stage: '安装完成', detail: `${installed.length} 个${module === 'shaders' ? '光影' : '模组'}` });
       return { ok: true, installed: await listInstalled(instanceId, module), module };
     } catch (err) {

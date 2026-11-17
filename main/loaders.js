@@ -198,7 +198,7 @@ async function downloadNeoForgeInstaller(store, gameVersion, loaderVersion, task
     retries: 2,
     timeout: 180000,
     onProgress: (p) => {
-      if (task) task.update({ stage: '下载 NeoForge 安装程序', percent: 50 + (p.percent || 0) * 0.08, detail: `NeoForge ${loaderVersion}` });
+      if (task) task.update({ stage: '下载 NeoForge 安装程序', percent: 50 + (p.percent || 0) * 0.08, detail: `NeoForge ${loaderVersion}`, downloaded: p.downloaded, total: p.total });
     },
   });
   return destination;
@@ -288,7 +288,7 @@ async function downloadForgeInstaller(store, gameVersion, loaderVersion, task) {
     retries: 2,
     timeout: 120000,
     onProgress: (p) => {
-      if (task) task.update({ stage: '下载 Forge 安装程序', percent: 50 + (p.percent || 0) * 0.08, detail: `Forge ${loaderVersion}` });
+      if (task) task.update({ stage: '下载 Forge 安装程序', percent: 50 + (p.percent || 0) * 0.08, detail: `Forge ${loaderVersion}`, downloaded: p.downloaded, total: p.total });
     },
   });
   return destination;

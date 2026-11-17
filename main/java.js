@@ -215,6 +215,8 @@ async function ensureJava(store, requiredMajor, task) {
           stage: `下载 Java ${downloadMajor} 运行时`,
           percent: Math.min(95, p.percent || 0),
           detail: p.total ? `${(p.downloaded / 1048576).toFixed(1)} / ${(p.total / 1048576).toFixed(1)} MB · 64 线程` : '正在下载…',
+          downloaded: p.downloaded,
+          total: p.total,
         });
       },
     });

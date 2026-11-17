@@ -242,6 +242,22 @@ function formatSpeed(bytesPerSecond) {
   return `${Math.max(1, Math.round(value / 1024))} KB/s`;
 }
 
+function formatBytesCompact(bytes) {
+  const value = Number(bytes) || 0;
+  if (value <= 0) return '0 B';
+  if (value >= 1024 * 1024 * 1024) return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  if (value >= 1024) return `${Math.round(value / 1024)} KB`;
+  return `${Math.round(value)} B`;
+}
+
+function formatEta(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds) || 0));
+  if (value < 60) return `${value} 秒`;
+  if (value < 3600) return `${Math.floor(value / 60)} 分 ${value % 60} 秒`;
+  return `${Math.floor(value / 3600)} 时 ${Math.floor((value % 3600) / 60)} 分`;
+}
+
 function sourceSpeedText(result) {
   if (!result) return '未测速';
   if (!result.ok) {
@@ -839,6 +855,7 @@ function createTaskCard(task) {
       <div class="task-copy">
         <div class="task-title"><span data-task-title></span><span class="task-pct" data-task-pct></span></div>
         <div class="task-stage" data-task-stage></div>
+        <div class="task-stats" data-task-stats hidden></div>
         <div class="task-detail" data-task-detail hidden></div>
       </div>
       <button class="task-close" type="button" data-task-close="${h(task.id)}" aria-label="关闭">${icon('x', 14)}</button>
@@ -877,6 +894,20 @@ function patchTaskCard(el, task) {
   setText(el.querySelector('[data-task-title]'), task.title || '任务');
   setText(el.querySelector('[data-task-pct]'), cancelled ? '已停止' : paused ? '已暂停' : error ? '失败' : success ? '完成' : `${Math.round(pct)}%`);
   setText(el.querySelector('[data-task-stage]'), cancelled ? '任务已停止' : task.stage || '处理中…');
+
+  const statsEl = el.querySelector('[data-task-stats]');
+  if (statsEl) {
+    const downloaded = Number(task.downloaded) || 0;
+    const total = Number(task.total) || 0;
+    const speed = Number(task.bytesPerSecond) || 0;
+    const eta = Number(task.etaSeconds) || 0;
+    const stats = [];
+    if (running && speed > 0) stats.push(formatSpeed(speed));
+    if (total > 0 && downloaded > 0) stats.push(`${formatBytesCompact(downloaded)} / ${formatBytesCompact(total)}`);
+    if (running && speed > 0 && eta > 0) stats.push(`剩余 ${formatEta(eta)}`);
+    setText(statsEl, stats.join(' · '));
+    statsEl.hidden = !stats.length || !running;
+  }
 
   const detailEl = el.querySelector('[data-task-detail]');
   if (detailEl) {

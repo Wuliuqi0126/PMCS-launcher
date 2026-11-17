@@ -9,6 +9,39 @@ class TaskManager {
     this.controllers = new Map();
   }
 
+  emit(state) {
+    const payload = { ...state };
+    delete payload._speedAt;
+    delete payload._speedBytes;
+    this.send('task:update', payload);
+  }
+
+  sampleSpeed(state, now) {
+    if (!Number.isFinite(state.downloaded)) return;
+    if (!Number.isFinite(state._speedAt)) {
+      state._speedAt = now;
+      state._speedBytes = state.downloaded;
+      return;
+    }
+    if (state.downloaded < state._speedBytes) {
+      state._speedAt = now;
+      state._speedBytes = state.downloaded;
+      state.bytesPerSecond = 0;
+      return;
+    }
+    const elapsed = (now - state._speedAt) / 1000;
+    if (elapsed < 0.45) return;
+    const instant = (state.downloaded - state._speedBytes) / elapsed;
+    if (Number.isFinite(instant) && instant >= 0) {
+      state.bytesPerSecond = state.bytesPerSecond > 0 ? state.bytesPerSecond * 0.6 + instant * 0.4 : instant;
+      state.etaSeconds = state.total > state.downloaded && state.bytesPerSecond > 1
+        ? (state.total - state.downloaded) / state.bytesPerSecond
+        : null;
+    }
+    state._speedAt = now;
+    state._speedBytes = state.downloaded;
+  }
+
   start({ title, kind = 'install', meta = {} }) {
     const id = randomId('task_');
     const state = {
@@ -27,7 +60,7 @@ class TaskManager {
     const controller = new AbortController();
     this.tasks.set(id, state);
     this.controllers.set(id, controller);
-    this.send('task:update', state);
+    this.emit(state);
     const task = {
       id,
       update: (patch) => this.update(id, patch),
@@ -46,7 +79,9 @@ class TaskManager {
     if (!state || state.status !== 'running') return false;
     state.status = 'paused';
     state.updatedAt = Date.now();
-    this.send('task:update', { ...state });
+    state._speedAt = Date.now();
+    state._speedBytes = state.downloaded || 0;
+    this.emit(state);
     return true;
   }
 
@@ -55,7 +90,9 @@ class TaskManager {
     if (!state || state.status !== 'paused') return false;
     state.status = 'running';
     state.updatedAt = Date.now();
-    this.send('task:update', { ...state });
+    state._speedAt = Date.now();
+    state._speedBytes = state.downloaded || 0;
+    this.emit(state);
     return true;
   }
 
@@ -67,7 +104,9 @@ class TaskManager {
     state.updatedAt = Date.now();
     const controller = this.controllers.get(id);
     if (controller) controller.abort();
-    this.send('task:update', { ...state });
+    state.bytesPerSecond = 0;
+    state.etaSeconds = null;
+    this.emit(state);
     setTimeout(() => {
       const current = this.tasks.get(id);
       if (current && current.status === 'cancelled') this.tasks.delete(id);
@@ -78,8 +117,14 @@ class TaskManager {
   update(id, patch) {
     const state = this.tasks.get(id);
     if (!state || state.status !== 'running') return;
-    Object.assign(state, patch, { updatedAt: Date.now() });
-    this.send('task:update', { ...state });
+    const now = Date.now();
+    if (Number.isFinite(patch.downloaded)) {
+      state.downloaded = Math.max(0, Number(patch.downloaded));
+      if (Number.isFinite(patch.total)) state.total = Math.max(0, Number(patch.total));
+      this.sampleSpeed(state, now);
+    }
+    Object.assign(state, patch, { updatedAt: now });
+    this.emit(state);
   }
 
   finish(id, status, patch = {}) {
@@ -88,9 +133,11 @@ class TaskManager {
     Object.assign(state, patch, {
       status,
       percent: status === 'success' ? 100 : state.percent,
+      bytesPerSecond: 0,
+      etaSeconds: null,
       updatedAt: Date.now(),
     });
-    this.send('task:update', { ...state });
+    this.emit(state);
     setTimeout(() => {
       const current = this.tasks.get(id);
       if (current && !['running', 'paused'].includes(current.status)) this.tasks.delete(id);
