@@ -1,9 +1,9 @@
 {
-  "name": "ol-launcher",
-  "version": "1.9.0",
-  "description": "OL启动器 - 我的世界 Java 版启动器，支持官方版本、局域网联机、Fabric/Forge 与 Modrinth 模组",
+  "name": "pmcs-launcher",
+  "version": "1.10.0",
+  "description": "PMCS launcher - 我的世界 Java 版启动器，支持官方版本、局域网联机、Fabric/Forge 与 Modrinth 模组",
   "main": "main/index.js",
-  "author": "OL Launcher",
+  "author": "PMCS Launcher",
   "license": "MIT",
   "scripts": {
     "start": "npm run build:renderer && electron .",
@@ -26,8 +26,8 @@
     "puppeteer-core": "^25.16.0"
   },
   "build": {
-    "appId": "com.ol.launcher",
-    "productName": "OL我的世界启动器",
+    "appId": "com.pmcs.launcher",
+    "productName": "PMCS launcher",
     "asar": true,
     "asarUnpack": [
       "assets/tailscale/**",
@@ -57,7 +57,7 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "artifactName": "OLLauncher-${version}-Setup.${ext}",
+      "artifactName": "PMCSLauncher-${version}-Setup.${ext}",
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
@@ -67,8 +67,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "OL我的世界启动器",
-      "uninstallDisplayName": "OL我的世界启动器 1.9.0",
+      "shortcutName": "PMCS launcher",
+      "uninstallDisplayName": "PMCS launcher 1.10.0",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
@@ -79,7 +79,7 @@
       ],
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false,
-      "artifactName": "OLLauncher-${version}-Setup.${ext}"
+      "artifactName": "PMCSLauncher-${version}-Setup.${ext}"
     }
   }
 }

@@ -1,17 +1,17 @@
 ﻿Unicode true
 !include "MUI2.nsh"
 
-!define APP_NAME "OL启动器"
+!define APP_NAME "PMCS launcher"
 !define APP_VERSION "1.3.0"
-!define APP_EXE "OL启动器.exe"
-!define PUBLISHER "OL Launcher"
-!define REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher"
+!define APP_EXE "PMCS launcher.exe"
+!define PUBLISHER "PMCS launcher"
+!define REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher"
 
 Name "${APP_NAME} ${APP_VERSION}"
 Caption "安装 ${APP_NAME} ${APP_VERSION}"
-OutFile "..\setup\OL启动器-1.3.0-安装包-侧边图版.exe"
-InstallDir "$LOCALAPPDATA\Programs\OL启动器"
-InstallDirRegKey HKCU "Software\OL Launcher" "InstallDir"
+OutFile "..\setup\PMCS launcher-1.3.0-安装包-侧边图版.exe"
+InstallDir "$LOCALAPPDATA\Programs\PMCS launcher"
+InstallDirRegKey HKCU "Software\PMCS launcher" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64
@@ -19,11 +19,11 @@ XPStyle on
 CRCCheck on
 ShowInstDetails show
 ShowUninstDetails show
-BrandingText "OL Launcher 1.3.0"
+BrandingText "PMCS launcher 1.3.0"
 VIProductVersion "1.3.0.0"
-VIAddVersionKey "ProductName" "OL启动器"
-VIAddVersionKey "CompanyName" "OL Launcher"
-VIAddVersionKey "FileDescription" "OL启动器安装程序"
+VIAddVersionKey "ProductName" "PMCS launcher"
+VIAddVersionKey "CompanyName" "PMCS launcher"
+VIAddVersionKey "FileDescription" "PMCS launcher安装程序"
 VIAddVersionKey "FileVersion" "1.3.0.0"
 VIAddVersionKey "ProductVersion" "1.3.0"
 
@@ -34,7 +34,7 @@ VIAddVersionKey "ProductVersion" "1.3.0"
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "..\assets\installer-sidebar.bmp"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "运行 ${APP_NAME}"
-!define MUI_FINISHPAGE_LINK "OL Launcher 1.3.0"
+!define MUI_FINISHPAGE_LINK "PMCS launcher 1.3.0"
 !define MUI_FINISHPAGE_LINK_LOCATION "https://www.minecraft.net/zh-hans"
 
 !insertmacro MUI_PAGE_WELCOME
@@ -57,7 +57,7 @@ Function un.onInit
   SetShellVarContext current
 FunctionEnd
 
-Section "OL启动器" SEC_MAIN
+Section "PMCS launcher" SEC_MAIN
   SectionIn RO
   SetShellVarContext current
   SetOutPath "$INSTDIR"
@@ -65,12 +65,12 @@ Section "OL启动器" SEC_MAIN
   File "使用说明.txt"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-  CreateDirectory "$SMPROGRAMS\OL启动器"
-  CreateShortcut "$SMPROGRAMS\OL启动器\OL启动器.lnk" "$INSTDIR\${APP_EXE}"
-  CreateShortcut "$SMPROGRAMS\OL启动器\卸载 OL启动器.lnk" "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$DESKTOP\OL启动器.lnk" "$INSTDIR\${APP_EXE}"
+  CreateDirectory "$SMPROGRAMS\PMCS launcher"
+  CreateShortcut "$SMPROGRAMS\PMCS launcher\PMCS launcher.lnk" "$INSTDIR\${APP_EXE}"
+  CreateShortcut "$SMPROGRAMS\PMCS launcher\卸载 PMCS launcher.lnk" "$INSTDIR\Uninstall.exe"
+  CreateShortcut "$DESKTOP\PMCS launcher.lnk" "$INSTDIR\${APP_EXE}"
 
-  WriteRegStr HKCU "Software\OL Launcher" "InstallDir" "$INSTDIR"
+  WriteRegStr HKCU "Software\PMCS launcher" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${REG_KEY}" "DisplayName" "${APP_NAME}"
   WriteRegStr HKCU "${REG_KEY}" "DisplayVersion" "${APP_VERSION}"
   WriteRegStr HKCU "${REG_KEY}" "Publisher" "${PUBLISHER}"
@@ -84,11 +84,11 @@ SectionEnd
 
 Section "Uninstall"
   SetShellVarContext current
-  Delete "$DESKTOP\OL启动器.lnk"
-  Delete "$SMPROGRAMS\OL启动器\OL启动器.lnk"
-  Delete "$SMPROGRAMS\OL启动器\卸载 OL启动器.lnk"
-  RMDir "$SMPROGRAMS\OL启动器"
+  Delete "$DESKTOP\PMCS launcher.lnk"
+  Delete "$SMPROGRAMS\PMCS launcher\PMCS launcher.lnk"
+  Delete "$SMPROGRAMS\PMCS launcher\卸载 PMCS launcher.lnk"
+  RMDir "$SMPROGRAMS\PMCS launcher"
   DeleteRegKey HKCU "${REG_KEY}"
-  DeleteRegKey HKCU "Software\OL Launcher"
+  DeleteRegKey HKCU "Software\PMCS launcher"
   RMDir /r "$INSTDIR"
 SectionEnd

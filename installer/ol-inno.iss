@@ -1,23 +1,23 @@
-; OL Launcher 1.3.0 - standard Inno Setup installer
+; PMCS launcher 1.3.0 - standard Inno Setup installer
 
 [Setup]
 AppId={{A3F9B6D2-7C4E-4A83-9B1D-2F8E6C5A1D47}
-AppName=OL我的世界启动器
+AppName=PMCS launcher
 AppVersion=1.3.0
-AppVerName=OL我的世界启动器 1.3.0
-AppPublisher=OL Launcher
+AppVerName=PMCS launcher 1.3.0
+AppPublisher=PMCS launcher
 AppPublisherURL=https://www.minecraft.net/
-DefaultDirName={localappdata}\Programs\OL我的世界启动器
-DefaultGroupName=OL我的世界启动器
+DefaultDirName={localappdata}\Programs\PMCS launcher
+DefaultGroupName=PMCS launcher
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\setup
-OutputBaseFilename=OL启动器-1.3.0-安装程序
+OutputBaseFilename=PMCS launcher-1.3.0-安装程序
 SetupIconFile=..\assets\icon.ico
-UninstallDisplayIcon={app}\OL我的世界启动器.exe
-UninstallDisplayName=OL我的世界启动器 1.3.0
+UninstallDisplayIcon={app}\PMCS launcher.exe
+UninstallDisplayName=PMCS launcher 1.3.0
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -39,8 +39,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "E:\OLBuild\msi\payload\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\OL我的世界启动器"; Filename: "{app}\OL我的世界启动器.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OL我的世界启动器.exe"
-Name: "{autodesktop}\OL我的世界启动器"; Filename: "{app}\OL我的世界启动器.exe"; WorkingDir: "{app}"; IconFilename: "{app}\OL我的世界启动器.exe"; Tasks: desktopicon
+Name: "{autoprograms}\PMCS launcher"; Filename: "{app}\PMCS launcher.exe"; WorkingDir: "{app}"; IconFilename: "{app}\PMCS launcher.exe"
+Name: "{autodesktop}\PMCS launcher"; Filename: "{app}\PMCS launcher.exe"; WorkingDir: "{app}"; IconFilename: "{app}\PMCS launcher.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\OL我的世界启动器.exe"; Description: "{cm:LaunchProgram,OL我的世界启动器}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\PMCS launcher.exe"; Description: "{cm:LaunchProgram,PMCS launcher}"; Flags: nowait postinstall skipifsilent

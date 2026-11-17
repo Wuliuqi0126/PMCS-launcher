@@ -262,7 +262,7 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       magic: MAGIC,
       hostId,
       port: host.port,
-      name: `[OL] ${host.worldName || host.instanceName}`,
+      name: `[PMCS] ${host.worldName || host.instanceName}`,
       instanceName: host.instanceName,
       version: host.version,
       loader: host.loader,

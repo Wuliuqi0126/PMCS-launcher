@@ -1545,7 +1545,7 @@ function recommendationsBody() {
   return `<div class="recommend-modal">
     <div class="recommend-hero">
       <span class="recommend-hero-icon">${icon('star', 20)}</span>
-      <div><strong>让 OL启动器更好用</strong><p>这些是实际能改善联机、帧率和稳定性的建议，不需要一次全部开启。</p></div>
+      <div><strong>让 PMCS launcher 更好用</strong><p>这些是实际能改善联机、帧率和稳定性的建议，不需要一次全部开启。</p></div>
     </div>
 
     <div class="recommend-grid">
@@ -1723,7 +1723,7 @@ function renderHomeRoute() {
     <div class="home-meta-row">
       <div class="home-version-notice">
         <span class="home-version-mark">${icon('sparkles', 14)}</span>
-        <span class="home-version-copy"><small>OL启动器 · 当前版本</small><strong>v${h(state.boot.app.version)}</strong></span>
+        <span class="home-version-copy"><small>PMCS launcher · 当前版本</small><strong>v${h(state.boot.app.version)}</strong></span>
         <span class="home-version-state"><i></i>本地版本</span>
       </div>
       <div class="home-meta-actions">
@@ -3485,7 +3485,7 @@ function saveSharePanelHtml() {
           <div class="save-share-address">
             ${active.addresses?.length ? `<code>${h(active.addresses[0])}</code><button class="icon-btn" data-action="lan-copy" data-text="${h(active.addresses[0])}" title="复制共享地址">${icon('copy', 14)}</button>` : '<span class="save-share-hint">正在获取本机地址…</span>'}
           </div>
-          <p class="save-share-hint">同一 Wi-Fi/热点下的 OL启动器会自动发现这段存档；客机也可以从下方列表选择并下载。共享前建议先退出该世界，避免复制到正在写入的存档文件。</p>
+          <p class="save-share-hint">同一 Wi-Fi/热点下的 PMCS launcher 会自动发现这段存档；客机也可以从下方列表选择并下载。共享前建议先退出该世界，避免复制到正在写入的存档文件。</p>
           <div class="save-share-actions"><button class="btn btn-danger btn-sm" data-action="save-share-stop">${icon('stop', 12)} 停止共享</button></div>` : `<div class="save-share-form">
             <label for="save-share-save">选择要共享的存档</label>
             ${saves.length ? `<div class="select-wrap"><select class="select" id="save-share-save">${saveShareSaveOptions()}</select><span class="select-arrow">${icon('chevronDown', 13)}</span></div>` : `<div class="save-share-empty">${data.loading ? '<span class="spinner light"></span> 正在识别本机存档…' : '没有识别到存档。先进入一次世界，或检查实例的 saves 目录。'}</div>`}
@@ -3500,7 +3500,7 @@ function saveSharePanelHtml() {
             <span class="save-share-row-icon">${icon('save', 16)}</span>
             <div class="save-share-row-copy">
               <strong>${h(share.save?.name || '未命名存档')}</strong>
-              <p>${h(share.hostName || 'OL启动器')} · ${formatCacheSize(share.save?.size || 0)}${share.save?.lastPlayed ? ` · ${timeAgo(share.save.lastPlayed)}` : ''}</p>
+              <p>${h(share.hostName || 'PMCS launcher')} · ${formatCacheSize(share.save?.size || 0)}${share.save?.lastPlayed ? ` · ${timeAgo(share.save.lastPlayed)}` : ''}</p>
             </div>
             <button class="btn btn-primary btn-sm" data-action="save-share-download" data-key="${h(share.key)}" ${data.busy ? 'disabled' : ''}>${data.busy === 'download' ? '<span class="spinner"></span>' : `${icon('download', 12)} 下载`}</button>
           </div>`).join('')}</div>` : `<div class="save-share-empty">${state.saveShare.loading ? '<span class="spinner light"></span> 正在扫描局域网共享…' : '暂时没有发现共享存档。请确认主机已开始共享，并且两台设备在同一个局域网。'}</div>`}
@@ -3764,7 +3764,7 @@ async function loadLanWorlds() {
 }
 
 const LAN_GUIDE_TEXT = [
-  'OL启动器 · 局域网联机完整指引',
+  'PMCS launcher · 局域网联机完整指引',
   '',
   '一、准备',
   '1. 主机和客机连接同一个 Wi-Fi、路由器或手机热点。',
@@ -3863,7 +3863,7 @@ async function copyLanGuide() {
 }
 
 const TAILSCALE_GUIDE_TEXT = [
-  'OL启动器 · Tailscale 外网联机指引',
+  'PMCS launcher · Tailscale 外网联机指引',
   '',
   '1. 主机和客机都安装 Tailscale，并登录同一个 tailnet（免费个人账号即可）。',
   '2. 在启动器「局域网联机」页面点击「下载安装 Tailscale」，完成后点击「登录 Tailscale」。',
@@ -4506,7 +4506,7 @@ function renderLanRoute() {
       </section>
 
       <section class="panel lan-panel">
-        <div class="settings-head"><span class="head-icon">${icon('users', 16)}</span><div><h3>加入房间</h3><p>自动扫描同一局域网内由OL启动器广播的房间</p></div></div>
+        <div class="settings-head"><span class="head-icon">${icon('users', 16)}</span><div><h3>加入房间</h3><p>自动扫描同一局域网内由 PMCS launcher 广播的房间</p></div></div>
         <div class="lan-body">
           <div class="field">
             <label for="lan-guest-instance">用于加入的实例</label>
@@ -4711,7 +4711,7 @@ function renderSettingsRoute() {
       <span class="settings-version-icon">${icon('sparkles', 20)}</span>
       <div class="settings-version-copy">
         <div class="eyebrow">CURRENT BUILD</div>
-        <strong>OL启动器 <span>v${h(state.boot.app.version)}</span></strong>
+        <strong>PMCS launcher <span>v${h(state.boot.app.version)}</span></strong>
         <p>当前版本 · Electron ${h(state.boot.app.electron)} · ${h(state.boot.app.platform)}/${h(state.boot.app.arch)}</p>
       </div>
       <button class="btn btn-secondary btn-sm" data-action="open-announcements">${icon('bell', 13)} 查看版本公告</button>
@@ -4751,7 +4751,7 @@ function renderSettingsRoute() {
             <div class="select-wrap"><select id="close-action">
               <option value="ask" ${(config.closeAction || 'ask') === 'ask' ? 'selected' : ''}>每次询问</option>
               <option value="tray" ${config.closeAction === 'tray' ? 'selected' : ''}>最小化到托盘</option>
-              <option value="quit" ${config.closeAction === 'quit' ? 'selected' : ''}>退出 OL启动器</option>
+              <option value="quit" ${config.closeAction === 'quit' ? 'selected' : ''}>退出 PMCS launcher</option>
             </select><span class="select-arrow">${icon('chevronDown', 13)}</span></div>
           </div>
         </div>
@@ -4851,9 +4851,9 @@ function renderSettingsRoute() {
       </section>
 
       <section class="panel settings-panel wide">
-        <div class="settings-head"><span class="head-icon">${icon('info', 16)}</span><div><h3>关于OL启动器</h3><p>一个独立、开源的 Minecraft Java 版启动器</p></div></div>
+        <div class="settings-head"><span class="head-icon">${icon('info', 16)}</span><div><h3>关于PMCS launcher</h3><p>一个独立、开源的 Minecraft Java 版启动器</p></div></div>
         <div class="setting-row">
-          <div class="setting-info"><strong>版本信息</strong><p class="about-version">OL启动器 ${h(state.boot.app.version)} · Electron ${h(state.boot.app.electron)} · ${h(state.boot.app.platform)}/${h(state.boot.app.arch)}<br>游戏内容版权归 Mojang Studios 与 Microsoft 所有。本启动器不附带游戏本体，所有原版文件均从官方源或其镜像下载。</p></div>
+          <div class="setting-info"><strong>版本信息</strong><p class="about-version">PMCS launcher ${h(state.boot.app.version)} · Electron ${h(state.boot.app.electron)} · ${h(state.boot.app.platform)}/${h(state.boot.app.arch)}<br>游戏内容版权归 Mojang Studios 与 Microsoft 所有。本启动器不附带游戏本体，所有原版文件均从官方源或其镜像下载。</p></div>
           <div class="setting-control about-links">
             <button class="about-link" data-action="external" data-url="https://www.minecraft.net/zh-hans">${icon('globe', 13)} Minecraft 官网</button>
             <button class="about-link" data-action="external" data-url="https://www.minecraft.net/zh-hans/download">${icon('download', 13)} 官方下载</button>
@@ -5202,7 +5202,7 @@ function openCloseDialog() {
   const preference = String(state.boot?.config?.closeAction || 'ask');
   const defaultAction = preference === 'quit' ? 'quit' : 'tray';
   openModal({
-    title: '关闭 OL启动器',
+    title: '关闭 PMCS launcher',
     subtitle: '请选择关闭方式',
     closable: false,
     body: `<div class="close-dialog">
@@ -5213,7 +5213,7 @@ function openCloseDialog() {
       </label>
       <label class="close-choice">
         <input type="radio" name="close-action" value="quit" ${defaultAction === 'quit' ? 'checked' : ''}>
-        <span class="close-choice-body"><strong>退出 OL启动器</strong><small>结束启动器及其关联进程，未保存的游戏进度可能会丢失。</small></span>
+        <span class="close-choice-body"><strong>退出 PMCS launcher</strong><small>结束启动器及其关联进程，未保存的游戏进度可能会丢失。</small></span>
       </label>
       <p class="close-hint">之后可以在设置栏里更改这个选项。</p>
       <label class="close-remember"><input type="checkbox" id="close-remember"> 记住该选项</label>
@@ -5269,7 +5269,7 @@ function openAnnouncements() {
   });
   openModal({
     title: '更新公告',
-    subtitle: `OL启动器 ${current || '当前版本'} · 从 1.0.0 到 ${current || '现在'}`,
+    subtitle: `PMCS launcher ${current || '当前版本'} · 从 1.0.0 到 ${current || '现在'}`,
     wide: true,
     body: `<div class="announcement-board">
       <div class="announcement-lead">${icon('bell', 18)}<div><strong>版本更新记录</strong><p>按项目实际保留的版本节点整理。1.0.1–1.0.4 没有单独保留发布记录，因此不虚构内容。</p></div></div>

@@ -12,12 +12,12 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("OL启动器安装程序")]
-[assembly: AssemblyProduct("OL我的世界启动器")]
-[assembly: AssemblyCompany("OL Launcher")]
-[assembly: AssemblyDescription("OL我的世界启动器 1.9.0 安装程序")]
-[assembly: AssemblyVersion("1.9.0.0")]
-[assembly: AssemblyFileVersion("1.9.0.0")]
+[assembly: AssemblyTitle("PMCS launcher 安装程序")]
+[assembly: AssemblyProduct("PMCS launcher")]
+[assembly: AssemblyCompany("PMCS launcher")]
+[assembly: AssemblyDescription("PMCS launcher 1.10.0 安装程序")]
+[assembly: AssemblyVersion("1.10.0.0")]
+[assembly: AssemblyFileVersion("1.10.0.0")]
 
 namespace OLSetup
 {
@@ -35,7 +35,7 @@ namespace OLSetup
                 if (arg.StartsWith("/DIR=", StringComparison.OrdinalIgnoreCase)) target = arg.Substring(5).Trim('"');
             }
             if (string.IsNullOrEmpty(target))
-                target = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OL launcher");
+                target = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "PMCS launcher");
 
             if (silent)
             {
@@ -112,7 +112,7 @@ namespace OLSetup
                         catch (UnauthorizedAccessException ex)
                         {
                             throw new UnauthorizedAccessException(
-                                "无法写入 " + dest + "。请先关闭正在运行的 OL启动器；如果目录属于系统保护位置，请换一个可写目录。",
+                                "无法写入 " + dest + "。请先关闭正在运行的 PMCS launcher；如果目录属于系统保护位置，请换一个可写目录。",
                                 ex);
                         }
                         if (progress != null) progress((int)(done * 90.0 / Math.Max(1, total)), "正在安装：" + name);
@@ -121,22 +121,26 @@ namespace OLSetup
             }
 
             if (progress != null) progress(93, "正在创建快捷方式…");
-            string exe = Path.Combine(fullTarget, "OL我的世界启动器.exe");
+            string exe = Path.Combine(fullTarget, "PMCS launcher.exe");
             string uninstaller = Path.Combine(fullTarget, "Uninstall.exe");
-            string programs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "OL我的世界启动器");
+            string programs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "PMCS launcher");
             try { File.Delete(Path.Combine(fullTarget, "Uninstall.cmd")); } catch { /* old uninstaller */ }
+            foreach (string legacyExe in new string[] { "OL我的世界启动器.exe", "OL启动器.exe" })
+            {
+                try { File.Delete(Path.Combine(fullTarget, legacyExe)); } catch { /* keep old file if locked */ }
+            }
             if (desktopShortcut)
             {
                 try
                 {
-                    CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "OL我的世界启动器.lnk"), exe, fullTarget);
+                    CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "PMCS launcher.lnk"), exe, fullTarget);
                 }
                 catch { /* the application is still installed if shell integration is blocked */ }
             }
             try
             {
                 Directory.CreateDirectory(programs);
-                CreateShortcut(Path.Combine(programs, "OL我的世界启动器.lnk"), exe, fullTarget);
+                CreateShortcut(Path.Combine(programs, "PMCS launcher.lnk"), exe, fullTarget);
             }
             catch { /* keep the installed files usable */ }
             RemoveLegacyShortcuts();
@@ -145,11 +149,11 @@ namespace OLSetup
             if (progress != null) progress(98, "正在写入卸载信息…");
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher"))
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher"))
                 {
-                    key.SetValue("DisplayName", "OL我的世界启动器");
-                    key.SetValue("DisplayVersion", "1.9.0");
-                    key.SetValue("Publisher", "OL Launcher");
+                    key.SetValue("DisplayName", "PMCS launcher");
+                    key.SetValue("DisplayVersion", "1.10.0");
+                    key.SetValue("Publisher", "PMCS launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);
                     key.SetValue("UninstallString", "\"" + uninstaller + "\"");
@@ -158,19 +162,39 @@ namespace OLSetup
                 }
             }
             catch { /* registry can be restricted by policy */ }
+            try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OLLauncher", false); } catch { }
             if (progress != null) progress(100, "安装完成。");
         }
 
         private static void ConfigureFirewall(string exe)
         {
+            foreach (string legacy in new string[]
+            {
+                "OL Launcher Private", "OL Launcher LAN Discovery", "OL Launcher Save Share",
+                "OL Launcher Save Discovery", "OL Launcher Java LAN", "OL Launcher Java 25565",
+            })
+            {
+                try
+                {
+                    ProcessStartInfo info = new ProcessStartInfo("netsh.exe", "advfirewall firewall delete rule name=\"" + legacy + "\"");
+                    info.UseShellExecute = false;
+                    info.CreateNoWindow = true;
+                    info.WindowStyle = ProcessWindowStyle.Hidden;
+                    using (Process process = Process.Start(info))
+                    {
+                        if (process != null) process.WaitForExit(5000);
+                    }
+                }
+                catch { }
+            }
             string[] rules =
             {
-                "name=\"OL Launcher Private\" dir=in action=allow program=\"" + exe + "\" profile=private,domain enable=yes",
-                "name=\"OL Launcher LAN Discovery\" dir=in action=allow protocol=UDP localport=24454 profile=private,domain enable=yes",
-                "name=\"OL Launcher Save Share\" dir=in action=allow protocol=TCP localport=24455 profile=private,domain enable=yes",
-                "name=\"OL Launcher Save Discovery\" dir=in action=allow protocol=UDP localport=24456 profile=private,domain enable=yes",
-                "name=\"OL Launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
-                "name=\"OL Launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Private\" dir=in action=allow program=\"" + exe + "\" profile=private,domain enable=yes",
+                "name=\"PMCS launcher LAN Discovery\" dir=in action=allow protocol=UDP localport=24454 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Save Share\" dir=in action=allow protocol=TCP localport=24455 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Save Discovery\" dir=in action=allow protocol=UDP localport=24456 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
             };
             foreach (string rule in rules)
             {
@@ -191,23 +215,23 @@ namespace OLSetup
 
         private static void RemoveLegacyShortcuts()
         {
-            try
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+            foreach (string name in new string[] { "OL我的世界启动器", "OL启动器", "OL launcher" })
             {
-                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                string legacyDesktop = Path.Combine(desktop, "OL启动器.lnk");
-                if (File.Exists(legacyDesktop)) File.Delete(legacyDesktop);
+                try
+                {
+                    string link = Path.Combine(desktop, name + ".lnk");
+                    if (File.Exists(link)) File.Delete(link);
+                }
+                catch { }
+                try
+                {
+                    string group = Path.Combine(programs, name);
+                    if (Directory.Exists(group)) Directory.Delete(group, true);
+                }
+                catch { }
             }
-            catch { }
-            try
-            {
-                string programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
-                string legacyGroup = Path.Combine(programs, "OL启动器");
-                string legacyStartMenu = Path.Combine(legacyGroup, "OL启动器.lnk");
-                if (File.Exists(legacyStartMenu)) File.Delete(legacyStartMenu);
-                if (Directory.Exists(legacyGroup) && Directory.GetFileSystemEntries(legacyGroup).Length == 0)
-                    Directory.Delete(legacyGroup);
-            }
-            catch { }
         }
 
         private static void StopTailscaleUp()
@@ -270,14 +294,17 @@ namespace OLSetup
             string root = target.TrimEnd(Path.DirectorySeparatorChar);
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             string startMenu = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
-            string oldGroup = Path.Combine(startMenu, "OL启动器");
             string script = "@echo off\r\n" +
                 "cd /d \"%TEMP%\"\r\n" +
+                "del \"" + Path.Combine(desktop, "PMCS launcher.lnk") + "\"\r\n" +
                 "del \"" + Path.Combine(desktop, "OL我的世界启动器.lnk") + "\"\r\n" +
                 "del \"" + Path.Combine(desktop, "OL启动器.lnk") + "\"\r\n" +
                 "rmdir /s /q \"" + programs + "\"\r\n" +
-                "rmdir /s /q \"" + oldGroup + "\"\r\n" +
+                "rmdir /s /q \"" + Path.Combine(startMenu, "OL我的世界启动器") + "\"\r\n" +
+                "rmdir /s /q \"" + Path.Combine(startMenu, "OL启动器") + "\"\r\n" +
+                "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\PMCSLauncher\" /f\r\n" +
                 "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OLLauncher\" /f\r\n" +
+                "del /f /q \"" + Path.Combine(root, "PMCS launcher.exe") + "\"\r\n" +
                 "del /f /q \"" + Path.Combine(root, "OL我的世界启动器.exe") + "\"\r\n" +
                 "del /f /q \"" + Path.Combine(root, "OL启动器.exe") + "\"\r\n" +
                 "rmdir /s /q \"" + Path.Combine(root, "resources") + "\"\r\n" +

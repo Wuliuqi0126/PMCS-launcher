@@ -26,13 +26,14 @@ const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
 const { ensureDir, isPathInside, readJson } = require('./util');
 
+app.setName('PMCS launcher');
+if (process.platform === 'win32') app.setAppUserModelId('com.pmcs.launcher');
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   return;
 }
 
-app.setName('OL启动器');
-if (process.platform === 'win32') app.setAppUserModelId('com.ol.launcher');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 function migrateLegacyBrandData() {
@@ -40,14 +41,23 @@ function migrateLegacyBrandData() {
     const current = app.getPath('userData');
     if (fs.existsSync(path.join(current, 'config.json')) || fs.existsSync(path.join(current, 'accounts.json'))) return;
     const appData = app.getPath('appData');
-    for (const legacyName of ['绿洲启动器', 'oasis-launcher']) {
+    const legacyNames = ['ol-launcher', 'OL启动器', '绿洲启动器', 'oasis-launcher'];
+    for (const legacyName of legacyNames) {
       const legacy = path.join(appData, legacyName);
       if (path.resolve(legacy) === path.resolve(current)) continue;
       if (!fs.existsSync(path.join(legacy, 'config.json')) && !fs.existsSync(path.join(legacy, 'accounts.json'))) continue;
       fs.mkdirSync(current, { recursive: true });
-      for (const file of ['config.json', 'accounts.json']) {
+      for (const file of ['config.json', 'accounts.json', 'resource-scan.json']) {
         const source = path.join(legacy, file);
-        if (fs.existsSync(source)) fs.copyFileSync(source, path.join(current, file));
+        const dest = path.join(current, file);
+        if (fs.existsSync(source) && !fs.existsSync(dest)) fs.copyFileSync(source, dest);
+      }
+      for (const dir of ['tailscale', 'playit', 'guides', 'save-share']) {
+        const source = path.join(legacy, dir);
+        const dest = path.join(current, dir);
+        if (fs.existsSync(source) && !fs.existsSync(dest)) {
+          try { fs.cpSync(source, dest, { recursive: true }); } catch (_) { /* copy what is possible */ }
+        }
       }
       logLine(`migrated legacy user data from ${legacy}`);
       break;
@@ -98,13 +108,13 @@ function createTray() {
     if (image.isEmpty()) image = nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'icon.ico'));
     if (!image.isEmpty()) image = image.resize({ width: 20, height: 20 });
     tray = new Tray(image);
-    tray.setToolTip('OL我的世界启动器');
+    tray.setToolTip('PMCS launcher');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '显示主界面', click: showMainWindow },
       { label: '隐藏到托盘', click: () => mainWindow?.hide() },
       { type: 'separator' },
       {
-        label: '退出 OL启动器',
+        label: '退出 PMCS launcher',
         click: () => {
           quitting = true;
           app.quit();
@@ -147,7 +157,7 @@ function createWindow() {
     show: false,
     frame: false,
     backgroundColor: '#0a0e0d',
-    title: 'OL启动器',
+    title: 'PMCS launcher',
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
@@ -194,10 +204,10 @@ function createWindow() {
       try {
         const { response } = await dialog.showMessageBox(mainWindow, {
           type: 'question',
-          title: '关闭 OL我的世界启动器',
+          title: '关闭 PMCS launcher',
           message: '您关闭了应用，您是想：',
           detail: '最小化到托盘后，游戏和下载任务会继续在后台运行；退出则会结束启动器及其关联进程。',
-          buttons: ['最小化到托盘', '退出 OL启动器', '暂不退出'],
+          buttons: ['最小化到托盘', '退出 PMCS launcher', '暂不退出'],
           defaultId: 0,
           cancelId: 2,
           noLink: true,
@@ -259,7 +269,7 @@ function buildBootstrap() {
   return {
     app: {
       version: app.getVersion(),
-      name: 'OL启动器',
+      name: 'PMCS launcher',
       platform: process.platform,
       arch: process.arch,
       electron: process.versions.electron,
