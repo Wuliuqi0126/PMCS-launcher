@@ -1,6 +1,7 @@
 'use strict';
 
 const dgram = require('dgram');
+const net = require('net');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -288,10 +289,13 @@ function compareInstanceConfig(hostConfig, localConfig, instance) {
   return { blocking, warnings, info, missingMods };
 }
 
-function createLanService({ store, launcher, onUpdate, onActiveChange }) {
+function createLanService({ store, launcher, accounts, resourceShare, onUpdate, onActiveChange }) {
   const hostId = crypto.randomBytes(8).toString('hex');
   const rooms = new Map();
+  const pings = new Map();
   let socket = null;
+  let mcSocket = null;
+  let pingTimer = null;
   let sender = null;
   let host = null;
   let discoveryError = '';
@@ -332,12 +336,16 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
         port: room.port,
         name: room.name || '未命名世界',
         instanceName: room.instanceName || '',
+        owner: room.owner || '',
         version: room.version || '',
         loader: room.loader || 'vanilla',
         loaderVersion: room.loaderVersion || '',
         modCount: room.config?.mods?.length || 0,
         hasConfig: Boolean(room.config),
         configOversize: Boolean(room.configOversize),
+        resourceKey: room.resourceKey || '',
+        latencyMs: Number(room.latencyMs) || 0,
+        source: room.source || 'pmcs',
         seenAt: room.seenAt,
       })),
       host: publicHost(),
@@ -375,21 +383,46 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     socket.on('message', (message, rinfo) => {
       let data;
       try { data = JSON.parse(message.toString('utf8')); } catch (_) { return; }
-      if (!data || data.magic !== MAGIC || data.hostId === hostId) return;
+      if (!data || data.magic !== MAGIC) return;
+      if (data.type === 'ping' && data.from !== hostId) {
+        if (host?.port) {
+          const reply = Buffer.from(JSON.stringify({ magic: MAGIC, type: 'pong', nonce: data.nonce, hostId }));
+          socket.send(reply, rinfo.port, rinfo.address, () => {});
+        }
+        return;
+      }
+      if (data.type === 'pong') {
+        const sent = pings.get(String(data.nonce || ''));
+        if (sent) {
+          pings.delete(String(data.nonce));
+          const room = [...rooms.values()].find((item) => item.hostId === data.hostId);
+          if (room) {
+            room.latencyMs = Math.max(1, Date.now() - sent);
+            emitSoon();
+          }
+        }
+        return;
+      }
+      if (data.hostId === hostId) return;
       const port = Number(data.port);
       if (!Number.isInteger(port) || port < 1 || port > 65535) return;
       const key = `${rinfo.address}:${port}`;
       rooms.set(key, {
         key,
+        hostId: String(data.hostId || ''),
         ip: rinfo.address,
         port,
         name: data.name || 'Minecraft 世界',
         instanceName: data.instanceName || '',
+        owner: data.owner || '',
         version: data.version || '',
         loader: data.loader || 'vanilla',
         loaderVersion: data.loaderVersion || '',
         config: data.config && typeof data.config === 'object' ? data.config : null,
         configOversize: Boolean(data.configOversize),
+        resourceKey: String(data.resourceKey || ''),
+        latencyMs: rooms.get(key)?.latencyMs || 0,
+        source: 'pmcs',
         seenAt: Date.now(),
       });
       emitSoon();
@@ -413,10 +446,12 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       port: host.port,
       name: `[PMCS] ${host.worldName || host.instanceName}`,
       instanceName: host.instanceName,
+      owner: host.owner || '',
       version: host.version,
       loader: host.loader,
       loaderVersion: host.loaderVersion || '',
       config: host.config || null,
+      resourceKey: host.resourceKey || '',
       ts: Date.now(),
     };
   }
@@ -509,11 +544,25 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     try {
       config = await instanceConfig(instance, store.instanceDir(instance), false);
     } catch (_) { /* the room can still advertise version/loader */ }
+    let owner = '';
+    try { owner = accounts?.getActive?.()?.name || ''; } catch (_) { /* ignore */ }
+    let resourceAuto = false;
+    let resourceKey = '';
+    if (resourceShare) {
+      try {
+        await resourceShare.startHost({ instanceId: instance.id, kinds: ['mods', 'resourcepacks', 'shaderpacks', 'skins'] });
+        resourceAuto = true;
+        resourceKey = resourceShare.state().share?.key || '';
+      } catch (_) { /* a manual share or a busy port must not block LAN */ }
+    }
     host = {
       active: true,
       status: 'starting',
+      resourceAuto,
+      resourceKey,
       instanceId: instance.id,
       instanceName: instance.name,
+      owner,
       version: instance.versionId,
       loader: instance.loader,
       loaderVersion: instance.loaderVersion || '',
@@ -556,6 +605,9 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       pollTimer = null;
     }
     stopBeacon();
+    if (host?.resourceAuto && resourceShare) {
+      try { resourceShare.stopHost(); } catch (_) { /* ignore */ }
+    }
     host = null;
     emitNow();
     return state();
@@ -629,12 +681,47 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
       seen.add(key);
       return true;
     });
+    let hostResource = null;
+    if (resourceShare) {
+      try {
+        const shares = resourceShare.state().shares;
+        const share = (room.resourceKey && shares.find((item) => item.hostId === room.resourceKey || item.key === room.resourceKey))
+          || shares.find((item) => item.ip === room.ip);
+        if (share) {
+          const wanted = [];
+          for (const item of blocking) {
+            if (item.mod?.filename) wanted.push({ kind: 'mods', name: item.mod.filename });
+          }
+          for (const item of info) {
+            if (item.kind === 'resourcepack' || item.kind === 'shader') {
+              wanted.push({ kind: item.kind === 'shader' ? 'shaderpacks' : 'resourcepacks', name: item.title });
+            }
+          }
+          const files = share.files.filter((file) => wanted.some((item) => item.kind === file.kind && item.name === file.name));
+          if (files.length) {
+            const groups = {};
+            for (const file of files) {
+              if (!groups[file.kind]) groups[file.kind] = [];
+              groups[file.kind].push(file.name);
+            }
+            hostResource = {
+              key: share.key,
+              owner: share.owner || share.hostName,
+              names: files.map((file) => file.name),
+              files: files.map((file) => ({ kind: file.kind, name: file.name, size: file.size })),
+              groups,
+            };
+          }
+        }
+      } catch (_) { /* optional */ }
+    }
     return {
       canJoin: uniqueBlocking.length === 0,
       blocking: uniqueBlocking,
       warnings,
       info,
       missingMods: compared.missingMods,
+      hostResource,
       host: {
         name: room.name,
         instanceName: room.instanceName,
@@ -689,22 +776,186 @@ function createLanService({ store, launcher, onUpdate, onActiveChange }) {
     if (changed) emitSoon();
   }
 
+  function sendPings() {
+    if (!socket) return;
+    const nonce = crypto.randomBytes(4).toString('hex');
+    pings.set(nonce, Date.now());
+    if (pings.size > 80) {
+      const oldest = [...pings.entries()].sort((a, b) => a[1] - b[1]).slice(0, 40);
+      for (const [key] of oldest) pings.delete(key);
+    }
+    const buffer = Buffer.from(JSON.stringify({ magic: MAGIC, type: 'ping', nonce, from: hostId }));
+    const targets = new Set(['255.255.255.255']);
+    for (const item of addresses()) {
+      if (item.broadcast) targets.add(item.broadcast);
+    }
+    for (const target of targets) socket.send(buffer, DISCOVERY_PORT, target, () => {});
+  }
+
+  function probeMinecraftRoom(room) {
+    if (!room || room.latencyMs) return;
+    const started = Date.now();
+    const probe = net.createConnection({ host: room.ip, port: room.port });
+    const chunks = [];
+    let connected = false;
+    let settled = false;
+    const finish = (latency) => {
+      if (settled) return;
+      settled = true;
+      try { probe.destroy(); } catch (_) { /* ignore */ }
+      if (!rooms.has(room.key)) return;
+      if (latency) room.latencyMs = latency;
+      emitSoon();
+    };
+    probe.setTimeout(1200, () => finish(connected ? Math.max(1, Date.now() - started) : 0));
+    probe.once('connect', () => {
+      connected = true;
+      try { probe.write(makeStatusRequest(room.ip, room.port)); } catch (_) { finish(0); }
+    });
+    probe.on('data', (chunk) => {
+      chunks.push(chunk);
+      if (Buffer.concat(chunks).length < 5) return;
+      const status = parseStatusPacket(Buffer.concat(chunks));
+      if (status?.version?.name) {
+        room.version = String(status.version.name);
+        room.versionKnown = true;
+        if (status.description) {
+          const motd = typeof status.description === 'string' ? status.description : status.description.text || '';
+          if (motd) room.motd = motd;
+        }
+      }
+      finish(Math.max(1, Date.now() - started));
+    });
+    probe.once('error', () => finish(0));
+  }
+
+  function varInt(value) {
+    const bytes = [];
+    let current = Number(value) >>> 0;
+    do {
+      let byte = current & 0x7f;
+      current >>>= 7;
+      if (current) byte |= 0x80;
+      bytes.push(byte);
+    } while (current);
+    return Buffer.from(bytes);
+  }
+
+  function varString(value) {
+    const data = Buffer.from(String(value), 'utf8');
+    return Buffer.concat([varInt(data.length), data]);
+  }
+
+  function makeStatusRequest(host, port) {
+    const handshake = Buffer.concat([
+      varInt(0),
+      varInt(0),
+      varString(host),
+      Buffer.from([(port >> 8) & 0xff, port & 0xff]),
+      varInt(1),
+    ]);
+    const handshakePacket = Buffer.concat([varInt(handshake.length), handshake]);
+    const request = Buffer.from([0x01, 0x00]);
+    return Buffer.concat([handshakePacket, request]);
+  }
+
+  function readVarInt(buffer, offset) {
+    let value = 0;
+    let shift = 0;
+    let cursor = offset;
+    while (cursor < buffer.length) {
+      const byte = buffer[cursor];
+      value |= (byte & 0x7f) << shift;
+      cursor += 1;
+      if (!(byte & 0x80)) return { value, offset: cursor };
+      shift += 7;
+      if (shift > 35) break;
+    }
+    return null;
+  }
+
+  function parseStatusPacket(buffer) {
+    try {
+      let cursor = 0;
+      const packetLength = readVarInt(buffer, cursor);
+      if (!packetLength) return null;
+      cursor = packetLength.offset;
+      const packetId = readVarInt(buffer, cursor);
+      if (!packetId) return null;
+      cursor = packetId.offset;
+      const textLength = readVarInt(buffer, cursor);
+      if (!textLength) return null;
+      cursor = textLength.offset;
+      const json = buffer.toString('utf8', cursor, cursor + textLength.value);
+      return JSON.parse(json);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function startMinecraftDiscovery() {
+    if (mcSocket) return;
+    mcSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    mcSocket.on('message', (message, rinfo) => {
+      const text = message.toString('utf8');
+      const motd = /\[MOTD\]([\s\S]*?)\[\/MOTD\]/i.exec(text)?.[1]?.replace(/§./g, '').trim();
+      const port = Number(/\[AD\](\d{1,5})\[\/AD\]/i.exec(text)?.[1]);
+      if (!motd || !Number.isInteger(port) || port < 1 || port > 65535) return;
+      const key = `mc:${rinfo.address}:${port}`;
+      if (rooms.has(key) && Date.now() - rooms.get(key).seenAt < 5000) {
+        rooms.get(key).seenAt = Date.now();
+        return;
+      }
+      const room = {
+        key,
+        hostId: '',
+        ip: rinfo.address,
+        port,
+        name: motd,
+        instanceName: 'Minecraft 局域网',
+        owner: 'Minecraft 主机',
+        version: '未知',
+        loader: 'vanilla',
+        loaderVersion: '',
+        config: null,
+        configOversize: false,
+        latencyMs: 0,
+        source: 'minecraft',
+        seenAt: Date.now(),
+      };
+      rooms.set(key, room);
+      probeMinecraftRoom(room);
+      emitSoon();
+    });
+    mcSocket.on('error', () => { /* Minecraft LAN discovery is optional */ });
+    mcSocket.bind(4445, '0.0.0.0', () => {});
+  }
+
   function start() {
     if (started) return;
     started = true;
     startDiscovery();
+    startMinecraftDiscovery();
+    setTimeout(sendPings, 900).unref?.();
+    pingTimer = setInterval(sendPings, 3000);
     expireTimer = setInterval(expireRooms, 2000);
   }
 
   function dispose() {
     if (pollTimer) clearInterval(pollTimer);
     if (expireTimer) clearInterval(expireTimer);
+    if (pingTimer) clearInterval(pingTimer);
     expireTimer = null;
+    pingTimer = null;
     started = false;
     stopBeacon();
     if (socket) {
       try { socket.close(); } catch (_) { /* ignore */ }
       socket = null;
+    }
+    if (mcSocket) {
+      try { mcSocket.close(); } catch (_) { /* ignore */ }
+      mcSocket = null;
     }
     if (emitTimer) clearTimeout(emitTimer);
   }

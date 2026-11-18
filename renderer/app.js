@@ -43,10 +43,26 @@ const state = {
     loadedAt: 0,
     requestId: 0,
   },
+  network: {
+    name: '正在检测网络…',
+    count: 0,
+    peers: [],
+    self: null,
+  },
+  share: {
+    state: null,
+    loading: false,
+    busy: '',
+    instanceId: '',
+    kinds: ['mods'],
+    targetInstanceId: '',
+    selected: {},
+  },
   skins: {
     items: [],
     loading: false,
     importing: false,
+    applying: '',
     loaded: false,
   },
   components: {
@@ -1167,6 +1183,22 @@ function bindGlobalEvents() {
       state.recommend.instanceId = event.target.value;
       return;
     }
+    if (event.target.id === 'share-host-instance') {
+      state.share.instanceId = event.target.value;
+      return;
+    }
+    if (event.target.id === 'share-target-instance') {
+      state.share.targetInstanceId = event.target.value;
+      return;
+    }
+    if (event.target.dataset.shareKind) {
+      const kind = event.target.dataset.shareKind;
+      state.share.kinds = event.target.checked
+        ? [...new Set([...state.share.kinds, kind])]
+        : state.share.kinds.filter((item) => item !== kind);
+      paintSharePanel();
+      return;
+    }
     if (event.target.id === 'memory-range') {
       await saveConfig({ memoryMb: Number(event.target.value) });
     }
@@ -1297,7 +1329,7 @@ function bindGlobalEvents() {
     api.on('resources:scan-done', (payload) => finishResourceScan(payload));
     api.on('saves:changed', (payload) => {
       state.saveShare.state = payload;
-      if (state.route === 'lan') paintSaveSharePanel();
+      if (state.route === 'lan' || state.route === 'share') paintSaveSharePanel();
     });
     api.on('lan:update', (payload) => {
       const previous = state.lan.host?.status;
@@ -1319,6 +1351,14 @@ function bindGlobalEvents() {
       if (payload.host?.status === 'error' && previous !== 'error') {
         toast('联机启动失败', payload.host.error || '请查看日志', 'error', 8000);
       }
+    });
+    api.on('network:update', (payload) => {
+      state.network = payload || state.network;
+      paintNetworkInfo();
+    });
+    api.on('resources-share:update', (payload) => {
+      state.share.state = payload;
+      if (state.route === 'share') paintSharePanel();
     });
     api.on('game:exit', async (payload) => {
       state.running.delete(payload.instanceId);
@@ -1368,7 +1408,7 @@ async function saveConfig(patch) {
 
 function routeFromHash() {
   const raw = (location.hash || '#/home').replace(/^#\/?/, '').split('?')[0] || 'home';
-  const allowed = ['home', 'versions', 'mods', 'lan', 'instances', 'settings'];
+  const allowed = ['home', 'versions', 'mods', 'lan', 'share', 'instances', 'settings'];
   const route = allowed.includes(raw) ? raw : 'home';
   const changed = state.route !== route;
   state.route = route;
@@ -1390,6 +1430,7 @@ function renderRoute() {
   else if (state.route === 'versions') renderVersionsRoute();
   else if (state.route === 'mods') renderModsRoute();
   else if (state.route === 'lan') renderLanRoute();
+  else if (state.route === 'share') renderShareRoute();
   else if (state.route === 'instances') renderInstancesRoute();
   else if (state.route === 'settings') renderSettingsRoute();
 }
@@ -1693,6 +1734,49 @@ function closeRecommendAndGo(hash) {
   if (location.hash !== hash) location.hash = hash;
 }
 
+async function refreshNetworkInfo() {
+  try {
+    state.network = await api.invoke('network:info');
+    paintNetworkInfo();
+  } catch (_) { /* network info is optional */ }
+}
+
+function paintNetworkInfo() {
+  const name = $('#home-network-name');
+  const count = $('#home-network-count');
+  if (name) name.textContent = state.network.name || '未连接网络';
+  if (count) count.textContent = state.network.count ? `${state.network.count} 人` : '检测中';
+}
+
+function networkInfoModalBody() {
+  const data = state.network;
+  const peers = [data.self, ...(data.peers || [])].filter(Boolean);
+  return `<div class="network-modal">
+    <div class="network-modal-hero">
+      <span class="network-modal-icon">${icon('wifi', 20)}</span>
+      <div><strong>${h(data.name || '未连接网络')}</strong><p>同一网络中发现 ${data.count || 1} 个启动器；包含当前设备。</p></div>
+    </div>
+    <div class="network-peer-list">
+      ${peers.map((peer) => `<div class="network-peer">
+        <span class="network-peer-avatar">${icon('user', 14)}</span>
+        <div><strong>${h(peer.account || '未登录账户')}${peer.self ? '<span class="chip green">本机</span>' : ''}</strong><p>${h(peer.host || '未知设备')}${peer.ip ? ` · ${h(peer.ip)}` : ''}${peer.self ? '' : ` · ${timeAgo(peer.seenAt)}`}</p></div>
+      </div>`).join('')}
+    </div>
+    <p class="network-modal-hint">局域网发现使用 UDP 24457，仅在同一 Wi-Fi/热点或同一网段内生效；不会上传账户信息到外网。</p>
+    <div class="network-modal-actions"><button class="btn btn-secondary btn-sm" data-action="network-refresh">${icon('refresh', 12)} 刷新</button></div>
+  </div>`;
+}
+
+function openNetworkInfo() {
+  openModal({
+    title: '当前网络',
+    subtitle: '同一网络中的启动器和账户',
+    body: networkInfoModalBody(),
+    footer: `<button class="btn btn-primary" data-action="scan-close-modal">关闭</button>`,
+  });
+  refreshNetworkInfo();
+}
+
 function renderHomeRoute() {
   const account = getAccount();
   const active = getActiveInstance();
@@ -1760,6 +1844,11 @@ function renderHomeRoute() {
         <span class="home-version-copy"><small>PMCS launcher · 当前版本</small><strong>v${h(state.boot.app.version)}</strong></span>
         <span class="home-version-state"><i></i>本地版本</span>
       </div>
+      <button class="home-network-info" type="button" data-action="open-network-info" title="查看当前网络和同一网络中的启动器">
+        <span class="home-network-icon">${icon('wifi', 14)}</span>
+        <span class="home-network-copy"><small>当前网络</small><strong id="home-network-name">${h(state.network.name)}</strong></span>
+        <span class="home-network-count" id="home-network-count">${state.network.count ? `${state.network.count} 人` : '检测中'}</span>
+      </button>
       <div class="home-meta-actions">
         <button class="home-recommend" type="button" data-action="open-recommendations">${icon('star', 14)} 推荐</button>
         <button class="home-announcement" type="button" data-action="open-announcements">${icon('bell', 14)} 公告 <span class="home-announcement-dot"></span></button>
@@ -1875,6 +1964,7 @@ function renderHomeRoute() {
     </div>
   </div>`;
   hydrateIcons($('#view'));
+  refreshNetworkInfo();
 }
 
 async function backupActiveInstance() {
@@ -3079,22 +3169,24 @@ function paintSkinsContent() {
   const box = $('#mods-content');
   if (!box) return;
   const items = state.skins.items || [];
-  const cards = items.map((item) => `<article class="skin-card">
-    <div class="skin-preview-wrap"><img class="skin-preview" src="${h(item.dataUrl)}" alt="${h(item.filename)}" draggable="false"></div>
+  const target = currentTargetInstance();
+  const cards = items.map((item) => `<article class="skin-card ${item.applied ? 'applied' : ''}">
+    <div class="skin-preview-wrap"><img class="skin-preview" src="${h(item.dataUrl)}" alt="${h(item.filename)}" draggable="false">${item.applied ? '<span class="skin-applied-badge">已应用</span>' : ''}</div>
     <div class="skin-card-foot">
       <div class="skin-card-copy"><strong title="${h(item.filename)}">${h(item.filename)}</strong><span>${item.width}×${item.height} · ${(item.size / 1024).toFixed(1)} KB</span></div>
       <button class="icon-btn danger" title="删除皮肤" data-action="delete-skin" data-file="${h(item.filename)}">${icon('trash', 14)}</button>
     </div>
+    <button class="btn btn-sm ${item.applied ? 'btn-secondary' : 'btn-primary'} skin-apply-btn" data-action="apply-skin" data-file="${h(item.filename)}" ${state.skins.applying ? 'disabled' : ''} ${item.applied ? 'title="重新应用到此实例"' : ''}>${state.skins.applying === item.filename ? '<span class="spinner"></span> 应用中' : `${icon('play', 11)} ${item.applied ? '重新应用' : '应用到游戏'}`}</button>
   </article>`).join('');
   box.innerHTML = `<div class="skin-toolbar panel">
-    <div><strong>我的皮肤库</strong><span>只管理本地 PNG 文件，不会自动上传到 Mojang 账号。</span></div>
+    <div><strong>我的皮肤库</strong><span>选择皮肤后点「应用到游戏」；启动器会自动安装 CustomSkinLoader，并写入当前实例的本地皮肤目录。${target ? `当前实例：${h(target.name)}` : ''}</span></div>
     <div class="skin-toolbar-actions">
       <button class="btn btn-secondary btn-sm" data-action="open-skins-folder">${icon('folder', 13)} 打开文件夹</button>
       <button class="btn btn-primary btn-sm" data-action="import-skin" ${state.skins.importing ? 'disabled' : ''}>${state.skins.importing ? '<span class="spinner"></span> 导入中' : `${icon('plus', 14)} 导入皮肤`}</button>
     </div>
   </div>
   ${state.skins.loading && !items.length ? `<div class="skin-grid">${Array.from({ length: 4 }).map(() => '<div class="skin-card"><div class="skeleton" style="height:180px;border-radius:9px"></div></div>').join('')}</div>` : ''}
-  ${!state.skins.loading && !items.length ? `<div class="panel empty-state skin-empty"><div class="empty-icon">${icon('user', 30)}</div><h3>还没有导入皮肤</h3><p>支持 64×64 或 64×32 的 PNG 皮肤文件。导入后可在这里预览、整理，或打开文件夹复制到游戏。</p><div class="empty-actions"><button class="btn btn-primary" data-action="import-skin">${icon('plus', 15)} 导入第一张皮肤</button></div></div>` : ''}
+  ${!state.skins.loading && !items.length ? `<div class="panel empty-state skin-empty"><div class="empty-icon">${icon('user', 30)}</div><h3>还没有导入皮肤</h3><p>支持 64×64 或 64×32 的 PNG 皮肤文件。导入后点「应用到游戏」，启动器会自动安装 CustomSkinLoader。</p><div class="empty-actions"><button class="btn btn-primary" data-action="import-skin">${icon('plus', 15)} 导入第一张皮肤</button></div></div>` : ''}
   ${items.length ? `<div class="skin-grid">${cards}</div>` : ''}
   <div class="skin-sites panel">
     <div class="mod-resource-head">${icon('compass', 16)}<strong>在线皮肤资源站</strong><span>在浏览器中挑选后下载 PNG，再导入这里</span></div>
@@ -3136,6 +3228,28 @@ async function deleteSkin(filename) {
     toast('皮肤已删除', filename, 'info');
   } catch (err) {
     toast('删除皮肤失败', err.message || String(err), 'error');
+  }
+}
+
+async function applySkin(filename) {
+  if (state.skins.applying) return;
+  const target = currentTargetInstance();
+  if (!target) {
+    toast('请选择实例', '先在实例管理中选择一个实例，再应用皮肤', 'info');
+    return;
+  }
+  state.skins.applying = filename;
+  paintSkinsContent();
+  try {
+    const result = await api.invoke('skins:apply', filename, target.id);
+    state.skins.items = Array.isArray(result.items) ? result.items : state.skins.items;
+    state.skins.loaded = true;
+    toast('皮肤已应用到游戏', `${result.player} · ${result.instanceName}${result.installedLoader ? ' · 已安装 CustomSkinLoader' : ''} · 重启游戏后生效`, 'success', 9000);
+  } catch (err) {
+    toast('应用皮肤失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.skins.applying = '';
+    paintSkinsContent();
   }
 }
 
@@ -3612,6 +3726,165 @@ async function oneClickPatchServer() {
   }
 }
 
+function shareHostInstance() {
+  const list = state.boot?.library?.instances || [];
+  return list.find((item) => item.id === state.share.instanceId && item.status === 'ready')
+    || list.find((item) => item.id === state.boot?.library?.activeInstanceId && item.status === 'ready')
+    || list.find((item) => item.status === 'ready')
+    || null;
+}
+
+function shareTargetInstance() {
+  const list = state.boot?.library?.instances || [];
+  return list.find((item) => item.id === state.share.targetInstanceId && item.status === 'ready')
+    || list.find((item) => item.id === state.boot?.library?.activeInstanceId && item.status === 'ready')
+    || list.find((item) => item.status === 'ready')
+    || null;
+}
+
+function shareKindCount(files, kind) {
+  return (files || []).filter((file) => file.kind === kind).length;
+}
+
+function shareKindsHtml() {
+  const kinds = [
+    ['mods', '模组', 'layers'],
+    ['resourcepacks', '资源包', 'folder'],
+    ['shaderpacks', '光影', 'sparkles'],
+    ['skins', '皮肤', 'user'],
+  ];
+  return `<div class="share-kind-grid">${kinds.map(([kind, label, iconName]) => `<label class="share-kind ${state.share.kinds.includes(kind) ? 'checked' : ''}">
+    <input type="checkbox" data-share-kind="${kind}" ${state.share.kinds.includes(kind) ? 'checked' : ''}>
+    <span class="share-kind-icon">${icon(iconName, 15)}</span>
+    <span><strong>${label}</strong><small>${kind === 'skins' ? '全局皮肤库' : '当前实例'}</small></span>
+  </label>`).join('')}</div>`;
+}
+
+function sharePanelHtml() {
+  const data = state.share;
+  const current = data.state || {};
+  const active = current.share;
+  const shares = current.shares || [];
+  const hostInstance = shareHostInstance();
+  const target = shareTargetInstance();
+  const instances = (state.boot?.library?.instances || []).filter((item) => item.status === 'ready');
+  const instanceOptions = (selected) => instances.map((item) => `<option value="${h(item.id)}" ${item.id === selected ? 'selected' : ''}>${h(item.name)} · ${h(item.versionId)}</option>`).join('');
+  return `<div class="page-enter share-page">
+    <div class="page-head">
+      <div class="page-head-copy"><div class="eyebrow">LAN Resources</div><h1 class="page-title">共享资源</h1><p class="page-subtitle">通过局域网把存档、模组、资源包、光影和皮肤直接发给朋友，不经过外网。</p></div>
+      <div class="page-actions"><button class="btn btn-secondary" data-action="share-refresh">${icon('refresh', 14)} 刷新</button></div>
+    </div>
+    <div class="share-layout">
+      <section class="panel share-panel">
+        <div class="settings-head"><span class="head-icon">${icon('arrowUpRight', 16)}</span><div><h3>共享我的资源</h3><p>主机选择实例和资源分类，局域网内其他启动器会自动发现</p></div><span class="chip ${active ? 'green' : ''}" style="margin-left:auto">${active ? '共享中' : '未共享'}</span></div>
+        <div class="share-panel-body">
+          ${active ? `<div class="share-active">
+            <span class="share-active-icon">${icon('folder', 20)}</span>
+            <div><strong>${h(active.instanceName)}</strong><p>${active.kinds.map((kind) => KINDS_LABEL[kind] || kind).join(' · ')} · ${active.files.length} 个文件</p></div>
+            <span class="chip green">${active.addresses?.[0] || ''}</span>
+          </div>
+          <div class="share-file-list">${active.files.slice(0, 8).map((file) => `<div><span class="chip">${h(KINDS_LABEL[file.kind] || file.kind)}</span><span>${h(file.name)}</span><em>${formatCacheSize(file.size)}</em></div>`).join('')}${active.files.length > 8 ? `<p>还有 ${active.files.length - 8} 个文件</p>` : ''}</div>
+          <button class="btn btn-danger btn-sm" data-action="share-stop">${icon('stop', 12)} 停止共享</button>` : `<div class="field"><label for="share-host-instance">共享哪个实例</label><select class="select" id="share-host-instance">${instanceOptions(hostInstance?.id)}</select></div>
+          ${shareKindsHtml()}
+          <button class="btn btn-primary" data-action="share-start" ${data.busy || !hostInstance ? 'disabled' : ''}>${data.busy === 'start' ? '<span class="spinner"></span> 正在准备' : `${icon('wifi', 14)} 开始共享资源`}</button>
+          <p class="share-hint">启动器会创建一个局域网 HTTP 服务；只有同一网络中的启动器能发现。共享期间请保持启动器运行。</p>`}
+        </div>
+      </section>
+      <section class="panel share-panel">
+        <div class="settings-head"><span class="head-icon">${icon('download', 16)}</span><div><h3>局域网资源</h3><p>选择资源类型，从房主处下载到你的实例</p></div><span class="chip" style="margin-left:auto">${shares.length} 个来源</span></div>
+        <div class="share-panel-body">
+          <div class="field"><label for="share-target-instance">下载到</label><select class="select" id="share-target-instance">${instanceOptions(target?.id)}</select></div>
+          ${shares.length ? `<div class="share-remote-list">${shares.map((share) => `<div class="share-remote">
+            <div class="share-remote-head"><strong>${h(share.owner || share.hostName)}</strong><span>${h(share.instanceName || '实例')}</span></div>
+            <div class="share-remote-actions">${['mods', 'resourcepacks', 'shaderpacks', 'skins'].map((kind) => {
+              const count = shareKindCount(share.files, kind);
+              return count ? `<button class="btn btn-secondary btn-xs" data-action="share-download" data-key="${h(share.key)}" data-kind="${kind}" ${data.busy ? 'disabled' : ''}>${icon('download', 11)} ${KINDS_LABEL[kind]} ${count}</button>` : '';
+            }).join('')}</div>
+          </div>`).join('')}</div>` : `<div class="share-empty">${icon('wifi', 24)}<strong>正在搜索局域网资源…</strong><p>请确认房主已经点击「开始共享资源」，并连接同一 Wi-Fi 或热点。</p></div>`}
+          <p class="share-hint">已存在且 SHA1 相同的文件会直接跳过，避免重复传输。</p>
+        </div>
+      </section>
+    </div>
+    <div class="share-save-section">${saveSharePanelHtml()}</div>
+  </div>`;
+}
+
+const KINDS_LABEL = { mods: '模组', resourcepacks: '资源包', shaderpacks: '光影', skins: '皮肤' };
+
+function paintSharePanel() {
+  if (state.route !== 'share') return;
+  $('#view').innerHTML = sharePanelHtml();
+  hydrateIcons($('#view'));
+  const panel = $('#save-share-panel');
+  if (panel) panel.dataset.signature = saveShareSignature();
+}
+
+async function refreshResourceShare(force = false) {
+  if (state.share.loading && !force) return;
+  state.share.loading = true;
+  try {
+    state.share.state = await api.invoke('resourcesShare:state');
+  } catch (err) {
+    toast('读取资源共享失败', err.message || String(err), 'error');
+  } finally {
+    state.share.loading = false;
+    paintSharePanel();
+  }
+}
+
+function renderShareRoute() {
+  paintSharePanel();
+  refreshResourceShare();
+  if (!state.saveShare.loaded) loadSaveShareSaves();
+  refreshSaveShareState();
+}
+
+async function startResourceShare() {
+  const instance = shareHostInstance();
+  if (!instance || state.share.busy) return;
+  if (!state.share.kinds.length) return toast('请选择资源类型', '至少勾选一类资源', 'info');
+  state.share.busy = 'start';
+  paintSharePanel();
+  try {
+    state.share.state = await api.invoke('resourcesShare:start', { instanceId: instance.id, kinds: state.share.kinds });
+    toast('资源共享已开始', '同一局域网中的启动器会自动发现', 'success', 7000);
+  } catch (err) {
+    toast('开始共享失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.share.busy = '';
+    paintSharePanel();
+  }
+}
+
+async function stopResourceShare() {
+  if (state.share.busy) return;
+  try {
+    state.share.state = await api.invoke('resourcesShare:stop');
+    toast('已停止资源共享', '', 'info');
+  } catch (err) {
+    toast('停止共享失败', cleanError(err), 'error');
+  }
+  paintSharePanel();
+}
+
+async function downloadSharedResource(key, kind) {
+  const target = shareTargetInstance();
+  if (!target) return toast('请选择下载目标实例', '', 'info');
+  if (state.share.busy) return;
+  state.share.busy = 'download';
+  paintSharePanel();
+  try {
+    const result = await api.invoke('resourcesShare:download', { shareKey: key, instanceId: target.id, kind, names: [] });
+    const failed = result.failed?.length ? `，${result.failed.length} 个失败` : '';
+    toast('资源下载完成', `新增 ${result.downloaded} 个，跳过 ${result.skipped} 个${failed}`, result.failed?.length ? 'error' : 'success', 8000);
+  } catch (err) {
+    toast('下载资源失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.share.busy = '';
+    paintSharePanel();
+  }
+}
+
 function saveShareTargetInstance() {
   const list = state.boot?.library?.instances || [];
   return list.find((item) => item.id === state.saveShare.targetInstanceId && item.status === 'ready')
@@ -3752,7 +4025,7 @@ async function refreshSaveShareState() {
     state.saveShare.error = cleanError(err);
   } finally {
     state.saveShare.loading = false;
-    if (state.route === 'lan') paintSaveSharePanel();
+    if (state.route === 'lan' || state.route === 'share') paintSaveSharePanel();
   }
 }
 
@@ -3833,6 +4106,15 @@ function lanRoomCompatible(room) {
   return Boolean(guest && guest.status === 'ready');
 }
 
+function lanLatencyInfo(room) {
+  if (room.source === 'minecraft' && !room.latencyMs) return { label: 'LAN 广播', color: 'blue' };
+  if (!room.latencyMs) return { label: '测速中', color: '' };
+  if (room.latencyMs < 30) return { label: `${room.latencyMs} ms · 极佳`, color: 'green' };
+  if (room.latencyMs < 80) return { label: `${room.latencyMs} ms · 良好`, color: 'green' };
+  if (room.latencyMs < 150) return { label: `${room.latencyMs} ms · 一般`, color: 'amber' };
+  return { label: `${room.latencyMs} ms · 较慢`, color: 'red' };
+}
+
 function lanRoomsHtml() {
   const rooms = state.lan.rooms || [];
   const guest = getLanGuestInstance();
@@ -3850,14 +4132,17 @@ function lanRoomsHtml() {
   return `<div class="lan-room-list">${rooms.map((room) => {
     const compatible = lanRoomCompatible(room);
     const versionLabel = [room.version, room.loader ? loaderInfo(room.loader).label : ''].filter(Boolean).join(' · ') || '版本未知';
+    const lat = lanLatencyInfo(room);
+    const title = String(room.name || '未命名世界').replace(/^\[PMCS\]\s*/i, '');
     return `<div class="lan-room ${compatible ? '' : 'incompatible'}">
-      <span class="lan-room-icon">${icon('wifi', 17)}</span>
+      <span class="lan-room-icon">${icon(room.source === 'minecraft' ? 'box' : 'wifi', 17)}</span>
       <div class="lan-room-copy">
-        <strong>${h(room.name)}</strong>
-        <span>${h(room.instanceName || 'Minecraft')} · ${h(versionLabel)}</span>
-        <code>${h(room.ip)}:${h(room.port)}</code>
+        <strong>${h(title)}${room.source === 'minecraft' ? '<span class="chip blue">Minecraft</span>' : ''}</strong>
+        <span>机主 ${h(room.owner || '未知')} · 版本 ${h(room.version || '未知')} · ${h(loaderInfo(room.loader).label)}</span>
+        <span class="lan-room-address">存档 ${h(title)} · <code>${h(room.ip)}:${h(room.port)}</code></span>
       </div>
       <div class="lan-room-action">
+        <span class="chip ${lat.color}" title="网络延迟">${icon('activity', 10)} ${h(lat.label)}</span>
         ${room.modCount ? `<span class="chip" title="主机启用的模组数量">${room.modCount} 个模组</span>` : ''}
         ${!room.hasConfig && !room.configOversize ? `<span class="chip red" title="旧版主机没有提供模组清单">仅版本检查</span>` : ''}
         <button class="btn btn-sm ${compatible ? 'btn-primary' : 'btn-secondary'}" data-action="lan-join-room" data-key="${h(room.key)}" data-host="${h(room.ip)}" data-port="${h(room.port)}" ${compatible && !state.lan.joinBusy && !state.lan.preflightBusy ? '' : 'disabled'}>${state.lan.joinBusy || state.lan.preflightBusy ? '<span class="spinner"></span>' : `${icon('play', 12)} 检查并加入`}</button>
@@ -3868,7 +4153,7 @@ function lanRoomsHtml() {
 
 function lanRoomsSignature() {
   return JSON.stringify({
-    rooms: (state.lan.rooms || []).map((room) => `${room.key}:${room.name}:${room.version}:${room.loader}:${room.modCount || 0}:${room.hasConfig ? 1 : 0}`),
+    rooms: (state.lan.rooms || []).map((room) => `${room.key}:${room.name}:${room.owner || ''}:${room.version}:${room.loader}:${room.modCount || 0}:${room.hasConfig ? 1 : 0}:${room.latencyMs || 0}:${room.source || ''}`),
     guest: getLanGuestInstance()?.id || '',
     error: state.lan.discoveryError,
     busy: `${state.lan.joinBusy}:${state.lan.preflightBusy}`,
@@ -4707,7 +4992,11 @@ function renderLanRoute() {
         </div>
       </section>
     </div>`}
-    ${saveSharePanelHtml()}
+    <a class="panel share-entry-link" href="#/share">
+      <span class="head-icon">${icon('folder', 16)}</span>
+      <div><strong>共享资源</strong><p>共享存档、模组、资源包、光影和皮肤，或从局域网其他启动器下载。</p></div>
+      ${icon('chevronRight', 16)}
+    </a>
     ${tailscalePanelHtml()}
     ${playitPanelHtml()}
   </div>`;
@@ -4878,6 +5167,7 @@ function lanPreflightHtml(check) {
     ${busy ? `<div class="lan-preflight-busy"><span class="spinner"></span><div><strong>${busy === 'create' ? '正在创建匹配实例…' : '正在下载缺失内容…'}</strong><p>下载进度可以在右下角任务卡片查看，完成后会自动重新检测。</p></div></div>` : ''}
     <div class="lan-preflight-actions">
       ${ready ? `<button class="btn btn-primary" data-action="lan-preflight-join">${icon('play', 13)} 仍然加入房间</button>` : ''}
+      ${check.hostResource?.names?.length && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-download-host">${icon('wifi', 13)} 从房主局域网补齐资源（${check.hostResource.names.length}）</button>` : ''}
       ${modMissing.length && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-download">${icon('download', 13)} 下载缺失内容${modMissing.length ? `（${modMissing.length}）` : ''}</button>` : ''}
       ${needsInstance && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-create">${icon('download', 13)} 创建匹配实例并下载</button>` : ''}
       ${manualMissing.length && !busy ? `<button class="btn btn-secondary" data-action="lan-preflight-open-mods">${icon('folder', 13)} 打开本机 mods 目录</button>` : ''}
@@ -4970,6 +5260,42 @@ async function downloadLanPreflight() {
   } catch (err) {
     check.error = cleanError(err);
     setModalBody(lanPreflightHtml(check));
+  }
+}
+
+async function downloadLanPreflightFromHost() {
+  const check = state.lan.preflight;
+  if (!check?.hostResource?.names?.length || check.busy) return;
+  check.busy = 'download';
+  check.error = '';
+  setModalBody(lanPreflightHtml(check));
+  try {
+    const groups = check.hostResource.groups || { mods: check.hostResource.names };
+    let downloaded = 0;
+    let skipped = 0;
+    const failed = [];
+    for (const [kind, names] of Object.entries(groups)) {
+      if (!names?.length) continue;
+      const result = await api.invoke('resourcesShare:download', {
+        shareKey: check.hostResource.key,
+        instanceId: check.local.id,
+        kind,
+        names,
+      });
+      downloaded += Number(result.downloaded) || 0;
+      skipped += Number(result.skipped) || 0;
+      for (const item of result.failed || []) failed.push({ kind, ...item });
+    }
+    const failedText = failed.length ? `，${failed.length} 个失败` : '';
+    toast('已从房主补齐资源', `新增 ${downloaded} 个，跳过 ${skipped} 个${failedText}`, failed.length ? 'error' : 'success', 8000);
+    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: check.local.id });
+    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error };
+    setModalBody(lanPreflightHtml(state.lan.preflight));
+  } catch (err) {
+    check.busy = '';
+    check.error = cleanError(err);
+    setModalBody(lanPreflightHtml(check));
+    toast('从房主下载失败', check.error, 'error', 9000);
   }
 }
 
@@ -5896,6 +6222,13 @@ async function runAction(action, el, event) {
       case 'open-recommendations':
         openRecommendations();
         break;
+      case 'open-network-info':
+        openNetworkInfo();
+        break;
+      case 'network-refresh':
+        await refreshNetworkInfo();
+        if (state.modal) setModalBody(networkInfoModalBody());
+        break;
       case 'recommend-install-perf':
         await installPerformanceRecommendations();
         break;
@@ -5984,6 +6317,18 @@ async function runAction(action, el, event) {
         break;
       case 'offline-lan-refresh':
         await refreshOfflineLanStatus();
+        break;
+      case 'share-refresh':
+        await refreshResourceShare(true);
+        break;
+      case 'share-start':
+        await startResourceShare();
+        break;
+      case 'share-stop':
+        await stopResourceShare();
+        break;
+      case 'share-download':
+        await downloadSharedResource(el.dataset.key || '', el.dataset.kind || 'mods');
         break;
       case 'save-share-refresh':
         await loadSaveShareSaves(true);
@@ -6084,6 +6429,9 @@ async function runAction(action, el, event) {
         break;
       case 'lan-preflight-download':
         await downloadLanPreflight();
+        break;
+      case 'lan-preflight-download-host':
+        await downloadLanPreflightFromHost();
         break;
       case 'lan-preflight-create':
         await createLanMatchingInstance();
@@ -6249,6 +6597,9 @@ async function runAction(action, el, event) {
         break;
       case 'delete-skin':
         await deleteSkin(el.dataset.file);
+        break;
+      case 'apply-skin':
+        await applySkin(el.dataset.file);
         break;
       case 'open-skins-folder':
         try { await api.invoke('skins:openFolder'); } catch (err) { toast('打开皮肤文件夹失败', err.message || String(err), 'error'); }

@@ -15,9 +15,9 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("PMCS launcher 安装程序")]
 [assembly: AssemblyProduct("PMCS launcher")]
 [assembly: AssemblyCompany("PMCS launcher")]
-[assembly: AssemblyDescription("PMCS launcher 1.17.0 安装程序")]
-[assembly: AssemblyVersion("1.17.0.0")]
-[assembly: AssemblyFileVersion("1.17.0.0")]
+[assembly: AssemblyDescription("PMCS launcher 2.0.0 安装程序")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 
 namespace OLSetup
 {
@@ -152,7 +152,7 @@ namespace OLSetup
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher"))
                 {
                     key.SetValue("DisplayName", "PMCS launcher");
-                    key.SetValue("DisplayVersion", "1.17.0");
+                    key.SetValue("DisplayVersion", "2.0.0");
                     key.SetValue("Publisher", "PMCS launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);
@@ -193,6 +193,9 @@ namespace OLSetup
                 "name=\"PMCS launcher LAN Discovery\" dir=in action=allow protocol=UDP localport=24454 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Save Share\" dir=in action=allow protocol=TCP localport=24455 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Save Discovery\" dir=in action=allow protocol=UDP localport=24456 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Resource Share\" dir=in action=allow protocol=TCP localport=24460 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Resource Discovery\" dir=in action=allow protocol=UDP localport=24461 profile=private,domain enable=yes",
+                "name=\"PMCS launcher Network Presence\" dir=in action=allow protocol=UDP localport=24457 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
             };
