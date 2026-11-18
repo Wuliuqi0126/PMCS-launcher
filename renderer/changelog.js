@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.1.0',
+    title: 'IPv6 公网直连',
+    current: true,
+    items: [
+      '联机页自动检测公网 IPv6、公网出口、游戏端口和 Windows 防火墙。',
+      '检测到端口后自动放行当前 TCP 端口，生成 [IPv6]:端口 地址。',
+      '客机可粘贴 IPv6 地址直接加入，不需要 Tailscale/playit。',
+      '支持重新检测、关闭防火墙规则和查看失败原因。',
+      '手动地址同时支持 IPv4 和 [IPv6]:端口。',
+    ],
+  },
+  {
     version: '2.0.0',
     title: '局域网 2.0 与共享资源',
-    current: true,
     items: [
       '加入房间直接扫描 PMCS 和原版 Minecraft 局域网，显示机主、版本、存档名和网络延迟。',
       '客机缺模组、资源包或光影时，可直接从房主局域网补齐，SHA1 相同自动跳过。',
