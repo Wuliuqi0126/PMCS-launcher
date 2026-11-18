@@ -15,9 +15,9 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("PMCS launcher 安装程序")]
 [assembly: AssemblyProduct("PMCS launcher")]
 [assembly: AssemblyCompany("PMCS launcher")]
-[assembly: AssemblyDescription("PMCS launcher 2.1.0 安装程序")]
-[assembly: AssemblyVersion("2.1.0.0")]
-[assembly: AssemblyFileVersion("2.1.0.0")]
+[assembly: AssemblyDescription("PMCS launcher 2.2.0 安装程序")]
+[assembly: AssemblyVersion("2.2.0.0")]
+[assembly: AssemblyFileVersion("2.2.0.0")]
 
 namespace OLSetup
 {
@@ -152,7 +152,7 @@ namespace OLSetup
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher"))
                 {
                     key.SetValue("DisplayName", "PMCS launcher");
-                    key.SetValue("DisplayVersion", "2.1.0");
+                    key.SetValue("DisplayVersion", "2.2.0");
                     key.SetValue("Publisher", "PMCS launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);
@@ -172,6 +172,7 @@ namespace OLSetup
             {
                 "OL Launcher Private", "OL Launcher LAN Discovery", "OL Launcher Save Share",
                 "OL Launcher Save Discovery", "OL Launcher Java LAN", "OL Launcher Java 25565",
+                "PMCS IPv6 Direct", "PMCS_IPv6_Direct",
             })
             {
                 try
@@ -198,6 +199,7 @@ namespace OLSetup
                 "name=\"PMCS launcher Network Presence\" dir=in action=allow protocol=UDP localport=24457 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Java LAN\" dir=in action=allow protocol=TCP localport=49152-65535 profile=private,domain enable=yes",
                 "name=\"PMCS launcher Java 25565\" dir=in action=allow protocol=TCP localport=25565 profile=private,domain enable=yes",
+                "name=\"PMCS IPv6 Direct\" dir=in action=allow protocol=TCP localport=49152-65535 remoteip=2000::/3 profile=any enable=yes",
             };
             foreach (string rule in rules)
             {

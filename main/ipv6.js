@@ -8,6 +8,8 @@ const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
 const RULE_NAME = 'PMCS_IPv6_Direct';
+const PERMANENT_RULE_NAME = 'PMCS IPv6 Direct';
+const INSTALLER_PORT_RANGE = '49152-65535';
 const EXTERNAL_HOSTS = ['api64.ipify.org', 'ipv6.icanhazip.com'];
 
 function globalAddresses() {
@@ -82,21 +84,55 @@ async function externalAddress() {
   return { address: '', source: '', error: '未检测到可用的 IPv6 公网出口' };
 }
 
-function ruleInfo() {
-  if (process.platform !== 'win32') return { exists: false, port: 0, admin: false };
+function readRule(name) {
+  if (process.platform !== 'win32') return null;
   try {
-    const result = spawnSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${RULE_NAME}`], {
+    const result = spawnSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${name}`], {
       encoding: 'utf8',
       windowsHide: true,
       timeout: 3500,
     });
     const text = String(result.stdout || '');
-    if (result.status !== 0 || !/LocalPort|本地端口/i.test(text)) return { exists: false, port: 0, admin: isAdmin() };
-    const port = Number((/LocalPort:\s*(\d+)/i.exec(text) || /本地端口:\s*(\d+)/i.exec(text) || [])[1]) || 0;
-    return { exists: true, port, admin: isAdmin() };
+    if (result.status !== 0 || !/LocalPort|本地端口/i.test(text)) return null;
+    const match = /(?:LocalPort|本地端口):\s*(\S+)/i.exec(text);
+    const range = match ? String(match[1]).trim() : '';
+    const port = /^\d+$/.test(range) ? Number(range) : 0;
+    return { name, range, port };
   } catch (_) {
-    return { exists: false, port: 0, admin: isAdmin() };
+    return null;
   }
+}
+
+function ruleCovers(rule, port) {
+  if (!rule) return false;
+  const value = Number(port);
+  if (!value) return false;
+  if (rule.port && rule.port === value) return true;
+  if (rule.range === INSTALLER_PORT_RANGE) return value >= 49152 && value <= 65535;
+  if (rule.range === 'Any' || rule.range === '*') return true;
+  const range = /^(\d+)-(\d+)$/.exec(rule.range);
+  return Boolean(range && value >= Number(range[1]) && value <= Number(range[2]));
+}
+
+function ruleInfo(port = 0) {
+  if (process.platform !== 'win32') return { exists: false, port: 0, admin: false };
+  const permanent = readRule(PERMANENT_RULE_NAME);
+  if (permanent && ruleCovers(permanent, port)) {
+    return { exists: true, port: permanent.port, range: permanent.range, permanent: true, name: permanent.name, admin: isAdmin() };
+  }
+  const dynamic = readRule(RULE_NAME);
+  if (dynamic && ruleCovers(dynamic, port)) {
+    return { exists: true, port: dynamic.port, range: dynamic.range, permanent: false, name: dynamic.name, admin: isAdmin() };
+  }
+  const found = permanent || dynamic;
+  return {
+    exists: false,
+    port: found?.port || 0,
+    range: found?.range || '',
+    permanent: Boolean(permanent),
+    name: found?.name || '',
+    admin: isAdmin(),
+  };
 }
 
 function listeningOnIpv6(port) {
@@ -165,7 +201,7 @@ async function state(port = 0) {
   const addresses = globalAddresses();
   const primary = addresses.find((item) => /^2[0-9a-f]{3}:/i.test(item.address)) || addresses[0] || null;
   const external = await externalAddress();
-  const firewall = ruleInfo();
+  const firewall = ruleInfo(portNumber);
   const listening = portNumber ? listeningOnIpv6(portNumber) : false;
   const ready = Boolean(primary && external.address && firewall.exists && (!portNumber || listening));
   const publicAddress = external.address || primary?.address || '';
@@ -174,7 +210,7 @@ async function state(port = 0) {
   else if (!external.address) reason = external.error || 'IPv6 公网出口不可用';
   else if (!portNumber) reason = '等待游戏开放局域网端口';
   else if (!firewall.exists) reason = 'Windows 防火墙尚未放行端口';
-  else if (!firewall.port || firewall.port !== portNumber) reason = '防火墙规则端口与当前端口不一致';
+  else if (!firewall.permanent && (!firewall.port || firewall.port !== portNumber)) reason = '防火墙规则端口与当前端口不一致';
   else if (!listening) reason = '游戏端口尚未监听 IPv6';
   return {
     supported: process.platform === 'win32',
@@ -187,8 +223,10 @@ async function state(port = 0) {
     firewall: {
       exists: firewall.exists,
       port: firewall.port,
+      range: firewall.range || '',
+      permanent: Boolean(firewall.permanent),
       admin: firewall.admin,
-      name: RULE_NAME,
+      name: firewall.name || RULE_NAME,
     },
     port: portNumber,
     listening,
@@ -206,7 +244,7 @@ async function open(port) {
   const before = await state(portNumber);
   if (!before.primary) throw new Error('没有检测到公网 IPv6 地址，无法开启 IPv6 直连');
   if (!before.external) throw new Error(before.externalError || 'IPv6 公网出口不可用，无法开启 IPv6 直连');
-  await addFirewallRule(portNumber);
+  if (!before.firewall.exists) await addFirewallRule(portNumber);
   return state(portNumber);
 }
 
@@ -215,4 +253,4 @@ async function close() {
   return state(0);
 }
 
-module.exports = { state, open, close, globalAddresses, isAdmin, RULE_NAME };
+module.exports = { state, open, close, globalAddresses, isAdmin, RULE_NAME, PERMANENT_RULE_NAME };

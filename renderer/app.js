@@ -4688,7 +4688,7 @@ function ipv6PanelHtml() {
     ['本机 IPv6', s.primary?.address || '未检测到', s.primary ? 'green' : 'amber'],
     ['公网出口', s.external || s.externalError || '检测中', s.external ? 'green' : 'amber'],
     ['游戏端口', port ? `${port}${s.listening ? ' · 已监听 IPv6' : ' · 暂未监听 IPv6'}` : '等待开放局域网', s.listening ? 'green' : 'amber'],
-    ['防火墙', s.firewall?.exists ? `已放行 TCP ${s.firewall.port || port || ''}` : '未放行', s.firewall?.exists ? 'green' : 'amber'],
+    ['防火墙', s.firewall?.exists ? `已放行 TCP ${s.firewall.range || s.firewall.port || port || ''}` : '未放行', s.firewall?.exists ? 'green' : 'amber'],
   ] : [];
   return `<section class="panel ipv6-panel" id="ipv6-panel">
     <div class="settings-head">
@@ -4700,11 +4700,12 @@ function ipv6PanelHtml() {
       ${data.loading && !s ? `<div class="tailscale-loading"><span class="spinner light"></span> 正在检测 IPv6 地址、公网出口和防火墙…</div>` : ''}
       ${s ? `<div class="ipv6-grid">${rows.map(([label, value, color]) => `<div class="ipv6-row"><span>${h(label)}</span><strong class="${color}">${h(value)}</strong></div>`).join('')}</div>` : ''}
       ${address ? `<div class="ipv6-address"><div><small>主机公网地址（发给客机）</small><code>${h(address)}</code></div><button class="btn btn-primary btn-sm" data-action="ipv6-copy" data-text="${h(address)}">${icon('copy', 13)} 复制地址</button></div>` : ''}
+      ${s?.firewall?.permanent ? `<div class="notice info">${icon('check', 15)}<span>安装程序已提前放行 Minecraft 局域网端口（TCP 49152–65535），首次开放 IPv6 不再弹出 UAC。</span></div>` : ''}
       ${s && !s.ready && s.primary ? `<div class="notice ${s.external ? 'info' : 'warn'}">${icon(s.external ? 'info' : 'alert', 15)}<span>${h(s.reason || (s.external ? '点击下方按钮放行 Windows 防火墙端口。' : '你的网络没有可用的公网 IPv6 出口；IPv6 直连只适用于双方都有公网 IPv6 的网络。'))}</span></div>` : ''}
       <div class="ipv6-actions">
         <button class="btn btn-primary btn-sm" data-action="ipv6-open" ${data.busy || !s?.primary || !port ? 'disabled' : ''}>${data.busy === 'open' ? '<span class="spinner"></span> 正在开放' : `${icon('shield', 13)} 检测并开放端口`}</button>
         <button class="btn btn-secondary btn-sm" data-action="ipv6-refresh" ${data.loading ? 'disabled' : ''}>${icon('refresh', 12)} 重新检测</button>
-        ${s?.firewall?.exists ? `<button class="btn btn-ghost btn-sm" data-action="ipv6-close" ${data.busy ? 'disabled' : ''}>${icon('x', 12)} 关闭防火墙规则</button>` : ''}
+        ${s?.firewall?.exists && !s.firewall.permanent ? `<button class="btn btn-ghost btn-sm" data-action="ipv6-close" ${data.busy ? 'disabled' : ''}>${icon('x', 12)} 关闭防火墙规则</button>` : ''}
       </div>
       <div class="ipv6-join">
         <label for="ipv6-join-address">客机：输入主机 IPv6 地址</label>
