@@ -588,6 +588,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('components:list', async (_event, instanceId) => components.list(String(instanceId)));
+  ipcMain.handle('shaders:provision', async (_event, id) => shaderLoader.provision(String(id)));
   ipcMain.handle('components:toggle', async (_event, payload) => {
     return components.toggle(
       String(payload?.instanceId || ''),

@@ -81,6 +81,7 @@ const INVOKE_CHANNELS = new Set([
   'skins:remove',
   'skins:openFolder',
   'components:list',
+  'shaders:provision',
   'components:toggle',
   'tailscale:status',
   'tailscale:install',

@@ -201,6 +201,14 @@ async function instanceConfig(instance, instanceDir, includeDisabled = false) {
   };
 }
 
+const VISUAL_MOD_PROJECTS = new Set(['YL57xq9U', 'AANobbMI', 'GchcoXML', '4ZqxOvjD']);
+
+function isVisualMod(mod) {
+  if (!mod) return false;
+  if (VISUAL_MOD_PROJECTS.has(String(mod.projectId || ''))) return true;
+  return /(^|[-_.])(iris|sodium|oculus|rubidium)([-_.]|$)/i.test(String(mod.filename || ''));
+}
+
 function modMatchKey(mod) {
   if (mod.projectId) return `p:${mod.projectId}`;
   if (mod.sha1) return `s:${mod.sha1}`;
@@ -231,34 +239,42 @@ function compareInstanceConfig(hostConfig, localConfig, instance) {
     if (match) {
       matched.add(match);
       if (!match.enabled) {
-        blocking.push({
+        const item = {
           kind: 'mod-disabled',
           title: mod.title || mod.filename,
           message: '主机已启用该模组，但本机把它禁用了',
           mod,
           downloadable: Boolean(mod.projectId),
           action: 'download-mod',
-        });
+        };
+        (isVisualMod(mod) ? info : blocking).push(item);
       } else if (mod.sha1 && match.sha1 && mod.sha1 !== match.sha1) {
-        blocking.push({
+        const item = {
           kind: 'mod-version',
           title: mod.title || mod.filename,
           message: `模组版本不一致：主机 ${mod.versionNumber || mod.filename}`,
           mod,
           downloadable: Boolean(mod.projectId),
           action: 'download-mod',
-        });
+        };
+        (isVisualMod(mod) ? info : blocking).push(item);
       }
       continue;
     }
     const item = {
-      kind: mod.projectId ? 'mod-missing' : 'mod-manual',
+      kind: isVisualMod(mod) ? 'shader-loader' : mod.projectId ? 'mod-missing' : 'mod-manual',
       title: mod.title || mod.filename,
-      message: mod.projectId ? `缺少主机模组 ${mod.filename}` : `缺少手动安装的模组 ${mod.filename}，无法自动下载`,
+      message: isVisualMod(mod)
+        ? `主机启用了光影加载器 ${mod.filename}（可选，只影响画面）`
+        : mod.projectId ? `缺少主机模组 ${mod.filename}` : `缺少手动安装的模组 ${mod.filename}，无法自动下载`,
       mod,
       downloadable: Boolean(mod.projectId),
       action: mod.projectId ? 'download-mod' : 'manual-mod',
     };
+    if (isVisualMod(mod)) {
+      info.push(item);
+      continue;
+    }
     blocking.push(item);
     if (mod.projectId) missingMods.push(mod);
   }
@@ -702,6 +718,7 @@ function createLanService({ store, launcher, accounts, resourceShare, invite, on
             if (item.mod?.filename) wanted.push({ kind: 'mods', name: item.mod.filename });
           }
           for (const item of info) {
+            if (item.mod?.filename) wanted.push({ kind: 'mods', name: item.mod.filename });
             if (item.kind === 'resourcepack' || item.kind === 'shader') {
               wanted.push({ kind: item.kind === 'shader' ? 'shaderpacks' : 'resourcepacks', name: item.title });
             }
@@ -713,12 +730,18 @@ function createLanService({ store, launcher, accounts, resourceShare, invite, on
               if (!groups[file.kind]) groups[file.kind] = [];
               groups[file.kind].push(file.name);
             }
+            const visualName = (name) => /(^|[-_.])(iris|sodium|oculus|rubidium)([-_.]|$)/i.test(String(name || ''));
+            const mods = groups.mods || [];
             hostResource = {
               key: share.key,
               owner: share.owner || share.hostName,
               names: files.map((file) => file.name),
               files: files.map((file) => ({ kind: file.kind, name: file.name, size: file.size })),
               groups,
+              requiredMods: mods.filter((name) => !visualName(name)),
+              shaderMods: mods.filter((name) => visualName(name)),
+              shaderpacks: groups.shaderpacks || [],
+              resourcepacks: groups.resourcepacks || [],
             };
           }
         }

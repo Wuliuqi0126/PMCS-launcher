@@ -3411,6 +3411,10 @@ function paintComponentSettings() {
   const query = s.query.trim().toLowerCase();
   const items = current.filter((item) => !query || `${item.title || ''} ${item.filename || ''}`.toLowerCase().includes(query));
   const enabledCount = current.filter((item) => item.enabled).length;
+  const hasShaderLoader = (categories.mods || []).some((item) => /iris|sodium|oculus|rubidium/i.test(item.filename || ''));
+  const shaderLoaderHint = hasShaderLoader
+    ? '已检测到光影加载器，可以直接在游戏内选择光影包。'
+    : '安装 Iris + Sodium（Forge 使用 Oculus + Rubidium），之后才能在游戏内加载光影。';
 
   box.innerHTML = `
     ${data.running ? `<div class="notice warn">${icon('info', 16)}<span>实例正在运行。为避免文件被占用，组件切换暂时禁用；退出游戏后再修改，模组会在下次启动时生效。</span></div>` : ''}
@@ -3424,6 +3428,11 @@ function paintComponentSettings() {
         <span class="count">${(categories[kind] || []).filter((item) => item.enabled).length} / ${(categories[kind] || []).length}</span>
       </button>`).join('')}
     </div>
+    ${s.tab === 'shaderpacks' ? `<div class="shader-loader-callout">
+      <span class="shader-loader-icon">${icon('sparkles', 18)}</span>
+      <div><strong>光影加载器</strong><p>${h(shaderLoaderHint)}</p></div>
+      <button class="btn ${hasShaderLoader ? 'btn-secondary' : 'btn-primary'} btn-sm" data-action="enable-shader-loader" ${s.busy ? 'disabled' : ''}>${s.busy === 'shader' ? '<span class="spinner"></span> 正在安装' : hasShaderLoader ? `${icon('refresh', 12)} 重新检测/安装` : `${icon('download', 12)} 启用光影加载器`}</button>
+    </div>` : ''}
     <div class="component-toolbar">
       <div class="component-search-wrap">${icon('search', 14)}<input id="component-search" autocomplete="off" placeholder="搜索已下载的${h(labels[s.tab] || componentKindLabel(s.tab))}" value="${h(s.query)}"></div>
       <button class="icon-btn" title="刷新" data-action="component-refresh">${icon('refresh', 15)}</button>
@@ -3459,6 +3468,29 @@ async function loadComponentSettings() {
     s.error = err.message || String(err);
   } finally {
     s.loading = false;
+    paintComponentSettings();
+  }
+}
+
+async function enableShaderLoader() {
+  const id = state.components.instanceId;
+  if (!id || state.components.busy) return;
+  state.components.busy = 'shader';
+  paintComponentSettings();
+  try {
+    const result = await api.invoke('shaders:provision', id);
+    if (result?.skipped) {
+      toast('无需重复安装', result.reason || result.loader || '光影加载器已就绪', 'info', 6000);
+    } else if (result?.ok) {
+      toast('光影加载器安装完成', `${result.loader || 'Iris'} · 需要重启游戏生效`, 'success', 9000);
+    } else {
+      toast('部分光影加载器安装失败', (result?.errors || []).join('；') || '请查看任务详情', 'error', 10000);
+    }
+    await loadComponentSettings();
+  } catch (err) {
+    toast('启用光影加载器失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.components.busy = '';
     paintComponentSettings();
   }
 }
@@ -5553,6 +5585,13 @@ function lanPreflightHtml(check) {
     </div>` : ''}
     ${check.error ? `<div class="notice error">${icon('alert', 14)}<span>${h(check.error)}</span></div>` : ''}
     ${busy ? `<div class="lan-preflight-busy"><span class="spinner"></span><div><strong>${busy === 'create' ? '正在创建匹配实例…' : '正在下载缺失内容…'}</strong><p>下载进度可以在右下角任务卡片查看，完成后会自动重新检测。</p></div></div>` : ''}
+    ${check.hostResource?.names?.length ? `<div class="lan-download-options">
+      <div class="lan-download-title">从主机下载资源</div>
+      <label><input type="checkbox" id="lan-dl-shader-loader" ${check.hostResource.shaderMods?.length ? 'checked' : 'disabled'}> 光影加载器${check.hostResource.shaderMods?.length ? `（${check.hostResource.shaderMods.length}）` : '（主机未共享）'}</label>
+      <label><input type="checkbox" id="lan-dl-shaderpacks" ${check.hostResource.shaderpacks?.length ? 'checked' : 'disabled'}> 光影包${check.hostResource.shaderpacks?.length ? `（${check.hostResource.shaderpacks.length}）` : ''}</label>
+      <label><input type="checkbox" id="lan-dl-resourcepacks" ${check.hostResource.resourcepacks?.length ? '' : 'disabled'}> 资源包${check.hostResource.resourcepacks?.length ? `（${check.hostResource.resourcepacks.length}）` : ''}</label>
+      <span class="lan-download-note">必装模组会一并补齐；光影加载器和光影包只影响画面，可不下载。</span>
+    </div>` : ''}
     <div class="lan-preflight-actions">
       ${ready ? `<button class="btn btn-primary" data-action="lan-preflight-join">${icon('play', 13)} 仍然加入房间</button>` : ''}
       ${check.hostResource?.names?.length && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-download-host">${icon('wifi', 13)} 从房主局域网补齐资源（${check.hostResource.names.length}）</button>` : ''}
@@ -5680,7 +5719,19 @@ async function downloadLanPreflightFromHost() {
   check.error = '';
   setModalBody(lanPreflightHtml(check));
   try {
-    const groups = check.hostResource.groups || { mods: check.hostResource.names };
+    const hostResource = check.hostResource;
+    const allGroups = hostResource.groups || { mods: hostResource.names };
+    const groups = {};
+    const requiredMods = hostResource.requiredMods
+      || (allGroups.mods || []).filter((name) => !/(^|[-_.])(iris|sodium|oculus|rubidium)([-_.]|$)/i.test(String(name || '')));
+    const shaderMods = hostResource.shaderMods || (allGroups.mods || []).filter((name) => /(^|[-_.])(iris|sodium|oculus|rubidium)([-_.]|$)/i.test(String(name || '')));
+    const mods = [...new Set([...requiredMods, ...(($('#lan-dl-shader-loader')?.checked ?? true) ? shaderMods : [])])];
+    if (mods.length) groups.mods = mods;
+    if (($('#lan-dl-shaderpacks')?.checked ?? true) && hostResource.shaderpacks?.length) groups.shaderpacks = hostResource.shaderpacks;
+    if ($('#lan-dl-resourcepacks')?.checked && hostResource.resourcepacks?.length) groups.resourcepacks = hostResource.resourcepacks;
+    if (!Object.keys(groups).length) {
+      for (const [kind, names] of Object.entries(allGroups)) groups[kind] = names;
+    }
     let downloaded = 0;
     let skipped = 0;
     const failed = [];
@@ -6690,6 +6741,9 @@ async function runAction(action, el, event) {
         state.components.tab = ['mods', 'shaderpacks', 'resourcepacks'].includes(el.dataset.kind) ? el.dataset.kind : 'mods';
         state.components.query = '';
         paintComponentSettings();
+        break;
+      case 'enable-shader-loader':
+        await enableShaderLoader();
         break;
       case 'component-toggle':
         await toggleComponent(el.dataset.kind, el.dataset.file, el.dataset.enabled === '1');
