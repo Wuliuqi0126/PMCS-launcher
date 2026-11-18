@@ -1902,11 +1902,13 @@ function statusChip(instance) {
 function instanceActions(instance) {
   if (isRunning(instance.id)) {
     return `<button class="btn btn-sm btn-danger" data-action="stop-instance" data-id="${h(instance.id)}">${icon('stop', 12)} 结束</button>
+      <button class="icon-btn" title="查看存档" data-action="instance-saves" data-id="${h(instance.id)}">${icon('save', 15)}</button>
       <button class="icon-btn" title="运行日志" data-action="open-logs" data-id="${h(instance.id)}">${icon('terminal2', 15)}</button>
       <button class="icon-btn" title="模组设置" data-action="component-settings" data-id="${h(instance.id)}">${icon('layers', 15)}</button>`;
   }
   if (instance.status === 'ready') {
     return `<button class="btn btn-sm btn-primary" data-action="launch-instance" data-id="${h(instance.id)}" ${state.launchBusy.has(instance.id) ? 'disabled' : ''}>${state.launchBusy.has(instance.id) ? '<span class="spinner"></span>' : icon('play', 12)} 启动</button>
+      <button class="icon-btn" title="查看存档" data-action="instance-saves" data-id="${h(instance.id)}">${icon('save', 15)}</button>
       <button class="icon-btn" title="模组设置" data-action="component-settings" data-id="${h(instance.id)}">${icon('layers', 15)}</button>
       <button class="icon-btn" title="运行日志" data-action="open-logs" data-id="${h(instance.id)}">${icon('terminal2', 15)}</button>
       <button class="icon-btn" title="打开实例文件夹" data-action="open-instance-folder" data-id="${h(instance.id)}">${icon('folder', 15)}</button>
@@ -1916,6 +1918,40 @@ function instanceActions(instance) {
     <button class="icon-btn" title="模组设置" data-action="component-settings" data-id="${h(instance.id)}">${icon('layers', 15)}</button>
     <button class="icon-btn" title="运行日志" data-action="open-logs" data-id="${h(instance.id)}">${icon('terminal2', 15)}</button>
     <button class="icon-btn" title="打开实例文件夹" data-action="open-instance-folder" data-id="${h(instance.id)}">${icon('folder', 15)}</button>`;
+}
+
+async function openInstanceSaves(instanceId) {
+  const instance = getInstance(instanceId);
+  if (!instance) return;
+  let saves = [];
+  try {
+    const all = await api.invoke('saves:list');
+    saves = (all || []).filter((save) => save.instanceId === instance.id).sort((a, b) => b.lastPlayed - a.lastPlayed);
+  } catch (err) {
+    toast('读取存档失败', err.message || String(err), 'error');
+    return;
+  }
+  const rows = saves.map((save) => {
+    const shared = save.source === 'shared';
+    return `<div class="instance-save-row">
+      ${save.icon ? `<img class="instance-save-icon" src="${h(save.icon)}" alt="">` : `<span class="instance-save-icon placeholder">${icon('save', 18)}</span>`}
+      <div class="instance-save-copy">
+        <strong>${h(save.name)} <span class="chip ${shared ? 'blue' : 'green'}">${shared ? '共享' : '本地'}</span></strong>
+        <p>${formatCacheSize(save.size)} · ${save.lastPlayed ? `最近游玩 ${timeAgo(save.lastPlayed)}` : '尚未游玩'}</p>
+        ${shared ? `<p class="instance-save-source">来自 <b>${h(save.sharedFrom || '其他玩家')}</b>${save.sharedFromInstance ? ` · ${h(save.sharedFromInstance)}` : ''}${save.downloadedAt ? ` · 下载于 ${formatDate(save.downloadedAt, true)}` : ''}${save.sharedFromHost ? ` · 主机 ${h(save.sharedFromHost)}` : ''}</p>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  openModal({
+    title: `${instance.name} · 存档`,
+    subtitle: '本地存档和从局域网接收的共享存档',
+    wide: true,
+    body: `<div class="instance-saves">
+      ${saves.length ? rows : `<div class="instance-saves-empty">${icon('save', 22)}<strong>这个实例还没有存档</strong><p>进入世界保存一次后，存档会显示在这里。</p></div>`}
+      <div class="instance-saves-foot"><span>共 ${saves.length} 个存档</span><button class="btn btn-secondary btn-sm" data-action="instance-saves-open" data-id="${h(instance.id)}">${icon('folder', 13)} 打开 saves 目录</button></div>
+    </div>`,
+    footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
+  });
 }
 
 function renderInstancesRoute() {
@@ -3556,7 +3592,7 @@ function saveShareTargetInstance() {
 function saveShareSaveOptions() {
   const saves = state.saveShare.saves || [];
   return saves.map((save) => {
-    const label = [save.instanceName, save.name, timeAgo(save.lastPlayed), formatCacheSize(save.size)]
+    const label = [save.source === 'shared' ? `共享 · 来自 ${save.sharedFrom || '其他玩家'}` : save.instanceName, save.name, timeAgo(save.lastPlayed), formatCacheSize(save.size)]
       .filter(Boolean).join(' · ');
     return `<option value="${h(save.path)}" ${save.path === state.saveShare.saveId ? 'selected' : ''}>${h(label)}</option>`;
   }).join('');
@@ -3611,8 +3647,8 @@ function saveSharePanelHtml() {
           ${shares.length ? `<div class="save-share-discovered">${shares.map((share) => `<div class="save-share-row">
             <span class="save-share-row-icon">${icon('save', 16)}</span>
             <div class="save-share-row-copy">
-              <strong>${h(share.save?.name || '未命名存档')}</strong>
-              <p>${h(share.hostName || 'PMCS launcher')} · ${formatCacheSize(share.save?.size || 0)}${share.save?.lastPlayed ? ` · ${timeAgo(share.save.lastPlayed)}` : ''}</p>
+              <strong>${h(share.save?.name || '未命名存档')}<span class="chip blue">共享</span></strong>
+              <p>来源：<b>${h(share.sender || share.hostName || 'PMCS launcher')}</b> · ${formatCacheSize(share.save?.size || 0)}${share.sharedAt ? ` · 共享于 ${timeAgo(share.sharedAt)}` : ''}${share.senderHost ? ` · 主机 ${h(share.senderHost)}` : ''}</p>
             </div>
             <button class="btn btn-primary btn-sm" data-action="save-share-download" data-key="${h(share.key)}" ${data.busy ? 'disabled' : ''}>${data.busy === 'download' ? '<span class="spinner"></span>' : `${icon('download', 12)} 下载`}</button>
           </div>`).join('')}</div>` : `<div class="save-share-empty">${state.saveShare.loading ? '<span class="spinner light"></span> 正在扫描局域网共享…' : '暂时没有发现共享存档。请确认主机已开始共享，并且两台设备在同一个局域网。'}</div>`}
@@ -3635,7 +3671,7 @@ function saveShareSignature() {
     active: Boolean(data.state?.active),
     share: data.state?.share?.save?.path || data.state?.share?.save?.id || '',
     shares: (data.state?.shares || []).map((item) => `${item.key}:${item.save?.name}`),
-    saves: (data.saves || []).map((item) => `${item.path}:${item.name}`),
+    saves: (data.saves || []).map((item) => `${item.path}:${item.name}:${item.source}:${item.sharedFrom}:${item.downloadedAt}`),
     saveId: data.saveId,
     target: data.targetInstanceId,
     busy: data.busy,
@@ -3748,7 +3784,7 @@ async function downloadSharedSave(key) {
   paintSaveSharePanel(true);
   try {
     const result = await api.invoke('saves:download', { instanceId: target.id, key });
-    toast('共享存档已导入', `${result.worldName || result.name} · ${target.name}`, 'success', 9000);
+    toast('共享存档已导入', `${result.worldName || result.name}${result.sharedFrom ? ` · 来自 ${result.sharedFrom}` : ''} · ${formatDate(result.downloadedAt, true)}`, 'success', 9000);
     await loadSaveShareSaves(true);
     await refreshSaveShareState();
   } catch (err) {
@@ -5845,6 +5881,12 @@ async function runAction(action, el, event) {
         break;
       case 'open-instance-folder':
         await api.invoke('instances:openFolder', { id });
+        break;
+      case 'instance-saves':
+        await openInstanceSaves(id);
+        break;
+      case 'instance-saves-open':
+        await api.invoke('instances:openFolder', { id, sub: 'saves' });
         break;
       case 'component-settings':
         await openComponentSettings(id);

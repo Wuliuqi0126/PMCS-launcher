@@ -659,6 +659,7 @@ app.whenReady().then(() => {
     app,
     store,
     tasks,
+    accounts,
     onUpdate: (payload) => broadcast('saves:changed', payload),
   });
   saveShare.start();

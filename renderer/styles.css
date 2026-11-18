@@ -615,6 +615,19 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .toggle.on { background: rgba(110, 231, 149, .2); border-color: rgba(110, 231, 149, .33); }
 .toggle.on::after { transform: translateX(15px); background: var(--accent); }
 
+.instance-saves { display: flex; flex-direction: column; gap: 7px; }
+.instance-save-row { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.014); }
+.instance-save-icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 7px; object-fit: cover; }
+.instance-save-icon.placeholder { display: grid; place-items: center; background: rgba(255,255,255,.04); color: var(--muted); }
+.instance-save-copy { min-width: 0; flex: 1; }
+.instance-save-copy strong { display: flex; align-items: center; gap: 6px; font-size: 10px; }
+.instance-save-copy p { margin: 3px 0 0; color: var(--muted); font-size: 8.5px; line-height: 1.5; }
+.instance-save-copy .instance-save-source { color: #9dc3ee; }
+.instance-save-copy .instance-save-source b { color: var(--text-soft); }
+.instance-saves-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 4px; color: var(--muted); font-size: 8.5px; }
+.instance-saves-empty { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 28px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 10px; }
+.instance-saves-empty strong { color: var(--text-soft); font-size: 10px; }
+.instance-saves-empty p { margin: 0; font-size: 8.5px; }
 .instance-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 13px; }
 .instance-tile {
   position: relative; overflow: hidden; display: flex; flex-direction: column;

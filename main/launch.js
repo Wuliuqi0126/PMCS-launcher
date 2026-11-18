@@ -49,6 +49,37 @@ function splitLegacyArguments(text) {
 function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, onHideWindow }) {
   const running = new Map();
 
+  function resolveImeHelper() {
+    if (process.platform !== 'win32') return '';
+    const appPath = app.getAppPath();
+    const unpacked = appPath.replace(/app\.asar([\\/]|$)/, 'app.asar.unpacked$1');
+    const candidates = [
+      path.join(appPath, 'assets', 'PMCS-IME-Helper.exe'),
+      path.join(unpacked, 'assets', 'PMCS-IME-Helper.exe'),
+      path.join(process.resourcesPath || '', 'app.asar.unpacked', 'assets', 'PMCS-IME-Helper.exe'),
+    ];
+    return candidates.find((file) => { try { return fs.existsSync(file); } catch (_) { return false; } }) || '';
+  }
+
+  function startImeHelper(pid) {
+    if (process.platform !== 'win32' || !pid) return null;
+    const helper = resolveImeHelper();
+    if (!helper) return null;
+    try {
+      const child = spawn(helper, [String(pid)], { windowsHide: true, stdio: 'ignore' });
+      child.on('error', () => { /* IME optimization is optional */ });
+      return child;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function stopImeHelper(record) {
+    if (!record?.imeHelper) return;
+    try { record.imeHelper.kill(); } catch (_) { /* ignore */ }
+    record.imeHelper = null;
+  }
+
   function buildClasspath(merged, profileId) {
     const entries = [];
     for (const lib of applicableLibraries(merged)) {
@@ -256,11 +287,13 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
         logFile,
         lines: [],
         taskId: task.id,
+        imeHelper: startImeHelper(child.pid),
       };
       running.set(instanceId, record);
       const tail = startLogTail(record);
       child.on('error', (err) => {
         tail.stop();
+        stopImeHelper(record);
         running.delete(instanceId);
         task.fail(err);
         emitLog(instanceId, [`[启动器] 启动失败: ${err.message}`]);
@@ -269,6 +302,7 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
       child.on('exit', (code, signal) => {
         tail.stop();
         tail.drain();
+        stopImeHelper(record);
         running.delete(instanceId);
         const playMs = Date.now() - record.startedAt;
         const current = store.getInstance(instanceId);
@@ -359,6 +393,7 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
   function kill(instanceId) {
     const record = running.get(instanceId);
     if (!record) throw new Error('该实例没有正在运行的游戏');
+    stopImeHelper(record);
     try {
       record.child.kill();
     } catch (_) { /* ignore */ }
@@ -400,6 +435,7 @@ function createLauncher({ app, store, tasks, mojang, java, accounts, onChange, o
   function killAll() {
     const records = [...running.values()];
     for (const record of records) {
+      stopImeHelper(record);
       try { record.child.kill(); } catch (_) { /* ignore */ }
       if (process.platform === 'win32' && record.pid) {
         try {

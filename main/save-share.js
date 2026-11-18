@@ -98,7 +98,7 @@ function saveIcon(worldDir) {
   return '';
 }
 
-function createSaveShare({ app, store, tasks, onUpdate }) {
+function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
   const userData = app.getPath('userData');
   const tempRoot = path.join(userData, 'save-share');
   const hostId = crypto.randomBytes(8).toString('hex');
@@ -157,6 +157,9 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
         key: item.key,
         hostId: item.hostId,
         hostName: item.hostName,
+        sender: item.sender,
+        senderHost: item.senderHost,
+        sharedAt: item.sharedAt,
         ip: item.ip,
         port: item.port,
         token: item.token,
@@ -169,21 +172,44 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
     };
   }
 
-  function addSave(data, save, source, instanceName = '', instanceId = '') {
+  function sourceMapPath(savesDir) {
+    return path.join(savesDir, '.pmcs-save-sources.json');
+  }
+
+  function readSourceMap(savesDir) {
+    return readJson(sourceMapPath(savesDir), {}) || {};
+  }
+
+  function writeSourceMap(savesDir, data) {
+    try {
+      ensureDir(savesDir);
+      fs.writeFileSync(sourceMapPath(savesDir), JSON.stringify(data, null, 2));
+    } catch (_) { /* metadata is best-effort */ }
+  }
+
+  function addSave(data, save, source, instanceName = '', instanceId = '', meta = null) {
     if (data.seen.has(save.path)) return;
     data.seen.add(save.path);
+    const shared = meta?.source === 'shared';
     data.saves.push({
       ...save,
       id: save.id,
       instanceId,
       instanceName,
-      source,
+      source: shared ? 'shared' : source,
+      sourceLabel: source,
+      sharedFrom: shared ? String(meta.from || '') : '',
+      sharedFromHost: shared ? String(meta.fromHost || '') : '',
+      sharedFromInstance: shared ? String(meta.fromInstance || '') : '',
+      sharedAt: shared ? Number(meta.sharedAt) || 0 : 0,
+      downloadedAt: shared ? Number(meta.downloadedAt) || 0 : 0,
     });
   }
 
   function scanSaveDir(dir, data, instanceId, instanceName, source) {
     let entries = [];
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    const sources = readSourceMap(dir);
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
       const worldDir = path.join(dir, entry.name);
@@ -198,7 +224,7 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
         size: dirSizeSync(worldDir),
         lastPlayed: stat ? stat.mtimeMs : Date.now(),
         icon: saveIcon(worldDir),
-      }, source, instanceName, instanceId);
+      }, source, instanceName, instanceId, sources[entry.name] || null);
     }
   }
 
@@ -239,12 +265,18 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
 
   function sharePayload() {
     if (!active) return null;
+    let sender = '';
+    try { sender = accounts?.getActive?.()?.name || ''; } catch (_) { /* ignore */ }
+    if (!sender) sender = os.hostname();
     return {
       magic: MAGIC,
       hostId,
       port: SAVE_HTTP_PORT,
       token: active.token,
-      hostName: `${os.hostname()} · ${active.save.instanceName || 'PMCS launcher'}`,
+      hostName: `${sender} · ${active.save.instanceName || 'PMCS launcher'}`,
+      sender,
+      senderHost: os.hostname(),
+      sharedAt: active.startedAt,
       addresses: localIPv4().map((item) => item.address),
       save: {
         id: active.save.id,
@@ -303,6 +335,9 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
         key,
         hostId: String(data.hostId),
         hostName: String(data.hostName || 'PMCS launcher'),
+        sender: String(data.sender || data.hostName || 'PMCS launcher'),
+        senderHost: String(data.senderHost || ''),
+        sharedAt: Number(data.sharedAt) || 0,
         ip: addresses[0] || rinfo.address,
         addresses,
         port,
@@ -539,6 +574,19 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
       const worldName = readLevelName(path.join(worldRoot, 'level.dat')) || share.save.name || '共享存档';
       const target = uniqueWorldDir(savesDir, worldName);
       fs.cpSync(worldRoot, target, { recursive: true });
+      const downloadedAt = Date.now();
+      const sources = readSourceMap(savesDir);
+      sources[path.basename(target)] = {
+        source: 'shared',
+        from: share.sender || share.hostName || 'PMCS launcher',
+        fromHost: share.senderHost || '',
+        fromInstance: share.save?.instanceName || '',
+        sharedAt: share.sharedAt || 0,
+        downloadedAt,
+        shareId: share.save?.id || '',
+        hostId: share.hostId || '',
+      };
+      writeSourceMap(savesDir, sources);
       task.done({ stage: '存档已导入', detail: `${instance.name} · ${path.basename(target)}` });
       return {
         name: path.basename(target),
@@ -546,6 +594,8 @@ function createSaveShare({ app, store, tasks, onUpdate }) {
         path: target,
         instanceId: instance.id,
         instanceName: instance.name,
+        sharedFrom: share.sender || share.hostName || '',
+        downloadedAt,
       };
     } catch (err) {
       task.fail(err);
