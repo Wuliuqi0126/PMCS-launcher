@@ -4551,7 +4551,12 @@ async function joinTailscale() {
     toast('端口无效', '端口必须在 1–65535 之间', 'error');
     return;
   }
-  await joinLanRoom(match[1], port);
+  try {
+    await openRemotePreflight(match[1], port, 'Tailscale 房间');
+  } catch (err) {
+    toast('无法读取主机配置，将直接加入', cleanError(err), 'error', 8000);
+    await joinLanRoom('', match[1], port);
+  }
 }
 
 function openTailscaleGuide() {
@@ -4784,41 +4789,47 @@ function paintIpv6Panel() {
   hydrateIcons($('#ipv6-panel'));
 }
 
-async function joinIpv6() {
+async function openRemotePreflight(host, port, title = '远程房间') {
   if (state.lan.preflightBusy) return;
-  const raw = String($('#ipv6-join-address')?.value || '').trim();
-  const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/);
-  if (!match) return toast('IPv6 地址格式不正确', '请使用 [IPv6]:端口，例如 [2408:8207:...:1]:54321', 'error');
   const instance = getLanGuestInstance();
   if (!instance) return toast('请选择加入实例', '', 'error');
-  state.ipv6.address = raw;
   state.lan.preflightBusy = true;
   try {
     const check = await api.invoke('lan:inspectRemote', {
-      host: match[1],
-      port: Number(match[2]),
+      host,
+      port: Number(port),
       instanceId: instance.id,
     });
     state.lan.preflight = {
       ...check,
       roomKey: '',
-      address: match[1],
-      port: Number(match[2]),
+      address: host,
+      port: Number(port),
       remote: true,
       busy: '',
       error: '',
     };
     openModal({
-      title: 'IPv6 房间 · 加入前检查',
+      title: `${title} · 加入前检查`,
       subtitle: '已读取主机版本、加载器和模组配置',
       wide: true,
       body: lanPreflightHtml(state.lan.preflight),
       footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
     });
-  } catch (err) {
-    toast('读取主机配置失败', cleanError(err), 'error', 10000);
   } finally {
     state.lan.preflightBusy = false;
+  }
+}
+
+async function joinIpv6() {
+  const raw = String($('#ipv6-join-address')?.value || '').trim();
+  const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/);
+  if (!match) return toast('IPv6 地址格式不正确', '请使用 [IPv6]:端口，例如 [2408:8207:...:1]:54321', 'error');
+  state.ipv6.address = raw;
+  try {
+    await openRemotePreflight(match[1], Number(match[2]), 'IPv6 房间');
+  } catch (err) {
+    toast('读取主机配置失败', cleanError(err), 'error', 10000);
   }
 }
 
@@ -5532,7 +5543,12 @@ async function joinLanManual() {
   const raw = String(state.lan.manualAddress || $('#lan-manual-address')?.value || '').trim();
   const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/) || raw.match(/^([A-Za-z0-9.-]+):(\d{1,5})$/);
   if (!match) return toast('地址格式不正确', '请使用 IPv4:端口 或 [IPv6]:端口，例如 192.168.1.23:54321', 'error');
-  await joinLanRoom('', match[1], Number(match[2]));
+  try {
+    await openRemotePreflight(match[1], Number(match[2]), '远程房间');
+  } catch (err) {
+    toast('无法读取主机配置，将直接加入', cleanError(err), 'error', 8000);
+    await joinLanRoom('', match[1], Number(match[2]));
+  }
 }
 
 async function copyLanText(text) {
