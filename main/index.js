@@ -26,6 +26,7 @@ const { createResourceScanner } = require('./resource-scan');
 const { createOfflineLan } = require('./offline-lan');
 const { createSaveShare } = require('./save-share');
 const { createModCheck } = require('./mod-check');
+const { createShaderLoader } = require('./shader-loader');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -81,6 +82,7 @@ let installer = null;
 let launcher = null;
 let mods = null;
 let modCheck = null;
+let shaderLoader = null;
 let skins = null;
 let cacheManager = null;
 let guides = null;
@@ -426,6 +428,9 @@ function registerIpc() {
       loaderVersion: payload?.loaderVersion || '',
       memoryMb: payload?.memoryMb,
     });
+    if (payload?.shaderLoader !== false) {
+      shaderLoader?.provision(instance.id).catch(() => { /* shader loader is best-effort */ });
+    }
     return instance;
   });
 
@@ -694,6 +699,7 @@ app.whenReady().then(() => {
   networkInfo.start();
   mods = createMods({ store, tasks });
   modCheck = createModCheck({ store });
+  shaderLoader = createShaderLoader({ store, mods });
   offlineLan = createOfflineLan({ store, mods });
   saveShare = createSaveShare({
     app,
