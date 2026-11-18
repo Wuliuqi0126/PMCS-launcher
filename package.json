@@ -1,6 +1,6 @@
 {
   "name": "pmcs-launcher",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "PMCS launcher - 我的世界 Java 版启动器，支持官方版本、局域网联机、Fabric/Forge 与 Modrinth 模组",
   "main": "main/index.js",
   "author": "PMCS Launcher",
@@ -69,7 +69,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "PMCS launcher",
-      "uninstallDisplayName": "PMCS launcher 2.7.0",
+      "uninstallDisplayName": "PMCS launcher 2.7.1",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",

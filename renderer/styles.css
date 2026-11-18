@@ -1304,7 +1304,7 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .toast-close:hover { color: var(--text); }
 
 .task-stack {
-  position: fixed; right: 22px; bottom: 22px; z-index: 90; display: flex; flex-direction: column; gap: 8px;
+  position: fixed; right: 22px; bottom: 22px; z-index: 1000; display: flex; flex-direction: column; gap: 8px;
   width: 370px; max-height: min(560px, calc(100vh - 120px)); overflow-y: auto; overflow-x: hidden;
   padding-left: 4px; pointer-events: none; scrollbar-gutter: stable;
 }
@@ -1318,6 +1318,8 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
   animation: taskIn .3s cubic-bezier(.2, .8, .2, 1) both;
 }
 @keyframes taskIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.task-card.task-out { animation: taskOut .18s ease forwards; pointer-events: none; }
+@keyframes taskOut { to { opacity: 0; transform: translateY(8px) scale(.98); } }
 .task-head { display: flex; align-items: flex-start; gap: 9px; }
 .task-icon { width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center; background: rgba(110, 231, 149, .1); color: var(--accent); flex: 0 0 27px; }
 .task-card.error .task-icon { background: rgba(240, 124, 114, .12); color: var(--red); }

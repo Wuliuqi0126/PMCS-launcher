@@ -1019,8 +1019,14 @@ function upsertTask(task) {
   if (isNew) state.taskOrder.push(task.id);
   if (task.status === 'success' && !state.taskTimers.has(task.id)) {
     const timer = setTimeout(() => {
-      removeTask(task.id);
-    }, 5200);
+      const el = document.querySelector(`[data-task-id="${CSS.escape(task.id)}"]`);
+      if (el) {
+        el.classList.add('task-out');
+        setTimeout(() => removeTask(task.id), 180);
+      } else {
+        removeTask(task.id);
+      }
+    }, 2800);
     state.taskTimers.set(task.id, timer);
   }
   if (task.status === 'error' && !['mod', 'shader'].includes(task.kind) && !state.taskTimers.has(`notify:${task.id}`)) {
