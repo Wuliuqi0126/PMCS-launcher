@@ -83,6 +83,7 @@ const INVOKE_CHANNELS = new Set([
   'resources:openPath',
   'offlineLan:status',
   'offlineLan:install',
+  'offlineLan:ensure',
   'offlineLan:patchServer',
   'saves:list',
   'saves:state',

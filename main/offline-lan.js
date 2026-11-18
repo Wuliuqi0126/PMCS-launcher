@@ -49,6 +49,30 @@ function createOfflineLan({ store, mods }) {
     };
   }
 
+  function ensureLspConfig(instance) {
+    const configDir = path.join(store.instanceDir(instance), 'config');
+    const file = path.join(configDir, 'lsp.json');
+    let data = {};
+    try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { data = {}; }
+    const before = JSON.stringify(data);
+    data.enablePreference = true;
+    data.onlineMode = false;
+    if (data.fixUUID === undefined) data.fixUUID = true;
+    if (data.allowPVP === undefined) data.allowPVP = true;
+    if (data.defaultPort === undefined) data.defaultPort = 25565;
+    if (data.maxPlayer === undefined) data.maxPlayer = 8;
+    const changed = JSON.stringify(data) !== before;
+    if (changed) {
+      try {
+        fs.mkdirSync(configDir, { recursive: true });
+        fs.writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+      } catch (err) {
+        throw new Error(`LAN Server Properties 配置写入失败：${err.message}`);
+      }
+    }
+    return { file, changed };
+  }
+
   async function install(instanceId) {
     const instance = instanceOf(instanceId);
     if (!['fabric', 'quilt', 'forge', 'neoforge'].includes(instance.loader)) {
@@ -71,8 +95,24 @@ function createOfflineLan({ store, mods }) {
       } catch (err) {
         throw new Error(`当前 ${instance.versionId} ${instance.loader} 没有可用的 LAN Server Properties 版本。请使用下方「独立服务端」方式，或改用支持该模组的游戏版本。原始错误：${err.message}`);
       }
+      ensureLspConfig(instance);
     }
     return status(instance.id);
+  }
+
+  async function ensure(instanceId) {
+    const instance = instanceOf(instanceId);
+    const current = await status(instance.id);
+    if (!current.supported) return { ...current, installedNow: false, configUpdated: false };
+    if (!current.installed) {
+      await install(instance.id);
+      return { ...(await status(instance.id)), installedNow: true, configUpdated: current.method === 'lan-properties' };
+    }
+    let configUpdated = false;
+    if (current.method === 'lan-properties') {
+      configUpdated = ensureLspConfig(instance).changed;
+    }
+    return { ...(await status(instance.id)), installedNow: false, configUpdated };
   }
 
   function patchServerProperties(folder) {
@@ -131,7 +171,7 @@ function createOfflineLan({ store, mods }) {
     };
   }
 
-  return { status, install, patchServerProperties };
+  return { status, install, ensure, patchServerProperties };
 }
 
 module.exports = { createOfflineLan, OFFLINE_LAN_PROJECT, FABRIC_API_PROJECT };
