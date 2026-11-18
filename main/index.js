@@ -16,6 +16,7 @@ const { createGuides } = require('./guide');
 const { createLanService } = require('./lan');
 const { createNetworkInfo } = require('./network-info');
 const ipv6 = require('./ipv6');
+const { createInviteService } = require('./invite');
 const { createResourceShare } = require('./resource-share');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
@@ -93,6 +94,7 @@ let saveShare = null;
 let lan = null;
 let networkInfo = null;
 let resourceShare = null;
+let invite = null;
 let tray = null;
 let quitting = false;
 let closePromptOpen = false;
@@ -493,6 +495,11 @@ function registerIpc() {
   ipcMain.handle('ipv6:state', async (_event, port) => ipv6.state(Number(port) || 0));
   ipcMain.handle('ipv6:open', async (_event, port) => ipv6.open(Number(port) || 0));
   ipcMain.handle('ipv6:close', async () => ipv6.close());
+  ipcMain.handle('invite:state', async () => invite.state());
+  ipcMain.handle('invite:create', async (_event, payload) => invite.create(payload || {}));
+  ipcMain.handle('invite:rearm', async () => invite.rearm());
+  ipcMain.handle('invite:rename', async (_event, name) => invite.rename(name));
+  ipcMain.handle('invite:resolve', async (_event, key) => invite.resolve(key));
   ipcMain.handle('resourcesShare:state', async () => resourceShare.state());
   ipcMain.handle('resourcesShare:start', async (_event, payload) => resourceShare.startHost(payload || {}));
   ipcMain.handle('resourcesShare:stop', async () => resourceShare.stopHost());
@@ -661,10 +668,12 @@ app.whenReady().then(() => {
   });
   launcher.setLogHandler((instanceId, lines) => broadcast('game:log', { instanceId, lines }));
   launcher.setExitHandler((instanceId, code) => broadcast('game:exit', { instanceId, code }));
+  invite = createInviteService();
   resourceShare = createResourceShare({
     app,
     store,
     accounts,
+    invite,
     onUpdate: (payload) => broadcast('resources-share:update', payload),
   });
   resourceShare.start();
@@ -673,6 +682,7 @@ app.whenReady().then(() => {
     launcher,
     accounts,
     resourceShare,
+    invite,
     onUpdate: (payload) => broadcast('lan:update', payload),
     onActiveChange: sendInstancesChanged,
   });

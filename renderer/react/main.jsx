@@ -64,7 +64,7 @@ function Sidebar() {
     ['home', 'home', '首页', null],
     ['versions', 'download', '版本库', 'nav-version-badge'],
     ['mods', 'layers', '模组市场', null],
-    ['lan', 'wifi', '局域网联机', null],
+    ['lan', 'wifi', '联机游玩', null],
     ['share', 'folder', '共享资源', null],
     ['instances', 'box', '实例管理', 'nav-instance-badge'],
   ];

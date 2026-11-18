@@ -289,7 +289,7 @@ function compareInstanceConfig(hostConfig, localConfig, instance) {
   return { blocking, warnings, info, missingMods };
 }
 
-function createLanService({ store, launcher, accounts, resourceShare, onUpdate, onActiveChange }) {
+function createLanService({ store, launcher, accounts, resourceShare, invite, onUpdate, onActiveChange }) {
   const hostId = crypto.randomBytes(8).toString('hex');
   const rooms = new Map();
   const pings = new Map();
@@ -760,7 +760,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     return preflightRoom(room, instance);
   }
 
-  async function inspectRemote({ host: address, port, instanceId }) {
+  async function inspectRemote({ host: address, port, instanceId, secret = '' }) {
     const instance = store.getInstance(String(instanceId || ''));
     if (!instance) throw new Error('请选择要加入的实例');
     if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
@@ -771,12 +771,24 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     const urlHost = hostName.includes(':') ? `[${hostName}]` : hostName;
     let data;
     try {
-      const response = await fetch(`http://${urlHost}:24460/info`, {
+      const endpoint = secret
+        ? `http://${urlHost}:24460/invite-info?key=${encodeURIComponent(secret)}`
+        : `http://${urlHost}:24460/info`;
+      const response = await fetch(endpoint, {
         signal: AbortSignal.timeout(6500),
         headers: { Accept: 'application/json' },
       });
+      if (response.status === 403 && secret) {
+        throw new Error('密钥已过期或无效，请让主机在联机页面重新激活密钥');
+      }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      data = await response.json();
+      const payload = await response.json();
+      if (secret) {
+        if (!invite) throw new Error('当前版本不支持密钥解密');
+        data = invite.decrypt(payload, secret);
+      } else {
+        data = payload;
+      }
     } catch (err) {
       throw new Error(`无法读取主机配置：${err.message}。请确认主机已创建房间、使用 2.3.0 或更高版本，并允许资源共享端口 24460`);
     }
@@ -819,6 +831,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
       remote: true,
       address: hostName,
       port: portNumber,
+      secret,
       resourceKey: room.resourceKey,
       host: {
         ...check.host,
