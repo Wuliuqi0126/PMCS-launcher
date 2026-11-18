@@ -49,6 +49,7 @@ const INVOKE_CHANNELS = new Set([
   'lan:setPort',
   'lan:join',
   'lan:preflight',
+  'lan:inspectRemote',
   'accounts:list',
   'accounts:addOffline',
   'accounts:setActive',

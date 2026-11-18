@@ -550,7 +550,19 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     let resourceKey = '';
     if (resourceShare) {
       try {
-        await resourceShare.startHost({ instanceId: instance.id, kinds: ['mods', 'resourcepacks', 'shaderpacks', 'skins'] });
+        await resourceShare.startHost({
+          instanceId: instance.id,
+          kinds: ['mods', 'resourcepacks', 'shaderpacks', 'skins'],
+          game: {
+            versionId: instance.versionId,
+            loader: instance.loader,
+            loaderVersion: instance.loaderVersion || '',
+            instanceName: instance.name,
+            worldName: worldName || '',
+            owner,
+            config,
+          },
+        });
         resourceAuto = true;
         resourceKey = resourceShare.state().share?.key || '';
       } catch (_) { /* a manual share or a busy port must not block LAN */ }
@@ -633,12 +645,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     return true;
   }
 
-  async function preflight({ roomKey, instanceId }) {
-    const room = rooms.get(String(roomKey || ''));
-    if (!room) throw new Error('房间已过期，请刷新局域网列表后重试');
-    const instance = store.getInstance(String(instanceId || ''));
-    if (!instance) throw new Error('请选择要加入的实例');
-    if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
+  async function preflightRoom(room, instance, remoteShare = null) {
     const localConfig = await instanceConfig(instance, store.instanceDir(instance), true);
     const compared = compareInstanceConfig(room.config, localConfig, instance);
     const blocking = [...compared.blocking];
@@ -686,7 +693,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     let hostResource = null;
     if (resourceShare) {
       try {
-        const shares = resourceShare.state().shares;
+        const shares = remoteShare ? [remoteShare] : resourceShare.state().shares;
         const share = (room.resourceKey && shares.find((item) => item.hostId === room.resourceKey || item.key === room.resourceKey))
           || shares.find((item) => item.ip === room.ip);
         if (share) {
@@ -740,6 +747,84 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
         loader: instance.loader,
         loaderVersion: instance.loaderVersion || '',
         modCount: localConfig.mods.filter((mod) => mod.enabled).length,
+      },
+    };
+  }
+
+  async function preflight({ roomKey, instanceId }) {
+    const room = rooms.get(String(roomKey || ''));
+    if (!room) throw new Error('房间已过期，请刷新局域网列表后重试');
+    const instance = store.getInstance(String(instanceId || ''));
+    if (!instance) throw new Error('请选择要加入的实例');
+    if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
+    return preflightRoom(room, instance);
+  }
+
+  async function inspectRemote({ host: address, port, instanceId }) {
+    const instance = store.getInstance(String(instanceId || ''));
+    if (!instance) throw new Error('请选择要加入的实例');
+    if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
+    const hostName = String(address || '').trim().replace(/^\[|\]$/g, '');
+    if (net.isIP(hostName) !== 6) throw new Error('请输入有效的 IPv6 地址');
+    const portNumber = Number(port);
+    if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) throw new Error('端口无效');
+    const urlHost = hostName.includes(':') ? `[${hostName}]` : hostName;
+    let data;
+    try {
+      const response = await fetch(`http://${urlHost}:24460/info`, {
+        signal: AbortSignal.timeout(6500),
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      data = await response.json();
+    } catch (err) {
+      throw new Error(`无法读取主机配置：${err.message}。请确认主机已创建房间、使用 2.2.1 或更高版本，并允许 IPv6 资源共享端口 24460`);
+    }
+    const game = data?.game && typeof data.game === 'object' ? data.game : {};
+    const room = {
+      key: `remote:${hostName}:${portNumber}`,
+      ip: hostName,
+      port: portNumber,
+      name: game.worldName || game.instanceName || 'IPv6 房间',
+      instanceName: game.instanceName || 'IPv6 主机',
+      owner: game.owner || data.owner || '',
+      version: game.versionId || '',
+      loader: game.loader || 'vanilla',
+      loaderVersion: game.loaderVersion || '',
+      config: game.config || null,
+      configOversize: false,
+      resourceKey: String(data.hostId || ''),
+      source: 'ipv6',
+      seenAt: Date.now(),
+    };
+    const share = data?.files?.length ? {
+      key: `${hostName}:24460`,
+      hostId: String(data.hostId || ''),
+      hostName: String(data.hostName || 'PMCS launcher'),
+      owner: String(data.owner || game.owner || ''),
+      instanceName: String(game.instanceName || ''),
+      ip: hostName,
+      port: 24460,
+      token: String(data.token || ''),
+      kinds: Array.isArray(data.kinds) ? data.kinds : [],
+      files: Array.isArray(data.files) ? data.files : [],
+      seenAt: Date.now(),
+    } : null;
+    if (share && resourceShare?.rememberRemote) {
+      try { resourceShare.rememberRemote(share); } catch (_) { /* optional */ }
+    }
+    const check = await preflightRoom(room, instance, share);
+    return {
+      ...check,
+      remote: true,
+      address: hostName,
+      port: portNumber,
+      resourceKey: room.resourceKey,
+      host: {
+        ...check.host,
+        owner: room.owner,
+        name: room.name,
+        instanceName: room.instanceName,
       },
     };
   }
@@ -971,6 +1056,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     setPort,
     join,
     preflight,
+    inspectRemote,
     listWorlds,
     hostId,
   };

@@ -5,6 +5,7 @@ const http = require('http');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
 const crypto = require('crypto');
 const { ensureDir, hashFile, sanitizeFileName } = require('./util');
 
@@ -74,7 +75,9 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
         instanceId: active.instanceId,
         instanceName: active.instanceName,
         hostName: active.hostName,
+        owner: active.owner,
         kinds: active.kinds,
+        game: active.game || null,
         files: publicFiles(active.files),
         addresses: localIPv4().map((item) => `${item.address}:${RESOURCE_PORT}`),
         startedAt: active.startedAt,
@@ -130,6 +133,15 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
       owner: browser,
       instanceName: active.instanceName,
       kinds: active.kinds,
+      game: active.game ? {
+        versionId: active.game.versionId,
+        loader: active.game.loader,
+        loaderVersion: active.game.loaderVersion,
+        instanceName: active.game.instanceName,
+        worldName: active.game.worldName,
+        owner: active.game.owner,
+        modCount: active.game.config?.mods?.length || 0,
+      } : null,
       files: publicFiles(active.files),
       ts: Date.now(),
     };
@@ -202,6 +214,32 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
     });
   }
 
+  function rememberRemote(share) {
+    if (!share || !share.ip || !share.port) return null;
+    const key = String(share.key || `${share.ip}:${share.port}`);
+    const entry = {
+      key,
+      hostId: String(share.hostId || ''),
+      hostName: String(share.hostName || 'PMCS launcher'),
+      owner: String(share.owner || ''),
+      instanceName: String(share.instanceName || ''),
+      ip: String(share.ip),
+      port: Number(share.port) || RESOURCE_PORT,
+      token: String(share.token || ''),
+      kinds: Array.isArray(share.kinds) ? share.kinds.map(String) : [],
+      files: Array.isArray(share.files) ? share.files.filter((file) => file && file.name).map((file) => ({
+        kind: String(file.kind || ''),
+        name: String(file.name),
+        size: Number(file.size) || 0,
+        sha1: String(file.sha1 || ''),
+      })) : [],
+      seenAt: Date.now(),
+    };
+    shares.set(key, entry);
+    emit(true);
+    return entry;
+  }
+
   function fileFor(shareKey, kind, name) {
     const share = shares.get(String(shareKey || ''));
     if (!share) throw new Error('资源共享已过期，请刷新');
@@ -234,7 +272,8 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
           const current = await hashFile(target, 'sha1');
           if (current === file.sha1) { skipped += 1; continue; }
         }
-        const url = `http://${share.ip}:${share.port}/file?token=${encodeURIComponent(share.token)}&kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(file.name)}`;
+        const hostPart = net.isIP(share.ip) === 6 ? `[${share.ip}]` : share.ip;
+        const url = `http://${hostPart}:${share.port}/file?token=${encodeURIComponent(share.token)}&kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(file.name)}`;
         const response = await fetch(url, { signal: AbortSignal.timeout(120000) });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const temp = `${target}.part`;
@@ -253,7 +292,7 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
     return { downloaded, skipped, failed, kind, targetDir };
   }
 
-  async function startHost({ instanceId, kinds }) {
+  async function startHost({ instanceId, kinds, game = null }) {
     if (active) throw new Error('已有资源共享在运行');
     const instance = store.getInstance(String(instanceId || ''));
     if (!instance) throw new Error('实例不存在');
@@ -271,6 +310,7 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
       hostName: os.hostname(),
       owner: browser,
       kinds: selected,
+      game: game && typeof game === 'object' ? game : null,
       files,
       token,
       startedAt: Date.now(),
@@ -290,7 +330,13 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
       }
       if (url.pathname === '/info') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify({ magic: MAGIC, hostId, ...beaconPayload() }));
+        const payload = beaconPayload() || {};
+        res.end(JSON.stringify({
+          magic: MAGIC,
+          hostId,
+          ...payload,
+          game: active?.game || payload.game || null,
+        }));
         return;
       }
       if (url.pathname === '/file') {
@@ -311,7 +357,8 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
       res.writeHead(404); res.end('not found');
     });
     server.on('error', () => { /* UI shows no active status if port is busy */ });
-    server.listen(RESOURCE_PORT, '0.0.0.0');
+    // Bind dual-stack so the same share is reachable over IPv6 and IPv4.
+    server.listen(RESOURCE_PORT, '::');
   }
 
   function stopServer() {
@@ -356,7 +403,7 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
     }
   }
 
-  return { start, dispose, state, startHost, stopHost, download };
+  return { start, dispose, state, startHost, stopHost, download, rememberRemote };
 }
 
 module.exports = { createResourceShare, RESOURCE_PORT, RESOURCE_DISCOVERY_PORT, KINDS };

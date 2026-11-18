@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.3.0',
+    title: 'IPv6 房间配置识别',
+    current: true,
+    items: [
+      'IPv6 客机加入前读取主机版本、加载器、模组和资源列表。',
+      '缺失模组可直接从主机 IPv6 地址下载，支持创建匹配实例。',
+      '主机资源共享服务同时监听 IPv6 和 IPv4。',
+      '安装程序放行 TCP 24460 公网 IPv6，用于传输配置和资源。',
+      '下载后自动重新检查，再进入游戏。',
+    ],
+  },
+  {
     version: '2.2.1',
     title: '修复 IPv6 防火墙误报',
-    current: true,
     items: [
       '修复中文 Windows 下已放行的 IPv6 防火墙规则被显示为「未放行」。',
       '改用 PowerShell 读取防火墙规则，不再依赖系统语言和 netsh 编码。',
