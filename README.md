@@ -1,6 +1,6 @@
 # PMCS launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.17.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **2.0.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [PMCS launcher 1.17.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.17.0/PMCSLauncher-1.17.0-Setup.exe)
-- [PMCS launcher 1.17.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.17.0/PMCSLauncher-1.17.0-Portable.zip)
+- [PMCS launcher 2.0.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.0.0/PMCSLauncher-2.0.0-Setup.exe)
+- [PMCS launcher 2.0.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.0.0/PMCSLauncher-2.0.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -31,6 +31,10 @@
 - **本机游戏资源检索**：首次安装或更新后自动检索设备上已下载的游戏包体与模组，按“游戏包体 → 模组”顺序在右下角显示实时进度；分阶段成功提示和完成提示均可点击查看结果。设置页也提供“检索游戏包体资源”按钮，结果保存在 `resource-scan.json`，不会移动、修改或上传本地文件。
 - **局域网正版验证修复**：客机提示“无效会话”时，主机可在联机页按加载器一键安装对应模组：Fabric/Quilt 使用 OfflineLAN，Forge/NeoForge 使用 LAN Server Properties；原版没有集成服务器开关，可直接选择独立服务端目录自动备份并修改 `server.properties`。
 - **自动准备离线联机**：创建房间启动主机前，启动器自动检查并安装当前加载器对应的离线验证模组；Forge/NeoForge 同时写入 `config/lsp.json`，默认把 `onlineMode` 设为 `false`。联机页新增「一键改独立服务端」，不需要进入修复弹窗。
+- **局域网房间总览**：加入房间会同时扫描 PMCS 房间和原版 Minecraft 局域网广播，显示房主、版本、存档名、模组数和实时延迟。
+- **共享资源**：左侧新增独立「共享资源」页面，可共享存档、模组、资源包、光影和皮肤；客机可直接从房主下载缺失资源，SHA1 相同的文件自动跳过。
+- **网络状态**：首页版本信息旁显示当前 Wi-Fi/网络名和同一网络中的启动器数量，点击可查看账户、主机和 IP 详情。
+- **皮肤进入游戏**：皮肤库新增「应用到游戏」，自动安装 CustomSkinLoader、写入当前实例的本地皮肤目录，并修正 `CustomSkinLoader.json` 的 LocalSkin 优先级、清空旧缓存；支持 Fabric/Quilt/Forge/NeoForge。
 - **托盘与关闭确认**：应用启动后显示系统托盘图标；关闭窗口时弹出上下两个单选项「最小化到托盘 / 退出 PMCS launcher」，并提供「记住该选项」和「之后可以在设置栏里更改」提示，底部为「暂不退出 / 退出启动器」。设置页的「关闭窗口时」可随时改回每次询问、最小化到托盘或直接退出。托盘菜单仍可重新显示主界面或彻底退出。
 - **可选卸载清理**：卸载程序提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」三个独立选项，默认保留存档与配置，并默认卸载 Tailscale；只删除程序文件时不会动 `游戏目录`。
 - **退出时清理关联进程**：关闭启动器会终止所有 Minecraft/Java 游戏进程、Tailscale 登录子进程和局域网服务，避免残留后台进程占用文件导致无法卸载。
@@ -126,7 +130,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/PMCS launcher-1.17.0-安装程序.exe
+setup/PMCS launcher-2.0.0-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `PMCS launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -143,14 +147,14 @@ setup/PMCS launcher-1.17.0-安装程序.exe
 PMCS launcher.exe
 ```
 
-安装包文件名统一为 **PMCS launcher-1.17.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名统一为 **PMCS launcher-2.0.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: 1BF352ADCC3056D010CFBC8100F36EE83900C30975BAE28F417851C5924922C8
+SHA256: 511C08C7BDC99928BDCADADE389586998CDEF54BCFC01A8F805723762CE5E53F
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
@@ -162,13 +166,13 @@ SHA256: 1BF352ADCC3056D010CFBC8100F36EE83900C30975BAE28F417851C5924922C8
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/PMCS launcher-1.17.0-便携版.zip
+setup/PMCS launcher-2.0.0-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-F56B40315AFFF7CF7F4D27FB8B069B9937F44CA160CEA1A11D3CDC28DCF3546F
+6C242B9FB9973665BBD71D38EF41883FD1C9F68DF09D347C2F0946886087A24E
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
@@ -213,7 +217,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `PMCS launcher.exe`，快捷方式同名。
-- 安装包文件名保持 `PMCS launcher-1.17.0-安装程序.exe`。
+- 安装包文件名保持 `PMCS launcher-2.0.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -234,7 +238,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-PMCS launcher-1.17.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
+PMCS launcher-2.0.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
 ```
 
 electron-builder 和缓存保留在：

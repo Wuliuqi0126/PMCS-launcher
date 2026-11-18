@@ -16,7 +16,19 @@ function pngDimensions(buffer) {
   return { width, height };
 }
 
-function createSkins({ store, getWindow }) {
+const CUSTOM_SKIN_LOADER_PROJECT = 'idMHQ4n2';
+
+const LOCAL_SKIN_ENTRY = {
+  name: 'LocalSkin',
+  type: 'Legacy',
+  checkPNG: false,
+  skin: 'LocalSkin/skins/{USERNAME}.png',
+  model: 'auto',
+  cape: 'LocalSkin/capes/{USERNAME}.png',
+  elytra: 'LocalSkin/elytras/{USERNAME}.png',
+};
+
+function createSkins({ store, mods, accounts, getWindow }) {
   function skinsDir() {
     const dir = path.join(store.gameDir, 'skins');
     ensureDir(dir);
@@ -42,6 +54,8 @@ function createSkins({ store, getWindow }) {
           width: dims.width,
           height: dims.height,
           dataUrl: `data:image/png;base64,${data.toString('base64')}`,
+          applied: store.config.skin === filename,
+          appliedInstanceId: store.config.skinInstanceId || '',
         });
       } catch (_) { /* skip broken file */ }
     }
@@ -84,6 +98,62 @@ function createSkins({ store, getWindow }) {
     return list();
   }
 
+  function ensureCustomSkinConfig(instance) {
+    const root = path.join(store.instanceDir(instance), 'CustomSkinLoader');
+    ensureDir(root);
+    const configFile = path.join(root, 'CustomSkinLoader.json');
+    let data = {};
+    try { data = JSON.parse(fs.readFileSync(configFile, 'utf8')); } catch (_) { data = {}; }
+    if (!Array.isArray(data.loadlist)) data.loadlist = [];
+    data.enable = true;
+    if (data.enableSkull === undefined) data.enableSkull = true;
+    if (data.enableDynamicSkull === undefined) data.enableDynamicSkull = true;
+    const rest = data.loadlist.filter((item) => !(item && (item.name === 'LocalSkin' || String(item.root || '').replace(/\\/g, '/').startsWith('LocalSkin'))));
+    data.loadlist = [LOCAL_SKIN_ENTRY, ...rest];
+    fs.writeFileSync(configFile, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    try { fs.rmSync(path.join(root, 'cache'), { recursive: true, force: true }); } catch (_) { /* cache is optional */ }
+    return configFile;
+  }
+
+  async function apply(filename, instanceId) {
+    const safe = path.basename(String(filename));
+    if (safe !== filename || !/\.png$/i.test(safe)) throw new Error('无效的皮肤文件名');
+    const source = path.join(skinsDir(), safe);
+    if (!exists(source)) throw new Error('皮肤文件不存在，请重新导入');
+    const instance = store.getInstance(String(instanceId || ''));
+    if (!instance) throw new Error('请选择要应用皮肤的实例');
+    if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
+    if (instance.loader === 'vanilla') throw new Error('原版实例无法加载本地皮肤；请使用 Fabric、Quilt、Forge 或 NeoForge 实例');
+    const account = accounts?.getActive?.();
+    if (!account?.name) throw new Error('请先创建或登录账户');
+    let installed = [];
+    try { installed = await mods.listInstalled(instance.id, 'mods'); } catch (_) { installed = []; }
+    const hasLoader = installed.some((item) => item.projectId === CUSTOM_SKIN_LOADER_PROJECT || /customskinloader/i.test(item.filename));
+    if (!hasLoader) {
+      await mods.install(instance.id, CUSTOM_SKIN_LOADER_PROJECT, {
+        source: 'modrinth',
+        mirror: 'mcim',
+        module: 'mods',
+      });
+    }
+    const root = path.join(store.instanceDir(instance), 'CustomSkinLoader', 'LocalSkin', 'skins');
+    ensureDir(root);
+    const names = new Set([sanitizeFileName(account.name, 'player')]);
+    if (account.uuid) names.add(String(account.uuid).replace(/-/g, ''));
+    for (const name of names) fs.copyFileSync(source, path.join(root, `${name}.png`));
+    ensureCustomSkinConfig(instance);
+    store.updateConfig({ skin: safe, skinInstanceId: instance.id });
+    return {
+      filename: safe,
+      instanceId: instance.id,
+      instanceName: instance.name,
+      player: account.name,
+      paths: [...names].map((name) => path.join(root, `${name}.png`)),
+      installedLoader: !hasLoader,
+      ...list(),
+    };
+  }
+
   async function openFolder() {
     const dir = skinsDir();
     const error = await shell.openPath(dir);
@@ -91,7 +161,7 @@ function createSkins({ store, getWindow }) {
     return dir;
   }
 
-  return { list, importSkin, remove, openFolder };
+  return { list, importSkin, remove, apply, openFolder };
 }
 
 module.exports = { createSkins, pngDimensions };

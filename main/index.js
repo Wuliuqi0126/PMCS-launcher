@@ -14,6 +14,8 @@ const { createSkins } = require('./skins');
 const { createCache } = require('./cache');
 const { createGuides } = require('./guide');
 const { createLanService } = require('./lan');
+const { createNetworkInfo } = require('./network-info');
+const { createResourceShare } = require('./resource-share');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
 const { createPlayit } = require('./playit');
@@ -88,6 +90,8 @@ let resources = null;
 let offlineLan = null;
 let saveShare = null;
 let lan = null;
+let networkInfo = null;
+let resourceShare = null;
 let tray = null;
 let quitting = false;
 let closePromptOpen = false;
@@ -484,6 +488,11 @@ function registerIpc() {
   });
   ipcMain.handle('lan:worlds', async (_event, instanceId) => lan.listWorlds(instanceId));
   ipcMain.handle('lan:hostStart', async (_event, payload) => lan.startHost(payload || {}));
+  ipcMain.handle('network:info', async () => networkInfo.state());
+  ipcMain.handle('resourcesShare:state', async () => resourceShare.state());
+  ipcMain.handle('resourcesShare:start', async (_event, payload) => resourceShare.startHost(payload || {}));
+  ipcMain.handle('resourcesShare:stop', async () => resourceShare.stopHost());
+  ipcMain.handle('resourcesShare:download', async (_event, payload) => resourceShare.download(payload || {}));
   ipcMain.handle('lan:stopHost', async () => lan.stopHost());
   ipcMain.handle('lan:setPort', async (_event, port) => lan.setPort(port));
   ipcMain.handle('lan:join', async (_event, payload) => lan.join(payload || {}));
@@ -543,6 +552,7 @@ function registerIpc() {
   ipcMain.handle('skins:list', async () => skins.list());
   ipcMain.handle('skins:import', async () => skins.importSkin());
   ipcMain.handle('skins:remove', async (_event, filename) => skins.remove(String(filename)));
+  ipcMain.handle('skins:apply', async (_event, filename, instanceId) => skins.apply(String(filename), String(instanceId || '')));
   ipcMain.handle('skins:openFolder', async () => skins.openFolder());
   ipcMain.handle('mods:toggle', async (_event, payload) => {
     return mods.setEnabled(String(payload?.instanceId), String(payload?.filename), Boolean(payload?.enabled));
@@ -646,13 +656,27 @@ app.whenReady().then(() => {
   });
   launcher.setLogHandler((instanceId, lines) => broadcast('game:log', { instanceId, lines }));
   launcher.setExitHandler((instanceId, code) => broadcast('game:exit', { instanceId, code }));
+  resourceShare = createResourceShare({
+    app,
+    store,
+    accounts,
+    onUpdate: (payload) => broadcast('resources-share:update', payload),
+  });
+  resourceShare.start();
   lan = createLanService({
     store,
     launcher,
+    accounts,
+    resourceShare,
     onUpdate: (payload) => broadcast('lan:update', payload),
     onActiveChange: sendInstancesChanged,
   });
   lan.start();
+  networkInfo = createNetworkInfo({
+    accounts,
+    onUpdate: (payload) => broadcast('network:update', payload),
+  });
+  networkInfo.start();
   mods = createMods({ store, tasks });
   modCheck = createModCheck({ store });
   offlineLan = createOfflineLan({ store, mods });
@@ -664,7 +688,7 @@ app.whenReady().then(() => {
     onUpdate: (payload) => broadcast('saves:changed', payload),
   });
   saveShare.start();
-  skins = createSkins({ store, getWindow: () => mainWindow });
+  skins = createSkins({ store, mods, accounts, getWindow: () => mainWindow });
   cacheManager = createCache({ store, app });
   guides = createGuides({ app, openExternal: (url) => shell.openExternal(url) });
   components = createComponents({ store, mods, launcher });
@@ -728,5 +752,7 @@ app.on('before-quit', () => {
   try { tailscale?.dispose(); } catch (_) { /* ignore */ }
   try { playit?.dispose(); } catch (_) { /* ignore */ }
   try { saveShare?.dispose(); } catch (_) { /* ignore */ }
+  try { networkInfo?.dispose(); } catch (_) { /* ignore */ }
+  try { resourceShare?.dispose(); } catch (_) { /* ignore */ }
   try { lan?.dispose(); } catch (_) { /* ignore */ }
 });

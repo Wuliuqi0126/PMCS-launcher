@@ -11,8 +11,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("PMCS launcher 卸载程序")]
 [assembly: System.Reflection.AssemblyProduct("PMCS launcher")]
 [assembly: System.Reflection.AssemblyCompany("PMCS launcher")]
-[assembly: System.Reflection.AssemblyVersion("1.17.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.17.0.0")]
+[assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.0.0.0")]
 
 namespace OLUninstall
 {
@@ -339,6 +339,9 @@ namespace OLUninstall
                 "PMCS launcher LAN Discovery",
                 "PMCS launcher Save Share",
                 "PMCS launcher Save Discovery",
+                "PMCS launcher Resource Share",
+                "PMCS launcher Resource Discovery",
+                "PMCS launcher Network Presence",
                 "PMCS launcher Java LAN",
                 "PMCS launcher Java 25565",
                 "OL Launcher Private",
