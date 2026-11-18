@@ -2448,6 +2448,10 @@ async function openCreateModal(preselectedVersion = '') {
           </button>`).join('')}
         </div>
       </div>
+      <div class="field">
+        <label class="checkbox-row"><input type="checkbox" id="create-shader-loader" checked> 同时安装光影加载器</label>
+        <div class="field-hint" id="create-shader-hint">自动安装符合当前版本和加载器的 Iris + Sodium（Forge 使用 Oculus + Rubidium）；没有兼容版本时跳过，不阻塞实例安装。</div>
+      </div>
       <div class="field" style="margin-bottom:0">
         <label>安装说明</label>
         <p class="form-note" style="margin:0">原版、Fabric、Quilt 安装较快；Forge、NeoForge 需要运行官方安装程序，可能需要几分钟。安装过程可在右下角查看，完成后即可启动。内存等设置在「设置」中调整。</p>
@@ -2462,6 +2466,8 @@ async function openCreateModal(preselectedVersion = '') {
       const loaderSelect = $('#create-loader-version', root);
       const hint = $('#loader-hint', root);
       const errorBox = $('#create-error', root);
+      const shaderCheck = $('#create-shader-loader', root);
+      const shaderHint = $('#create-shader-hint', root);
 
       const showError = (message) => {
         errorBox.hidden = false;
@@ -2496,10 +2502,24 @@ async function openCreateModal(preselectedVersion = '') {
         }
       }
 
+      function syncShaderOption() {
+        const supported = loader !== 'vanilla';
+        if (shaderCheck) {
+          shaderCheck.disabled = !supported;
+          if (!supported) shaderCheck.checked = false;
+        }
+        if (shaderHint) {
+          shaderHint.textContent = supported
+            ? '自动安装符合当前版本和加载器的 Iris + Sodium（Forge 使用 Oculus + Rubidium）；没有兼容版本时跳过，不阻塞实例安装。'
+            : '原版实例无法加载光影模组。';
+        }
+      }
+
       root.querySelectorAll('[data-loader-option]').forEach((btn) => {
         btn.addEventListener('click', () => {
           loader = btn.dataset.loaderOption;
           root.querySelectorAll('[data-loader-option]').forEach((item) => item.classList.toggle('active', item.dataset.loaderOption === loader));
+          syncShaderOption();
           loadLoaderVersions();
         });
       });
@@ -2508,6 +2528,7 @@ async function openCreateModal(preselectedVersion = '') {
         if (loader !== 'vanilla') loadLoaderVersions();
       });
       nameInput.addEventListener('input', () => { nameInput.dataset.touched = '1'; });
+      syncShaderOption();
       $('#create-instance-form', root).addEventListener('submit', async (event) => {
         event.preventDefault();
         errorBox.hidden = true;
@@ -2523,6 +2544,7 @@ async function openCreateModal(preselectedVersion = '') {
             versionId: versionSelect.value,
             loader,
             loaderVersion: loader === 'vanilla' ? '' : loaderSelect.value,
+            shaderLoader: Boolean(shaderCheck?.checked),
           });
           close();
           await reloadBoot(false);

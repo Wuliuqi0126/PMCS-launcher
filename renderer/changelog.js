@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.6.0',
+    title: '创建实例自动装光影',
+    current: true,
+    items: [
+      '创建实例时默认勾选「同时安装光影加载器」。',
+      'Fabric/Quilt/NeoForge 自动安装 Iris + Sodium。',
+      'Forge 1.16.5–1.20.1 自动安装 Oculus + Rubidium。',
+      '没有兼容版本时跳过，不阻塞实例安装。',
+      '原版实例自动禁用该选项。',
+    ],
+  },
+  {
     version: '2.5.0',
     title: '安全密钥联机',
-    current: true,
     items: [
       '主机生成自定义密钥名，AES-GCM 加密地址、端口和房间信息。',
       '密钥 10 分钟有效，可重新激活继续使用。',
