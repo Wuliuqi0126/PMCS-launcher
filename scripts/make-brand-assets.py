@@ -80,10 +80,7 @@ for (x, y) in [(7, 10), (9, 8), (11, 12), (52, 9), (54, 12)]:
 icon512 = img.resize((512, 512), Image.Resampling.NEAREST)
 icon512.save(ASSETS / "icon.png")
 icon512.save(ASSETS / "icon-512.png")
-img.resize((256, 256), Image.Resampling.NEAREST).save(ASSETS / "icon-256.png")
 icon512.save(ASSETS / "icon.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-img.resize((64, 64), Image.Resampling.NEAREST).save(ASSETS / "icon-preview-64.png")
-img.resize((32, 32), Image.Resampling.NEAREST).save(ASSETS / "icon-preview-32.png")
 
 # ------------------------------------------------------- NSIS sidebar 164x314
 W, H = 164, 314
@@ -143,5 +140,4 @@ side.paste(icon512.resize((44, 44), Image.Resampling.NEAREST), (60, 248))
 for (x, y) in [(18, 270), (22, 266), (26, 274), (140, 266), (136, 272)]:
     sd.rectangle((x, y, x + 3, y + 3), fill=(56, 156, 92))
 side.save(ASSETS / "installer-sidebar.bmp")
-side.save(ASSETS / "installer-sidebar.png")
 print("brand assets written to", ASSETS)
