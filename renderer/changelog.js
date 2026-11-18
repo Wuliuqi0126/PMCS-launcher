@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.17.0',
+    title: '自动准备离线联机',
+    current: true,
+    items: [
+      '创建房间启动主机前，自动安装当前加载器对应的离线验证模组，不再手动放 jar。',
+      'Forge / NeoForge 自动写入 config/lsp.json，默认 onlineMode=false。',
+      'Fabric / Quilt 自动安装 OfflineLAN；Quilt 使用 Fabric 兼容模式。',
+      '联机页新增「一键改独立服务端」，选择目录后自动备份并关闭 online-mode。',
+      '自动安装失败会提示原因并继续启动，不阻塞正常联机。',
+    ],
+  },
+  {
     version: '1.16.0',
     title: '更多加载器关闭正版验证',
-    current: true,
     items: [
       'Fabric / Quilt 安装 OfflineLAN，Forge / NeoForge 安装 LAN Server Properties。',
       '修复工具按实例加载器自动切换模组名称、安装按钮和游戏内操作步骤。',

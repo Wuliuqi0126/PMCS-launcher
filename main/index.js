@@ -585,6 +585,7 @@ function registerIpc() {
   ipcMain.handle('resources:latest', async () => resources.latest());
   ipcMain.handle('offlineLan:status', async (_event, instanceId) => offlineLan.status(String(instanceId || '')));
   ipcMain.handle('offlineLan:install', async (_event, instanceId) => offlineLan.install(String(instanceId || '')));
+  ipcMain.handle('offlineLan:ensure', async (_event, instanceId) => offlineLan.ensure(String(instanceId || '')));
   ipcMain.handle('offlineLan:patchServer', async (_event, folder) => offlineLan.patchServerProperties(String(folder || '')));
   ipcMain.handle('saves:list', async () => saveShare.listSaves());
   ipcMain.handle('saves:state', async () => saveShare.state());

@@ -3586,6 +3586,32 @@ async function patchOfflineLanServer() {
   }
 }
 
+async function oneClickPatchServer() {
+  const folder = await api.invoke('app:pickDirectory', {
+    title: '选择独立服务端根目录（包含 server.properties）',
+    defaultPath: state.boot?.config?.gameDir || '',
+  });
+  if (!folder) return;
+  try {
+    const result = await api.invoke('offlineLan:patchServer', folder);
+    toast('独立服务端正版验证已关闭', '请完全停止服务端后重新启动', 'success', 12000);
+    openModal({
+      title: '独立服务端已切换为离线验证',
+      subtitle: '修改已写入 server.properties，并保留了原文件备份',
+      body: `<div class="offline-lan-result">
+        <strong>${result.changed ? '已修改 server.properties' : 'server.properties 已经是离线配置'}</strong>
+        <p><code>online-mode=false</code> · <code>enforce-secure-profile=false</code></p>
+        <p class="offline-lan-path" title="${h(result.file)}">${h(result.file)}</p>
+        <p class="offline-lan-path" title="${h(result.backup)}">原文件备份：${h(result.backup)}</p>
+        <p>修改 <code>server.properties</code> 后不能用 <code>/reload</code> 生效，请完全停止服务端再重新启动。</p>
+      </div>`,
+      footer: `<button class="btn btn-primary" data-action="scan-close-modal">知道了</button>`,
+    });
+  } catch (err) {
+    toast('修改独立服务端失败', cleanError(err), 'error', 9000);
+  }
+}
+
 function saveShareTargetInstance() {
   const list = state.boot?.library?.instances || [];
   return list.find((item) => item.id === state.saveShare.targetInstanceId && item.status === 'ready')
@@ -4643,6 +4669,7 @@ function renderLanRoute() {
               : `<button class="btn btn-primary" data-action="lan-start" ${hostBusy ? 'disabled' : ''}>${hostBusy ? '<span class="spinner"></span> 正在启动' : `${icon('play', 15)} 进入存档并准备联机`}</button>`}
             <button class="btn btn-secondary" data-action="lan-refresh-worlds" ${hostActive ? 'disabled' : ''}>${icon('refresh', 13)} 刷新存档</button>
             <button class="btn btn-ghost" data-action="lan-open-saves">${icon('folder', 13)} 打开存档目录</button>
+            <button class="btn btn-secondary" data-action="lan-patch-server">${icon('file', 13)} 一键改独立服务端</button>
           </div>
           <ol class="lan-steps">
             <li><span>1</span>点击上方按钮，启动器会直接进入所选存档（旧版本可能需要手动选择世界）。</li>
@@ -4700,6 +4727,21 @@ function renderLanRoute() {
   }
 }
 
+async function ensureOfflineLanForHost(instance) {
+  try {
+    const result = await api.invoke('offlineLan:ensure', instance.id);
+    if (result?.installedNow) {
+      toast('已自动准备离线局域网支持', `${result.methodLabel || '模组'} 已安装，启动游戏后生效`, 'success', 7000);
+    } else if (result?.configUpdated) {
+      toast('已自动关闭 LAN Server Properties 的正版验证', '打开局域网时会默认使用离线模式', 'success', 7000);
+    }
+    return result;
+  } catch (err) {
+    toast('自动准备离线局域网失败', `${cleanError(err)}；将按当前配置启动`, 'error', 9000);
+    return null;
+  }
+}
+
 async function startLanHost() {
   if (state.lan.hostBusy) return;
   const instance = getLanHostInstance();
@@ -4708,6 +4750,7 @@ async function startLanHost() {
   state.lan.hostBusy = true;
   renderLanRoute();
   try {
+    await ensureOfflineLanForHost(instance);
     const result = await api.invoke('lan:hostStart', {
       instanceId: instance.id,
       worldId: state.lan.worldId || '',
@@ -5935,6 +5978,9 @@ async function runAction(action, el, event) {
         break;
       case 'offline-lan-patch-server':
         await patchOfflineLanServer();
+        break;
+      case 'lan-patch-server':
+        await oneClickPatchServer();
         break;
       case 'offline-lan-refresh':
         await refreshOfflineLanStatus();
