@@ -262,6 +262,15 @@ function formatPlaytime(ms) {
   return `${Math.round(hours)} 小时`;
 }
 
+function formatMemoryMb(mb) {
+  const value = Number(mb) || 0;
+  if (value >= 1024) {
+    const gb = value / 1024;
+    return `${Number.isInteger(gb) ? gb : gb.toFixed(1)} GB`;
+  }
+  return `${value} MB`;
+}
+
 function formatWeekPlay(ms) {
   const value = Number(ms) || 0;
   if (value < 60000) return '0 分钟';
@@ -1026,7 +1035,7 @@ function upsertTask(task) {
       } else {
         removeTask(task.id);
       }
-    }, 2800);
+    }, 1700);
     state.taskTimers.set(task.id, timer);
   }
   if (task.status === 'error' && !['mod', 'shader'].includes(task.kind) && !state.taskTimers.has(`notify:${task.id}`)) {
@@ -1177,7 +1186,7 @@ function bindGlobalEvents() {
       state.lan.tailscaleAddress = event.target.value;
     }
     if (event.target.id === 'memory-range') {
-      const value = `${event.target.value} MB`;
+      const value = formatMemoryMb(event.target.value);
       const label = $('#memory-value');
       if (label) label.textContent = value;
       event.target.style.setProperty('--range-pct', `${((event.target.value - event.target.min) / (event.target.max - event.target.min)) * 100}%`);
@@ -5897,7 +5906,7 @@ function renderSettingsRoute() {
           <div class="setting-info"><strong>游戏内存</strong><p>为 Java 分配的最大堆内存。大型整合包建议 6–8 GB。</p></div>
           <div class="setting-control">
             <input class="range" id="memory-range" type="range" min="1024" max="16384" step="512" value="${memory}" style="--range-pct:${rangePct}%">
-            <span class="memory-value" id="memory-value">${memory} MB</span>
+            <span class="memory-value" id="memory-value">${formatMemoryMb(memory)}</span>
           </div>
         </div>
         <div class="setting-row">
