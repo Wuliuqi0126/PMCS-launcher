@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.2.1',
+    title: '修复 IPv6 防火墙误报',
+    current: true,
+    items: [
+      '修复中文 Windows 下已放行的 IPv6 防火墙规则被显示为「未放行」。',
+      '改用 PowerShell 读取防火墙规则，不再依赖系统语言和 netsh 编码。',
+      '安装程序提前放行的 PMCS IPv6 Direct 规则会被正确识别。',
+      '「等待开放局域网」是正常状态，需先在游戏内开放局域网端口。',
+    ],
+  },
+  {
     version: '2.2.0',
     title: 'IPv6 权限安装时放行',
-    current: true,
     items: [
       '安装程序提前放行 TCP 49152–65535 的公网 IPv6 入站，首次开放不再弹 UAC。',
       '启动器优先复用安装程序创建的 PMCS IPv6 Direct 规则。',

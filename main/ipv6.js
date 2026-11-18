@@ -86,6 +86,33 @@ async function externalAddress() {
 
 function readRule(name) {
   if (process.platform !== 'win32') return null;
+  // netsh output is localized and uses the OEM code page, so parsing its
+  // Chinese labels as UTF-8 fails on many systems. PowerShell returns JSON
+  // with locale-independent field names instead.
+  try {
+    const safeName = String(name).replace(/'/g, "''");
+    const script = [
+      `$r = Get-NetFirewallRule -DisplayName '${safeName}' -ErrorAction SilentlyContinue | Select-Object -First 1`,
+      "if (-not $r) { '{\"exists\":false}'; exit 0 }",
+      '$p = $r | Get-NetFirewallPortFilter',
+      '[pscustomobject]@{ exists = $true; localPort = [string]$p.LocalPort; remoteAddress = [string]$p.RemoteAddress; enabled = [string]$r.Enabled } | ConvertTo-Json -Compress',
+    ].join('\n');
+    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+    });
+    const text = String(result.stdout || '').replace(/^\uFEFF/, '').trim();
+    const data = JSON.parse(text);
+    if (data?.exists && String(data.enabled).toLowerCase() !== 'false') {
+      const range = String(data.localPort || '').trim();
+      const port = /^\d+$/.test(range) ? Number(range) : 0;
+      return { name, range, port, remoteAddress: String(data.remoteAddress || '') };
+    }
+    return null;
+  } catch (_) {
+    // Fallback for systems where the NetSecurity module is unavailable.
+  }
   try {
     const result = spawnSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${name}`], {
       encoding: 'utf8',
@@ -93,9 +120,10 @@ function readRule(name) {
       timeout: 3500,
     });
     const text = String(result.stdout || '');
-    if (result.status !== 0 || !/LocalPort|本地端口/i.test(text)) return null;
+    const knownRange = /(49152-65535)/.exec(text)?.[1] || '';
     const match = /(?:LocalPort|本地端口):\s*(\S+)/i.exec(text);
-    const range = match ? String(match[1]).trim() : '';
+    const range = knownRange || (match ? String(match[1]).trim() : '');
+    if (!range) return null;
     const port = /^\d+$/.test(range) ? Number(range) : 0;
     return { name, range, port };
   } catch (_) {
