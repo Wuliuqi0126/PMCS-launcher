@@ -20,6 +20,9 @@ internal static class Program
     private static IntPtr hook;
     private static HookProc hookProc;
     private static IntPtr savedContext = IntPtr.Zero;
+    private static IntPtr originalLayout = IntPtr.Zero;
+    private static IntPtr englishLayout = IntPtr.Zero;
+    private static IntPtr chineseLayout = IntPtr.Zero;
     private static bool imeDisabled;
     private static bool chatOpen;
     private static long pendingDisableAt;
@@ -64,6 +67,26 @@ internal static class Program
     [DllImport("imm32.dll")]
     private static extern int ImmGetCompositionString(IntPtr hIMC, int dwIndex, byte[] lpBuf, int dwBufLen);
 
+    [DllImport("imm32.dll")]
+    private static extern bool ImmSetOpenStatus(IntPtr hIMC, bool fOpen);
+
+    [DllImport("imm32.dll")]
+    private static extern bool ImmSetConversionStatus(IntPtr hIMC, int fdwConversion, int fdwSentence);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetKeyboardLayout(uint idThread);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    private const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
+    private const uint KLF_ACTIVATE = 0x00000001;
+    private const int IME_CMODE_ALPHANUMERIC = 0x0000;
+    private const int IME_SMODE_NONE = 0x0000;
+
     private static bool IsGameForeground()
     {
         IntPtr hwnd = GetForegroundWindow();
@@ -90,17 +113,50 @@ internal static class Program
 
     private static void DisableIme()
     {
-        if (imeDisabled) return;
         IntPtr hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return;
-        savedContext = ImmAssociateContext(hwnd, IntPtr.Zero);
-        imeDisabled = true;
+        int pid;
+        uint threadId = GetWindowThreadProcessId(hwnd, out pid);
+        if (pid != targetPid) return;
+
+        // Close the IME conversion window and force alphanumeric mode. This is
+        // the part that actually stops the floating Chinese candidate window;
+        // ImmAssociateContext alone does not work reliably with GLFW.
+        IntPtr context = ImmGetContext(hwnd);
+        if (context != IntPtr.Zero)
+        {
+            ImmSetOpenStatus(context, false);
+            ImmSetConversionStatus(context, IME_CMODE_ALPHANUMERIC, IME_SMODE_NONE);
+            ImmReleaseContext(hwnd, context);
+        }
+        if (!imeDisabled)
+        {
+            savedContext = ImmAssociateContext(hwnd, IntPtr.Zero);
+            imeDisabled = true;
+        }
+        else
+        {
+            ImmAssociateContext(hwnd, IntPtr.Zero);
+        }
+
+        // Switch the game window to the English (US) keyboard layout. This
+        // survives the game re-associating its IME context on focus changes.
+        if (originalLayout == IntPtr.Zero) originalLayout = GetKeyboardLayout(threadId);
+        if (englishLayout == IntPtr.Zero) englishLayout = LoadKeyboardLayout("00000409", KLF_ACTIVATE);
+        IntPtr current = GetKeyboardLayout(threadId);
+        if (englishLayout != IntPtr.Zero && current != englishLayout)
+        {
+            PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, englishLayout);
+        }
     }
 
     private static void EnableIme()
     {
         IntPtr hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return;
+        int pid;
+        uint threadId = GetWindowThreadProcessId(hwnd, out pid);
+        if (pid != targetPid) return;
         if (imeDisabled)
         {
             if (savedContext != IntPtr.Zero) ImmAssociateContext(hwnd, savedContext);
@@ -110,6 +166,18 @@ internal static class Program
         else
         {
             ImmAssociateContextEx(hwnd, IntPtr.Zero, IACE_DEFAULT);
+        }
+        IntPtr context = ImmGetContext(hwnd);
+        if (context != IntPtr.Zero)
+        {
+            ImmSetOpenStatus(context, true);
+            ImmReleaseContext(hwnd, context);
+        }
+        if (chineseLayout == IntPtr.Zero) chineseLayout = LoadKeyboardLayout("00000804", KLF_ACTIVATE);
+        IntPtr restore = chineseLayout != IntPtr.Zero ? chineseLayout : originalLayout != IntPtr.Zero ? originalLayout : GetKeyboardLayout(threadId);
+        if (restore != IntPtr.Zero && GetKeyboardLayout(threadId) != restore)
+        {
+            PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, restore);
         }
     }
 
