@@ -22,6 +22,7 @@ const state = {
   taskOrder: [],
   taskTimers: new Map(),
   launchBusy: new Set(),
+  modCheckInstanceId: '',
   repairBusy: new Set(),
   versionInstalling: new Set(),
   modInstalling: new Set(),
@@ -2416,7 +2417,7 @@ async function activateInstance(id, navigate = false) {
   }
 }
 
-async function launchInstance(id) {
+async function launchInstance(id, options = {}) {
   if (state.launchBusy.has(id)) return;
   if (!getAccount()) {
     openAccountModal({ firstRun: true });
@@ -2426,6 +2427,13 @@ async function launchInstance(id) {
   state.launchBusy.add(id);
   if (state.route === 'home' || state.route === 'instances') renderRoute();
   try {
+    if (!options.skipCheck) {
+      const check = await api.invoke('launch:preflight', id);
+      if ((check.blocking || []).length || (check.warnings || []).length) {
+        openModCheckModal(id, check);
+        return;
+      }
+    }
     const result = await api.invoke('launch:start', id);
     state.running.set(id, { instanceId: id, pid: result.pid, startedAt: Date.now() });
     const instance = getInstance(id);
@@ -2436,6 +2444,77 @@ async function launchInstance(id) {
   } finally {
     state.launchBusy.delete(id);
     if (!state.modal) renderRoute();
+  }
+}
+
+function modCheckItemHtml(item, severity) {
+  const badge = severity === 'blocking' ? '必须处理' : severity === 'warning' ? '警告' : '提示';
+  const color = severity === 'blocking' ? 'red' : severity === 'warning' ? 'amber' : 'blue';
+  return `<div class="mod-check-item ${severity}">
+    <span class="mod-check-dot">${icon(severity === 'blocking' ? 'alert' : 'info', 13)}</span>
+    <div class="mod-check-copy">
+      <strong>${h(item.title || '模组检查')}<span class="chip ${color}">${badge}</span></strong>
+      <p>${h(item.message || '')}</p>
+      ${item.filename && severity === 'blocking' && item.action === 'disable' ? `<button class="btn btn-ghost btn-xs" data-action="mod-check-disable" data-file="${h(item.filename)}">${icon('x', 11)} 禁用这个模组</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function modCheckHtml(check) {
+  return `<div class="mod-check">
+    <div class="mod-check-hero ${check.canLaunch ? 'ok' : 'blocked'}">
+      <span class="mod-check-hero-icon">${icon(check.canLaunch ? 'check' : 'alert', 19)}</span>
+      <div><strong>${check.canLaunch ? '没有会阻止启动的问题' : '发现会阻止启动的问题'}</strong><p>${check.canLaunch ? '可以继续启动；下面这些差异建议确认。' : '请先禁用冲突模组或补齐前置，再重新检查。'}</p></div>
+    </div>
+    <div class="mod-check-meta">
+      <span>${h(check.instance?.name || '实例')}</span>
+      <span>${h(check.instance?.versionId || '')} · ${h(loaderInfo(check.instance?.loader).label)}</span>
+      <span>${check.installed?.length || 0} 个模组</span>
+    </div>
+    ${(check.blocking || []).length ? `<div class="mod-check-section"><div class="mod-check-title blocking">必须处理 <span>${check.blocking.length}</span></div>${check.blocking.map((item) => modCheckItemHtml(item, 'blocking')).join('')}</div>` : ''}
+    ${(check.warnings || []).length ? `<div class="mod-check-section"><div class="mod-check-title warning">警告 <span>${check.warnings.length}</span></div>${check.warnings.slice(0, 10).map((item) => modCheckItemHtml(item, 'warning')).join('')}${check.warnings.length > 10 ? `<div class="mod-check-more">还有 ${check.warnings.length - 10} 条警告</div>` : ''}</div>` : ''}
+    ${(check.info || []).length ? `<div class="mod-check-section"><div class="mod-check-title info">提示 <span>${check.info.length}</span></div>${check.info.slice(0, 6).map((item) => modCheckItemHtml(item, 'info')).join('')}</div>` : ''}
+    <div class="mod-check-actions">
+      ${check.canLaunch ? `<button class="btn btn-primary" data-action="mod-check-launch">${icon('play', 13)} 仍然启动</button>` : ''}
+      <button class="btn btn-secondary" data-action="mod-check-refresh">${icon('refresh', 13)} 重新检查</button>
+      <button class="btn btn-ghost" data-action="mod-check-open-mods">${icon('folder', 13)} 打开 mods 目录</button>
+      <button class="btn btn-ghost" data-action="scan-close-modal">取消</button>
+    </div>
+    <p class="mod-check-footnote">检查只读取模组元数据，不会修改任何文件。禁用模组后可以重新检查。</p>
+  </div>`;
+}
+
+async function openModCheckModal(instanceId, check) {
+  state.modCheckInstanceId = instanceId;
+  openModal({
+    title: '启动前模组检查',
+    subtitle: '发现依赖或版本冲突时先处理，避免 Forge/Fabric 启动失败',
+    wide: true,
+    body: modCheckHtml(check),
+    footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
+  });
+}
+
+async function refreshModCheck() {
+  const id = state.modCheckInstanceId;
+  if (!id) return;
+  try {
+    const check = await api.invoke('launch:preflight', id);
+    setModalBody(modCheckHtml(check));
+  } catch (err) {
+    toast('重新检查失败', err.message || String(err), 'error');
+  }
+}
+
+async function disableModFromCheck(filename) {
+  const id = state.modCheckInstanceId;
+  if (!id || !filename) return;
+  try {
+    await api.invoke('components:toggle', { instanceId: id, kind: 'mods', filename, enabled: false });
+    await refreshModCheck();
+    toast('已禁用模组', filename, 'success', 5000);
+  } catch (err) {
+    toast('禁用失败', err.message || String(err), 'error');
   }
 }
 
@@ -5934,6 +6013,23 @@ async function runAction(action, el, event) {
         break;
       case 'launch-instance':
         await launchInstance(id);
+        break;
+      case 'mod-check-launch': {
+        const checkId = state.modCheckInstanceId;
+        closeModal();
+        if (checkId) await launchInstance(checkId, { skipCheck: true });
+        break;
+      }
+      case 'mod-check-refresh':
+        await refreshModCheck();
+        break;
+      case 'mod-check-open-mods': {
+        const checkId = state.modCheckInstanceId;
+        if (checkId) await api.invoke('instances:openFolder', { id: checkId, sub: 'mods' });
+        break;
+      }
+      case 'mod-check-disable':
+        await disableModFromCheck(el.dataset.file);
         break;
       case 'stop-instance':
         await stopInstance(id);

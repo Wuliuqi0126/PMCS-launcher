@@ -21,6 +21,7 @@ const { createBackups } = require('./backup');
 const { createResourceScanner } = require('./resource-scan');
 const { createOfflineLan } = require('./offline-lan');
 const { createSaveShare } = require('./save-share');
+const { createModCheck } = require('./mod-check');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -75,6 +76,7 @@ let mojang = null;
 let installer = null;
 let launcher = null;
 let mods = null;
+let modCheck = null;
 let skins = null;
 let cacheManager = null;
 let guides = null;
@@ -470,6 +472,7 @@ function registerIpc() {
     return [];
   });
 
+  ipcMain.handle('launch:preflight', async (_event, id) => modCheck.checkInstance(String(id || '')));
   ipcMain.handle('launch:start', async (_event, id, options = {}) => launcher.launch(String(id), options || {}));
   ipcMain.handle('launch:kill', async (_event, id) => launcher.kill(String(id)));
   ipcMain.handle('launch:log', async (_event, id) => launcher.latestLog(String(id)));
@@ -650,6 +653,7 @@ app.whenReady().then(() => {
   });
   lan.start();
   mods = createMods({ store, tasks });
+  modCheck = createModCheck({ store });
   offlineLan = createOfflineLan({ store, mods });
   saveShare = createSaveShare({
     app,
