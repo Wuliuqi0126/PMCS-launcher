@@ -18,6 +18,7 @@ internal static class Program
 
     private static int targetPid;
     private static IntPtr hook;
+    private static HookProc hookProc;
     private static IntPtr savedContext = IntPtr.Zero;
     private static bool imeDisabled;
     private static bool chatOpen;
@@ -187,7 +188,8 @@ internal static class Program
     private static void Main(string[] args)
     {
         if (args.Length < 1 || !int.TryParse(args[0], out targetPid) || targetPid <= 0) return;
-        hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardHook, GetModuleHandle(null), 0);
+        hookProc = KeyboardHook;
+        hook = SetWindowsHookEx(WH_KEYBOARD_LL, hookProc, GetModuleHandle(null), 0);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.Run(new HiddenForm());
