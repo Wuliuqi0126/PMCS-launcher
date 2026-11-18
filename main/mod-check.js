@@ -249,7 +249,7 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
     const full = path.join(modsDir, filename);
     const parsed = parseJar(full, filename);
     if (!parsed) {
-      warnings.push({ kind: 'unreadable', title: filename, message: '无法读取模组元数据，可能不是有效模组或已损坏', filename });
+      blocking.push({ kind: 'unreadable', title: filename, message: '无法读取模组元数据，可能不是有效模组或已损坏', filename, action: 'disable' });
       continue;
     }
     const entries = Array.isArray(parsed) ? parsed : [parsed];
@@ -296,7 +296,7 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
         }
         if (depId === 'fabricloader' || depId === 'fabric-loader') {
           if (dep.range && instance.loaderVersion && !inFabricRange(instance.loaderVersion, dep.range)) {
-            warnings.push({ kind: 'loader-version', title: mod.name || mod.id, message: `需要 Fabric Loader ${dep.range}，当前 ${instance.loaderVersion}`, filename: mod.filename });
+            blocking.push({ kind: 'loader-version', title: mod.name || mod.id, message: `需要 Fabric Loader ${dep.range}，当前 ${instance.loaderVersion}`, filename: mod.filename, id: mod.id, action: 'disable' });
           }
           continue;
         }
@@ -327,7 +327,7 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
         }
         if (depId === 'forge' || depId === 'neoforge' || depId === 'javafml' || depId === 'lowcodefml') {
           if (dep.range && instance.loaderVersion && !inMavenRange(instance.loaderVersion, dep.range)) {
-            warnings.push({ kind: 'loader-version', title: mod.name || mod.id, message: `需要加载器 ${dep.range}，当前 ${instance.loaderVersion}`, filename: mod.filename });
+            blocking.push({ kind: 'loader-version', title: mod.name || mod.id, message: `需要加载器 ${dep.range}，当前 ${instance.loaderVersion}`, filename: mod.filename, id: mod.id, action: 'disable' });
           }
           continue;
         }
