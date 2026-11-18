@@ -214,8 +214,8 @@ function createMods({ store, tasks }) {
     return result;
   }
 
-  async function fetchModrinthVersion(projectId, instance, mirror, module = 'mods') {
-    const loader = loaderCategory(instance.loader);
+  async function fetchModrinthVersion(projectId, instance, mirror, module = 'mods', loaderOverride = '') {
+    const loader = loaderOverride || loaderCategory(instance.loader);
     const facets = [];
     if (instance.versionId) facets.push(`game_versions=${encodeURIComponent(JSON.stringify([instance.versionId]))}`);
     if (module !== 'shaders' && loader) facets.push(`loaders=${encodeURIComponent(JSON.stringify([loader]))}`);
@@ -274,7 +274,7 @@ function createMods({ store, tasks }) {
     }
   }
 
-  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null, task = null) {
+  async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null, task = null, loaderOverride = '') {
     if (depth > 5) return [];
     const source = version.source === 'curseforge' ? 'curseforge' : 'modrinth';
     const projectKey = `${source}:${version.project_id}`;
@@ -333,14 +333,14 @@ function createMods({ store, tasks }) {
           try { depVersion = await fetchModrinthVersionById(dependency.version_id, mirror); } catch (_) { depVersion = null; }
         }
         if (!depVersion) {
-          try { depVersion = await fetchModrinthVersion(dependency.project_id, instance, mirror, module); } catch (_) { depVersion = null; }
+          try { depVersion = await fetchModrinthVersion(dependency.project_id, instance, mirror, module, loaderOverride); } catch (_) { depVersion = null; }
         }
       } else {
         try { depVersion = await fetchCurseForgeVersion(dependency.project_id, instance, module); } catch (_) { depVersion = null; }
       }
       if (!depVersion) continue;
       depVersion.source = source;
-      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module, signal, task);
+      const nested = await downloadModVersion(instance, depVersion, manifest, mirror, depth + 1, visited, module, signal, task, loaderOverride);
       installed.push(...nested);
     }
     return installed;
@@ -349,6 +349,7 @@ function createMods({ store, tasks }) {
   async function install(instanceId, projectId, options = {}) {
     const module = options.module === 'shaders' ? 'shaders' : 'mods';
     const instance = ensureInstance(instanceId, module);
+    const loaderOverride = options.loaderOverride === 'fabric' ? 'fabric' : '';
     const { source, mirror } = sourceOf(store, options);
     const task = tasks.start({
       title: `安装${source === 'curseforge' ? ' CurseForge ' : ' Modrinth '}${module === 'shaders' ? '光影' : '模组'}`,
@@ -359,11 +360,11 @@ function createMods({ store, tasks }) {
       task.update({ stage: '查找兼容版本', percent: 5, detail: `${instance.versionId} · ${module === 'shaders' ? '光影' : instance.loader}` });
       const version = source === 'curseforge'
         ? await fetchCurseForgeVersion(projectId, instance, module)
-        : await fetchModrinthVersion(projectId, instance, mirror, module);
+        : await fetchModrinthVersion(projectId, instance, mirror, module, loaderOverride);
       version.source = source;
       const manifest = readManifest(instance, module);
       task.update({ stage: `下载${module === 'shaders' ? '光影' : '模组'}文件`, percent: 20, detail: version.version_number || version.name || '' });
-      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal, task);
+      const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal, task, loaderOverride);
       task.done({ stage: '安装完成', detail: `${installed.length} 个${module === 'shaders' ? '光影' : '模组'}` });
       return { ok: true, installed: await listInstalled(instanceId, module), module };
     } catch (err) {

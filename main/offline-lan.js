@@ -14,6 +14,7 @@ const path = require('path');
 
 const OFFLINE_LAN_PROJECT = 'pimmstPB';
 const FABRIC_API_PROJECT = 'P7dR8mSH';
+const LAN_PROPERTIES_PROJECT = 'SqnBX2qd';
 
 function createOfflineLan({ store, mods }) {
   function instanceOf(instanceId) {
@@ -26,14 +27,21 @@ function createOfflineLan({ store, mods }) {
     const instance = instanceOf(instanceId);
     let installed = [];
     try { installed = await mods.listInstalled(instance.id, 'mods'); } catch (_) { installed = []; }
-    const offline = installed.find((item) => item.projectId === OFFLINE_LAN_PROJECT || /offlinelan/i.test(item.filename));
+    const fabricLike = ['fabric', 'quilt'].includes(instance.loader);
+    const forgeLike = ['forge', 'neoforge'].includes(instance.loader);
+    const method = fabricLike ? 'offlinelan' : forgeLike ? 'lan-properties' : 'none';
+    const projectId = method === 'offlinelan' ? OFFLINE_LAN_PROJECT : method === 'lan-properties' ? LAN_PROPERTIES_PROJECT : '';
+    const offline = installed.find((item) => item.projectId === projectId || (method === 'offlinelan' ? /offlinelan/i.test(item.filename) : /lan.?server.?properties/i.test(item.filename)));
     const fabricApi = installed.find((item) => item.projectId === FABRIC_API_PROJECT || /fabric-api/i.test(item.filename));
     return {
       instanceId: instance.id,
       instanceName: instance.name,
       versionId: instance.versionId,
       loader: instance.loader,
-      supported: instance.loader === 'fabric',
+      supported: method !== 'none',
+      method,
+      methodLabel: method === 'offlinelan' ? 'OfflineLAN' : method === 'lan-properties' ? 'LAN Server Properties' : '',
+      projectId,
       installed: Boolean(offline),
       fabricApi: Boolean(fabricApi),
       filename: offline?.filename || '',
@@ -43,14 +51,27 @@ function createOfflineLan({ store, mods }) {
 
   async function install(instanceId) {
     const instance = instanceOf(instanceId);
-    if (instance.loader !== 'fabric') {
-      throw new Error('游戏内局域网关闭正版验证目前仅支持 Fabric 实例；Forge/NeoForge/原版请使用下方「独立服务端」方式');
+    if (!['fabric', 'quilt', 'forge', 'neoforge'].includes(instance.loader)) {
+      throw new Error('原版实例无法在集成服务器关闭正版验证；请使用独立服务端，或新建 Fabric/Quilt/Forge/NeoForge 实例');
     }
-    await mods.install(instance.id, OFFLINE_LAN_PROJECT, {
-      source: 'modrinth',
-      mirror: 'mcim',
-      module: 'mods',
-    });
+    if (instance.loader === 'fabric' || instance.loader === 'quilt') {
+      await mods.install(instance.id, OFFLINE_LAN_PROJECT, {
+        source: 'modrinth',
+        mirror: 'mcim',
+        module: 'mods',
+        loaderOverride: instance.loader === 'quilt' ? 'fabric' : '',
+      });
+    } else {
+      try {
+        await mods.install(instance.id, LAN_PROPERTIES_PROJECT, {
+          source: 'modrinth',
+          mirror: 'mcim',
+          module: 'mods',
+        });
+      } catch (err) {
+        throw new Error(`当前 ${instance.versionId} ${instance.loader} 没有可用的 LAN Server Properties 版本。请使用下方「独立服务端」方式，或改用支持该模组的游戏版本。原始错误：${err.message}`);
+      }
+    }
     return status(instance.id);
   }
 

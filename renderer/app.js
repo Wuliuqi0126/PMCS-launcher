@@ -1584,7 +1584,7 @@ function recommendationsBody() {
 
     <div class="recommend-grid">
       <section class="recommend-card">
-        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('shield', 16)}</span><div><strong>关闭主机正版验证</strong><p>客机提示“无效会话”时使用。Fabric 主机可一键安装 OfflineLAN；独立服务端可直接修改 server.properties。</p></div></div>
+        <div class="recommend-card-head"><span class="recommend-card-icon">${icon('shield', 16)}</span><div><strong>关闭主机正版验证</strong><p>客机提示“无效会话”时使用。Fabric/Quilt 安装 OfflineLAN，Forge/NeoForge 安装 LAN Server Properties；原版请用独立服务端。</p></div></div>
         <div class="recommend-card-actions"><button class="btn btn-primary btn-sm" data-action="recommend-offline-lan">${icon('shield', 13)} 打开修复工具</button></div>
       </section>
 
@@ -3436,8 +3436,8 @@ function offlineLanHostInstance() {
 function offlineLanStatusChip(status) {
   if (!status) return '<span class="chip">读取中</span>';
   if (status.installed) return '<span class="chip green">已安装</span>';
-  if (!status.supported) return '<span class="chip amber">需要 Fabric</span>';
-  return '<span class="chip">未安装</span>';
+  if (!status.supported) return '<span class="chip amber">原版不支持</span>';
+  return `<span class="chip">未安装 · ${h(status.methodLabel || '模组')}</span>`;
 }
 
 function offlineLanModalBody() {
@@ -3452,6 +3452,8 @@ function offlineLanModalBody() {
   }
   const installed = Boolean(status?.installed);
   const supported = Boolean(status?.supported);
+  const method = status?.method || 'none';
+  const methodLabel = status?.methodLabel || (method === 'lan-properties' ? 'LAN Server Properties' : method === 'offlinelan' ? 'OfflineLAN' : '');
   const server = data.serverResult;
   return `<div class="offline-lan-modal">
     <div class="offline-lan-head">
@@ -3465,21 +3467,25 @@ function offlineLanModalBody() {
     <section class="offline-lan-option">
       <div class="offline-lan-option-head">
         <span class="offline-lan-number">01</span>
-        <div><strong>主机在游戏内「对局域网开放」</strong><p>给主机实例安装 OfflineLAN，在开放局域网时关闭在线验证。客机不需要安装。</p></div>
+        <div><strong>主机在游戏内「对局域网开放」</strong><p>${method === 'lan-properties' ? '给主机实例安装 LAN Server Properties，在开放局域网时关闭在线验证。客机不需要安装。' : '给主机实例安装 OfflineLAN，在开放局域网时关闭在线验证。客机不需要安装。'}</p></div>
       </div>
-      ${!supported ? `<div class="notice warn">${icon('alert', 15)}<span>当前实例是 ${h(loaderInfo(instance.loader).label)}，游戏内局域网修复目前只支持 Fabric。可以新建一个 Fabric 实例，或使用下面的独立服务端方式。</span></div>` : installed ? `
-        <div class="offline-lan-installed">${icon('check', 15)} <strong>OfflineLAN 已安装</strong>${status?.fabricApi ? ' · Fabric API 已就绪' : ''}${status?.versionNumber ? ` · v${h(status.versionNumber)}` : ''}</div>
+      ${!supported ? `<div class="notice warn">${icon('alert', 15)}<span>当前实例是 ${h(loaderInfo(instance.loader).label)}。原版没有关闭集成服务器正版验证的入口；请使用下面的「独立服务端」方式，或把世界迁移到 Fabric/Quilt/Forge/NeoForge 实例。</span></div>` : installed ? `
+        <div class="offline-lan-installed">${icon('check', 15)} <strong>${h(methodLabel)} 已安装</strong>${status?.fabricApi ? ' · Fabric API 已就绪' : ''}${status?.versionNumber ? ` · v${h(status.versionNumber)}` : ''}</div>
         <ol class="offline-lan-steps">
           <li>完全退出主机游戏，重新启动实例。</li>
           <li>进入世界后按 <b>Esc</b> → <b>对局域网开放</b>。</li>
-          <li>在 OfflineLAN 的选项里确认关闭正版验证，再点“创建局域网世界”。</li>
+          ${method === 'lan-properties'
+            ? '<li>打开 <b>LAN Server Properties</b> 的设置，把 <b>online-mode</b> 改为关闭。</li>'
+            : '<li>在 OfflineLAN 的选项里确认关闭正版验证，再点“创建局域网世界”。</li>'}
           <li>客机重新加入；客机可以继续使用离线账号。</li>
         </ol>` : `
         <div class="offline-lan-actions">
           <button class="btn btn-primary btn-sm" data-action="offline-lan-install" ${data.busy ? 'disabled' : ''}>${data.busy === 'install' ? '<span class="spinner"></span> 正在安装' : `${icon('download', 13)} 安装离线局域网模组`}</button>
           <button class="btn btn-ghost btn-sm" data-action="offline-lan-refresh">${icon('refresh', 12)} 刷新状态</button>
         </div>
-        <p class="offline-lan-hint">会安装 OfflineLAN 和它需要的 Fabric API；安装完成后需要重启游戏。模组只对主机生效。</p>`}
+        <p class="offline-lan-hint">${method === 'lan-properties'
+          ? '会安装 LAN Server Properties；安装完成后需要重启游戏。该模组目前只覆盖支持它的游戏版本，26.3 等新版本可能还没有兼容构建。'
+          : '会安装 OfflineLAN 和它需要的 Fabric API；安装完成后需要重启游戏。Quilt 会以 Fabric 兼容模式加载。模组只对主机生效。'}</p>`}
     </section>
 
     <section class="offline-lan-option">
