@@ -29,6 +29,7 @@ const INVOKE_CHANNELS = new Set([
   'instances:setActive',
   'instances:openFolder',
   'loader:versions',
+  'launch:preflight',
   'launch:start',
   'launch:kill',
   'launch:log',

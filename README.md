@@ -1,6 +1,6 @@
 # PMCS launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.13.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **1.14.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [PMCS launcher 1.13.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.13.0/PMCSLauncher-1.13.0-Setup.exe)
-- [PMCS launcher 1.13.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.13.0/PMCSLauncher-1.13.0-Portable.zip)
+- [PMCS launcher 1.14.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.14.0/PMCSLauncher-1.14.0-Setup.exe)
+- [PMCS launcher 1.14.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v1.14.0/PMCSLauncher-1.14.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -42,6 +42,7 @@
 - **多实例管理**：每个实例拥有独立的存档、模组、配置与日志；共享 `versions`、`libraries`、`assets`，节省磁盘空间。
 - **局域网联机**：主机选择实例和存档后自动进入世界，在游戏内「对局域网开放」后自动检测端口；同一 Wi-Fi/热点下的设备通过启动器自动发现房间并一键加入，也支持手动输入 `IP:端口`。内置完整联机指引和故障排查。
 - **进房前配置检查**：点击房间先对比版本、加载器、加载器版本和模组清单；缺失或版本不一致的模组标记为必须处理，可直接启动下载，资源包/光影/额外客户端模组只作为提示或警告，不严重的差异仍可进入。
+- **启动前模组检查**：启动实例前读取 Forge/Fabric 模组元数据，检查 Minecraft 版本、加载器版本、必装前置、依赖版本和重复 modId；有阻断项时先提示并可禁用违规模组，只有警告/提示时仍可继续启动。
 - **局域网共享存档**：自动识别本机所有实例、游戏目录和其他启动器目录中的存档；主机选择存档后通过局域网 HTTP 共享，客机自动发现并下载导入到指定实例，同名存档自动追加序号，不覆盖原存档。
 - **主页推荐设置**：主页公告按钮旁新增“推荐”，集中提供关闭主机正版验证、一键安装 Sodium / Lithium / FerriteCore、下载 Java 21、局域网共享存档入口，并附带内存、版本一致和防火墙建议。
 - **Tailscale 外网联机**：在局域网页面内安装/登录 Tailscale、读取 `100.x.x.x` 地址；Tailscale 官方 MSI 已内置在主安装包，首次安装无需单独下载。主机一键复制地址，客机粘贴后直接启动游戏。无需公网 IP 或端口转发。
@@ -122,7 +123,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/PMCS launcher-1.13.0-安装程序.exe
+setup/PMCS launcher-1.14.0-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `PMCS launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -139,14 +140,14 @@ setup/PMCS launcher-1.13.0-安装程序.exe
 PMCS launcher.exe
 ```
 
-安装包文件名统一为 **PMCS launcher-1.13.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名统一为 **PMCS launcher-1.14.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
 ```
 
 ```
-SHA256: 65B9B27E7D6CEF7D3A590769F35989A1A2A06E13522A90C7C71E5D63318BDD27
+SHA256: C7718791088D4DFB522C9E9DB372DEE48443E96F13E7BF355235CE62AE5F6F7D
 ```
 
 > 安装程序已内置 `requireAdministrator` 清单，双击后会先弹出 Windows UAC「用户账户控制」；允许后才会开始安装。`Uninstall.exe` 同样默认请求管理员权限，方便删除安装到受保护目录的文件。
@@ -158,13 +159,13 @@ SHA256: 65B9B27E7D6CEF7D3A590769F35989A1A2A06E13522A90C7C71E5D63318BDD27
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/PMCS launcher-1.13.0-便携版.zip
+setup/PMCS launcher-1.14.0-便携版.zip
 ```
 
 便携版 SHA256：
 
 ```
-6004B35338792E1583B0476E643562FDE54B3A939524877B897FD8A387E177C8
+B1A39B43482E24D7133C5C98C830542ED704B8412103651FD5A7A0F3722DC177
 ```
 
 之后所有新安装包统一输出到 `setup/`，不再放到桌面或 `dist/`。
@@ -209,7 +210,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `PMCS launcher.exe`，快捷方式同名。
-- 安装包文件名保持 `PMCS launcher-1.13.0-安装程序.exe`。
+- 安装包文件名保持 `PMCS launcher-1.14.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -230,7 +231,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-PMCS launcher-1.13.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
+PMCS launcher-1.14.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
 ```
 
 electron-builder 和缓存保留在：
