@@ -4785,11 +4785,41 @@ function paintIpv6Panel() {
 }
 
 async function joinIpv6() {
+  if (state.lan.preflightBusy) return;
   const raw = String($('#ipv6-join-address')?.value || '').trim();
   const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/);
   if (!match) return toast('IPv6 地址格式不正确', '请使用 [IPv6]:端口，例如 [2408:8207:...:1]:54321', 'error');
+  const instance = getLanGuestInstance();
+  if (!instance) return toast('请选择加入实例', '', 'error');
   state.ipv6.address = raw;
-  await joinLanRoom('', match[1], Number(match[2]));
+  state.lan.preflightBusy = true;
+  try {
+    const check = await api.invoke('lan:inspectRemote', {
+      host: match[1],
+      port: Number(match[2]),
+      instanceId: instance.id,
+    });
+    state.lan.preflight = {
+      ...check,
+      roomKey: '',
+      address: match[1],
+      port: Number(match[2]),
+      remote: true,
+      busy: '',
+      error: '',
+    };
+    openModal({
+      title: 'IPv6 房间 · 加入前检查',
+      subtitle: '已读取主机版本、加载器和模组配置',
+      wide: true,
+      body: lanPreflightHtml(state.lan.preflight),
+      footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
+    });
+  } catch (err) {
+    toast('读取主机配置失败', cleanError(err), 'error', 10000);
+  } finally {
+    state.lan.preflightBusy = false;
+  }
 }
 
 function playitPanelHtml() {
@@ -5370,6 +5400,19 @@ async function performLanJoin(check) {
   }
 }
 
+async function refreshLanPreflightCheck(check, instanceId = check.local.id) {
+  if (check.remote) {
+    const fresh = await api.invoke('lan:inspectRemote', {
+      host: check.address,
+      port: check.port,
+      instanceId,
+    });
+    return { ...fresh, roomKey: '', address: check.address, port: check.port, remote: true, busy: '', error: check.error || '' };
+  }
+  const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId });
+  return { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error || '' };
+}
+
 async function downloadLanPreflight() {
   const check = state.lan.preflight;
   if (!check || check.busy) return;
@@ -5399,8 +5442,7 @@ async function downloadLanPreflight() {
   check.busy = '';
   if (errors.length) check.error = errors.join('；');
   try {
-    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: check.local.id });
-    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error };
+    state.lan.preflight = await refreshLanPreflightCheck(check);
     setModalBody(lanPreflightHtml(state.lan.preflight));
   } catch (err) {
     check.error = cleanError(err);
@@ -5433,8 +5475,7 @@ async function downloadLanPreflightFromHost() {
     }
     const failedText = failed.length ? `，${failed.length} 个失败` : '';
     toast('已从房主补齐资源', `新增 ${downloaded} 个，跳过 ${skipped} 个${failedText}`, failed.length ? 'error' : 'success', 8000);
-    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: check.local.id });
-    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error };
+    state.lan.preflight = await refreshLanPreflightCheck(check);
     setModalBody(lanPreflightHtml(state.lan.preflight));
   } catch (err) {
     check.busy = '';
@@ -5473,8 +5514,7 @@ async function createLanMatchingInstance() {
     });
     state.lan.guestInstanceId = instance.id;
     await waitForLanInstance(instance.id);
-    const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId: instance.id });
-    state.lan.preflight = { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: '' };
+    state.lan.preflight = await refreshLanPreflightCheck(check, instance.id);
     setModalBody(lanPreflightHtml(state.lan.preflight));
     toast('匹配实例已就绪', `${instance.name}`, 'success', 6000);
   } catch (err) {
