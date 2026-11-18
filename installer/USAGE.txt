@@ -1,4 +1,4 @@
-PMCS launcher 2.7.1
+PMCS launcher 2.7.2
 
 感谢安装 PMCS launcher。安装完成后可以从桌面或开始菜单启动。
 

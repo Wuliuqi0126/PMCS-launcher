@@ -24,6 +24,9 @@ internal static class Program
     private static IntPtr englishLayout = IntPtr.Zero;
     private static IntPtr chineseLayout = IntPtr.Zero;
     private static bool imeDisabled;
+    private static bool chatImeEnabled;
+    private static long lastOpenCheck;
+    private static IntPtr lastDisabledHwnd = IntPtr.Zero;
     private static bool chatOpen;
     private static long pendingDisableAt;
 
@@ -119,9 +122,29 @@ internal static class Program
         uint threadId = GetWindowThreadProcessId(hwnd, out pid);
         if (pid != targetPid) return;
 
-        // Close the IME conversion window and force alphanumeric mode. This is
-        // the part that actually stops the floating Chinese candidate window;
-        // ImmAssociateContext alone does not work reliably with GLFW.
+        // Once the game window has been handled, do not keep re-associating
+        // the IME context or re-posting WM_INPUTLANGCHANGEREQUEST every tick.
+        // Repeating that while WASD is held makes Minecraft miss key events.
+        if (imeDisabled && hwnd == lastDisabledHwnd)
+        {
+            if (NowMs() - lastOpenCheck < 2000) return;
+            lastOpenCheck = NowMs();
+            IntPtr openContext = ImmGetContext(hwnd);
+            if (openContext != IntPtr.Zero)
+            {
+                ImmSetOpenStatus(openContext, false);
+                ImmReleaseContext(hwnd, openContext);
+            }
+            return;
+        }
+        if (hwnd != lastDisabledHwnd)
+        {
+            imeDisabled = false;
+            chatImeEnabled = false;
+            savedContext = IntPtr.Zero;
+            originalLayout = IntPtr.Zero;
+        }
+
         IntPtr context = ImmGetContext(hwnd);
         if (context != IntPtr.Zero)
         {
@@ -129,22 +152,16 @@ internal static class Program
             ImmSetConversionStatus(context, IME_CMODE_ALPHANUMERIC, IME_SMODE_NONE);
             ImmReleaseContext(hwnd, context);
         }
-        if (!imeDisabled)
-        {
-            savedContext = ImmAssociateContext(hwnd, IntPtr.Zero);
-            imeDisabled = true;
-        }
-        else
-        {
-            ImmAssociateContext(hwnd, IntPtr.Zero);
-        }
+        savedContext = ImmAssociateContext(hwnd, IntPtr.Zero);
+        imeDisabled = true;
+        lastDisabledHwnd = hwnd;
+        lastOpenCheck = NowMs();
 
-        // Switch the game window to the English (US) keyboard layout. This
-        // survives the game re-associating its IME context on focus changes.
+        // One layout switch per game focus. The old loop switched every
+        // 250ms and caused intermittent movement lockups.
         if (originalLayout == IntPtr.Zero) originalLayout = GetKeyboardLayout(threadId);
         if (englishLayout == IntPtr.Zero) englishLayout = LoadKeyboardLayout("00000409", KLF_ACTIVATE);
-        IntPtr current = GetKeyboardLayout(threadId);
-        if (englishLayout != IntPtr.Zero && current != englishLayout)
+        if (englishLayout != IntPtr.Zero)
         {
             PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, englishLayout);
         }
@@ -157,16 +174,14 @@ internal static class Program
         int pid;
         uint threadId = GetWindowThreadProcessId(hwnd, out pid);
         if (pid != targetPid) return;
+        if (chatImeEnabled && !imeDisabled) return;
         if (imeDisabled)
         {
             if (savedContext != IntPtr.Zero) ImmAssociateContext(hwnd, savedContext);
             else ImmAssociateContextEx(hwnd, IntPtr.Zero, IACE_DEFAULT);
             imeDisabled = false;
         }
-        else
-        {
-            ImmAssociateContextEx(hwnd, IntPtr.Zero, IACE_DEFAULT);
-        }
+        lastDisabledHwnd = IntPtr.Zero;
         IntPtr context = ImmGetContext(hwnd);
         if (context != IntPtr.Zero)
         {
@@ -175,10 +190,11 @@ internal static class Program
         }
         if (chineseLayout == IntPtr.Zero) chineseLayout = LoadKeyboardLayout("00000804", KLF_ACTIVATE);
         IntPtr restore = chineseLayout != IntPtr.Zero ? chineseLayout : originalLayout != IntPtr.Zero ? originalLayout : GetKeyboardLayout(threadId);
-        if (restore != IntPtr.Zero && GetKeyboardLayout(threadId) != restore)
+        if (restore != IntPtr.Zero)
         {
             PostMessage(hwnd, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, restore);
         }
+        chatImeEnabled = true;
     }
 
     private static IntPtr KeyboardHook(int nCode, IntPtr wParam, IntPtr lParam)
@@ -188,9 +204,12 @@ internal static class Program
             int vk = Marshal.ReadInt32(lParam);
             if (vk == VK_T || vk == VK_SLASH)
             {
-                chatOpen = true;
-                pendingDisableAt = 0;
-                EnableIme();
+                if (!chatOpen)
+                {
+                    chatOpen = true;
+                    pendingDisableAt = 0;
+                    EnableIme();
+                }
             }
             else if (vk == VK_ESCAPE && chatOpen)
             {
