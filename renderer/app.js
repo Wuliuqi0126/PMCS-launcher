@@ -57,6 +57,15 @@ const state = {
     autoOpen: true,
     address: '',
   },
+  invite: {
+    status: null,
+    loading: false,
+    busy: '',
+    name: '',
+    revealed: false,
+    hostRevealed: false,
+    resolved: null,
+  },
   share: {
     state: null,
     loading: false,
@@ -4373,6 +4382,22 @@ function tailscaleHostAddress() {
   return ip && port ? `${ip}:${port}` : '';
 }
 
+function openTunnelMethods() {
+  openModal({
+    title: '无法联机？尝试隧道方式吧！',
+    subtitle: '没有公网 IPv6、或路由器无法端口映射时，用 Tailscale 或 playit 把游戏带到外网',
+    wide: true,
+    body: `<div class="tunnel-modal">
+      ${tailscalePanelHtml()}
+      ${playitPanelHtml()}
+      <div class="notice info">${icon('info', 15)}<span>Tailscale 适合朋友一起装客户端；playit.gg 适合朋友只想直接连公网地址。两者只需要选一种。</span></div>
+    </div>`,
+    footer: `<button class="btn btn-primary" data-action="scan-close-modal">关闭</button>`,
+  });
+  if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
+  if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
+}
+
 function tailscalePanelHtml() {
   const t = state.tailscale;
   const s = t.status;
@@ -4684,10 +4709,142 @@ function ipv6StatusChip(status) {
   return '<span class="chip">待开放</span>';
 }
 
+function inviteRemainingText(ms) {
+  const total = Math.max(0, Math.ceil(Number(ms || 0) / 1000));
+  const min = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+async function refreshInvite() {
+  if (state.invite.loading) return;
+  state.invite.loading = true;
+  try {
+    state.invite.status = await api.invoke('invite:state');
+    if (state.invite.status?.name && !state.invite.name) state.invite.name = state.invite.status.name;
+    const remaining = Number(state.invite.status?.expiresAt || 0) - Date.now();
+    if (remaining > 0) setTimeout(() => { if (state.route === 'lan') paintIpv6Panel(); }, remaining + 250);
+  } catch (_) { /* optional */ }
+  state.invite.loading = false;
+  paintIpv6Panel();
+}
+
+async function ensureInviteKey() {
+  const status = state.ipv6.status;
+  const port = ipv6Port();
+  if (!status?.external || !status?.primary || !port) return;
+  const host = status.external || status.primary.address;
+  const current = state.invite.status;
+  if (current?.key && current.host === host && current.port === port) return;
+  try {
+    state.invite.status = await api.invoke('invite:create', {
+      host,
+      port,
+      name: state.invite.name || `房间-${String(port).slice(-4)}`,
+    });
+    state.invite.name = state.invite.status.name || state.invite.name;
+    paintIpv6Panel();
+  } catch (_) { /* no key until host has a port */ }
+}
+
+async function createInviteKey() {
+  if (state.invite.busy) return;
+  const status = state.ipv6.status;
+  const port = ipv6Port();
+  if (!status?.external && !status?.primary) return toast('还没有可用的 IPv6 地址', '先完成 IPv6 检测', 'info');
+  if (!port) return toast('还没有游戏端口', '先在游戏内开放局域网', 'info');
+  state.invite.name = String($('#invite-name')?.value || state.invite.name || '').trim();
+  state.invite.busy = 'create';
+  paintIpv6Panel();
+  try {
+    state.invite.status = await api.invoke('invite:create', {
+      host: status.external || status.primary.address,
+      port,
+      name: state.invite.name,
+    });
+    state.invite.name = state.invite.status.name || state.invite.name;
+    toast('已生成联机密钥', '复制密钥名发给客机；10 分钟内有效', 'success', 8000);
+  } catch (err) {
+    toast('生成密钥失败', cleanError(err), 'error', 8000);
+  } finally {
+    state.invite.busy = '';
+    paintIpv6Panel();
+  }
+}
+
+async function rearmInviteKey() {
+  if (state.invite.busy) return;
+  state.invite.busy = 'rearm';
+  paintIpv6Panel();
+  try {
+    state.invite.status = await api.invoke('invite:rearm');
+    toast('密钥已重新激活', '从现在起再有效 10 分钟', 'success', 6000);
+  } catch (err) {
+    toast('重新激活失败', cleanError(err), 'error', 6000);
+  } finally {
+    state.invite.busy = '';
+    paintIpv6Panel();
+  }
+}
+
+async function copyInviteKey() {
+  const key = state.invite.status?.key;
+  if (!key) return toast('还没有生成密钥', '', 'info');
+  try {
+    await Promise.resolve(api.writeClipboard(key));
+    toast('密钥已复制', '发给客机后，客机只需粘贴密钥', 'success', 5000);
+  } catch (_) {
+    const input = $('#invite-key');
+    if (input) { input.focus(); input.select(); }
+  }
+}
+
+async function joinByInvite() {
+  const raw = String($('#invite-join-key')?.value || '').trim();
+  if (!raw) return toast('请输入主机密钥名', '', 'info');
+  try {
+    const resolved = await api.invoke('invite:resolve', raw);
+    state.invite.resolved = resolved;
+    state.invite.revealed = false;
+    await openRemotePreflight(resolved.host, resolved.port, '密钥房间', resolved.secret);
+  } catch (err) {
+    toast('密钥无法使用', cleanError(err), 'error', 9000);
+  }
+}
+
+function revealInviteAddress() {
+  if (!state.invite.resolved) {
+    const key = String($('#invite-join-key')?.value || '').trim();
+    if (!key) return toast('先输入密钥', '', 'info');
+    api.invoke('invite:resolve', key).then((resolved) => {
+      state.invite.resolved = resolved;
+      state.invite.revealed = true;
+      paintIpv6Panel();
+    }).catch((err) => toast('无法解析密钥', cleanError(err), 'error'));
+    return;
+  }
+  state.invite.revealed = true;
+  paintIpv6Panel();
+}
+
+function revealHostIpv6() {
+  state.invite.hostRevealed = !state.invite.hostRevealed;
+  paintIpv6Panel();
+}
+
+function directJoinInvite() {
+  if (!state.invite.resolved) return;
+  openRemotePreflight(state.invite.resolved.host, state.invite.resolved.port, '密钥房间').catch((err) => {
+    toast('直接连接失败', cleanError(err), 'error');
+  });
+}
+
 function ipv6PanelHtml() {
   const data = state.ipv6;
   const s = data.status;
   const port = ipv6Port();
+  const inv = state.invite.status;
+  const invActive = Boolean(inv?.key && inv.expiresAt && Date.now() < inv.expiresAt);
   const address = s?.address || (s?.primary && port ? `[${s.primary.address}]:${port}` : '');
   const rows = s ? [
     ['本机 IPv6', s.primary?.address || '未检测到', s.primary ? 'green' : 'amber'],
@@ -4697,29 +4854,43 @@ function ipv6PanelHtml() {
   ] : [];
   return `<section class="panel ipv6-panel" id="ipv6-panel">
     <div class="settings-head">
-      <span class="head-icon">${icon('globe', 16)}</span>
-      <div><h3>IPv6 公网直连</h3><p>不需要 Tailscale 或 playit，直接通过 IPv6 地址让外网朋友加入</p></div>
+      <span class="head-icon">${icon('shield', 16)}</span>
+      <div><h3>安全密钥联机</h3><p>密钥代替明文 IP；客机只有拿到密钥才能读取房间并加入</p></div>
       <span class="chip ${s?.ready ? 'green' : ''}" style="margin-left:auto">${ipv6StatusChip(s)}</span>
     </div>
     <div class="ipv6-body">
       ${data.loading && !s ? `<div class="tailscale-loading"><span class="spinner light"></span> 正在检测 IPv6 地址、公网出口和防火墙…</div>` : ''}
       ${s ? `<div class="ipv6-grid">${rows.map(([label, value, color]) => `<div class="ipv6-row"><span>${h(label)}</span><strong class="${color}">${h(value)}</strong></div>`).join('')}</div>` : ''}
-      ${address ? `<div class="ipv6-address"><div><small>主机公网地址（发给客机）</small><code>${h(address)}</code></div><button class="btn btn-primary btn-sm" data-action="ipv6-copy" data-text="${h(address)}">${icon('copy', 13)} 复制地址</button></div>` : ''}
-      ${s?.firewall?.permanent ? `<div class="notice info">${icon('check', 15)}<span>安装程序已提前放行 Minecraft 局域网端口（TCP 49152–65535），首次开放 IPv6 不再弹出 UAC。</span></div>` : ''}
-      ${s && !s.ready && s.primary ? `<div class="notice ${s.external ? 'info' : 'warn'}">${icon(s.external ? 'info' : 'alert', 15)}<span>${h(s.reason || (s.external ? '点击下方按钮放行 Windows 防火墙端口。' : '你的网络没有可用的公网 IPv6 出口；IPv6 直连只适用于双方都有公网 IPv6 的网络。'))}</span></div>` : ''}
+      ${s?.firewall?.permanent ? `<div class="notice info">${icon('check', 15)}<span>安装程序已提前放行 Minecraft 端口和资源共享端口，首次开放不再弹 UAC。</span></div>` : ''}
+      ${s && !s.ready && s.primary ? `<div class="notice ${s.external ? 'info' : 'warn'}">${icon(s.external ? 'info' : 'alert', 15)}<span>${h(s.reason || (s.external ? '点击下方按钮放行 Windows 防火墙端口。' : '你的网络没有可用的公网 IPv6 出口；安全密钥联机只适用于双方都有公网 IPv6 的网络。'))}</span></div>` : ''}
       <div class="ipv6-actions">
         <button class="btn btn-primary btn-sm" data-action="ipv6-open" ${data.busy || !s?.primary || !port ? 'disabled' : ''}>${data.busy === 'open' ? '<span class="spinner"></span> 正在开放' : `${icon('shield', 13)} 检测并开放端口`}</button>
         <button class="btn btn-secondary btn-sm" data-action="ipv6-refresh" ${data.loading ? 'disabled' : ''}>${icon('refresh', 12)} 重新检测</button>
         ${s?.firewall?.exists && !s.firewall.permanent ? `<button class="btn btn-ghost btn-sm" data-action="ipv6-close" ${data.busy ? 'disabled' : ''}>${icon('x', 12)} 关闭防火墙规则</button>` : ''}
       </div>
-      <div class="ipv6-join">
-        <label for="ipv6-join-address">客机：输入主机 IPv6 地址</label>
-        <div class="input-row">
-          <input class="input" id="ipv6-join-address" placeholder="例如 [2408:8207:...:1]:54321" value="${h(data.address)}" autocomplete="off">
-          <button class="btn btn-secondary btn-sm" data-action="ipv6-join">${icon('arrowRight', 13)} 加入</button>
+
+      <div class="invite-card">
+        <div class="invite-card-head"><strong>主机密钥</strong><span class="chip ${invActive ? 'green' : 'amber'}">${invActive ? '有效' : inv?.key ? '已过期' : '等待生成'}</span></div>
+        <div class="invite-name-row">
+          <input class="input" id="invite-name" maxlength="32" placeholder="自定义密钥名，例如 今晚八点" value="${h(state.invite.name || inv?.name || '')}">
+          <button class="btn btn-secondary btn-sm" data-action="invite-create" ${state.invite.busy ? 'disabled' : ''}>${state.invite.busy === 'create' ? '<span class="spinner"></span>' : `${icon('refresh', 12)} 生成/更新`}</button>
         </div>
+        ${inv?.key ? `<div class="input-row invite-key-row"><input class="input" id="invite-key" readonly value="${h(inv.key)}"><button class="btn btn-primary btn-sm" data-action="invite-copy">${icon('copy', 13)} 复制密钥</button></div>
+        <div class="invite-meta"><span>有效期剩余 <b>${invActive ? inviteRemainingText(inv.expiresAt - Date.now()) : '00:00'}</b></span><button class="btn btn-ghost btn-sm" data-action="invite-rearm" ${state.invite.busy ? 'disabled' : ''}>${icon('refresh', 11)} 重新激活密钥</button></div>` : `<p class="invite-hint">${port ? '点击“生成/更新”创建密钥；密钥 10 分钟后过期。' : '先在游戏内开放局域网端口，才能生成密钥。'}</p>`}
+        <button class="btn btn-ghost btn-sm invite-reveal" data-action="ipv6-reveal-host">${icon('eye', 12)} 无法连接？点击这里直接获取 IP 地址</button>
+        ${state.invite.hostRevealed && address ? `<div class="invite-address"><code>${h(address)}</code><button class="icon-btn" data-action="ipv6-copy" data-text="${h(address)}" title="复制地址">${icon('copy', 13)}</button></div>` : ''}
       </div>
-      <p class="ipv6-hint">${icon('info', 13)} 只有主机和客机都拥有公网 IPv6 才能直连；首次放行端口会弹出 Windows UAC，请允许管理员权限。路由器或运营商防火墙也可能拦截入站，失败时改用 Tailscale/playit。公网端口可被扫描，请只把地址发给可信玩家。</p>
+
+      <div class="invite-guest">
+        <label for="invite-join-key">客机：输入主机密钥名</label>
+        <div class="input-row">
+          <input class="input" id="invite-join-key" placeholder="粘贴主机复制的完整密钥" autocomplete="off">
+          <button class="btn btn-primary btn-sm" data-action="invite-join">${icon('arrowRight', 13)} 使用密钥加入</button>
+        </div>
+        <button class="btn btn-ghost btn-sm invite-reveal" data-action="invite-reveal">${icon('eye', 12)} 无法连接？点击这里直接获取 IP 地址</button>
+        ${state.invite.revealed && state.invite.resolved ? `<div class="invite-address"><span>解析到主机：</span><code>${h(state.invite.resolved.host)}:${h(state.invite.resolved.port)}</code><button class="btn btn-secondary btn-sm" data-action="invite-direct">直接尝试连接</button></div>` : ''}
+      </div>
+      <p class="ipv6-hint">${icon('info', 13)} 密钥使用 AES-GCM 加密房间地址和主机信息，10 分钟后失效；主机勾选重新激活后，同一密钥可继续使用。不要公开分享密钥。</p>
     </div>
   </section>`;
 }
@@ -4736,6 +4907,9 @@ async function refreshIpv6(force = false) {
     if (state.ipv6.autoOpen && port && status?.primary && status.external && !status.ready && state.ipv6.autoTried !== String(port)) {
       state.ipv6.autoTried = String(port);
       setTimeout(() => { if (state.route === 'lan') openIpv6(true); }, 300);
+    }
+    if (status?.primary && status?.external && port) {
+      ensureInviteKey().catch(() => {});
     }
   } catch (err) {
     state.ipv6.status = { supported: false, error: err.message || String(err), reason: err.message || String(err), primary: null, external: '', firewall: {}, port: 0, ready: false };
@@ -4789,7 +4963,7 @@ function paintIpv6Panel() {
   hydrateIcons($('#ipv6-panel'));
 }
 
-async function openRemotePreflight(host, port, title = '远程房间') {
+async function openRemotePreflight(host, port, title = '远程房间', secret = '') {
   if (state.lan.preflightBusy) return;
   const instance = getLanGuestInstance();
   if (!instance) return toast('请选择加入实例', '', 'error');
@@ -4799,6 +4973,7 @@ async function openRemotePreflight(host, port, title = '远程房间') {
       host,
       port: Number(port),
       instanceId: instance.id,
+      secret,
     });
     state.lan.preflight = {
       ...check,
@@ -5090,9 +5265,9 @@ function renderLanRoute() {
   $('#view').innerHTML = `<div class="page-enter">
     <div class="page-head">
       <div class="page-head-copy">
-        <div class="eyebrow">LAN Multiplayer</div>
-        <h1 class="page-title">局域网联机</h1>
-        <p class="page-subtitle">同一 Wi-Fi、路由器或手机热点下的设备，可以一起进入同一个世界。无需端口转发。</p>
+        <div class="eyebrow">Play Together</div>
+        <h1 class="page-title">联机游玩</h1>
+        <p class="page-subtitle">局域网、IPv6、Tailscale 和 playit 都可以让朋友加入同一个世界。</p>
       </div>
       <div class="page-actions">
         <span class="top-note"><span class="dot"></span> 自动发现端口 ${h(state.lan.discoveryError ? '不可用' : '24454')}</span>
@@ -5100,11 +5275,21 @@ function renderLanRoute() {
         <button class="btn btn-secondary" data-action="lan-refresh">${icon('refresh', 15)} 刷新</button>
       </div>
     </div>
-    ${!instances.length ? `<div class="panel empty-state">
-      <div class="empty-icon">${icon('wifi', 30)}</div>
-      <h3>还没有可联机的实例</h3>
-      <p>先创建一个已安装完成的原版、Fabric 或 Forge 实例，所有设备需要使用相同版本和模组。</p>
-      <div class="empty-actions"><button class="btn btn-primary" data-action="open-create">${icon('plus', 15)} 创建实例</button></div>
+    ${!instances.length ? `<div class="lan-grid">
+      <section class="panel lan-panel">
+        <div class="settings-head"><span class="head-icon">${icon('plus', 16)}</span><div><h3>先创建实例</h3><p>没有实例也可以搜索局域网房间，但需要实例才能加入</p></div></div>
+        <div class="lan-body">
+          <div class="empty-state compact"><div class="empty-icon">${icon('wifi', 26)}</div><h3>还没有可联机的实例</h3><p>先创建一个已安装完成的原版、Fabric、Quilt、Forge 或 NeoForge 实例。</p><div class="empty-actions"><button class="btn btn-primary" data-action="open-create">${icon('plus', 15)} 创建实例</button></div></div>
+        </div>
+      </section>
+      <section class="panel lan-panel">
+        <div class="settings-head"><span class="head-icon">${icon('users', 16)}</span><div><h3>加入房间</h3><p>仍会扫描当前网络内的所有房间；创建实例后即可检查并加入</p></div><span class="chip" style="margin-left:auto">${(state.lan.rooms || []).length} 个房间</span></div>
+        <div class="lan-body">
+          <div class="lan-scan-head"><span class="top-note"><span class="dot"></span> ${state.lan.discoveryError ? '自动发现不可用' : '自动扫描中'}</span><button class="btn btn-ghost btn-sm" data-action="lan-refresh-rooms" ${state.lan.scanning ? 'disabled' : ''}>${state.lan.scanning ? '<span class="spinner"></span>' : `${icon('refresh', 12)} 刷新`}</button></div>
+          <div id="lan-rooms">${lanRoomsHtml()}</div>
+          <p class="field-hint">创建实例后，选择它作为加入实例即可检查版本和模组并加入。</p>
+        </div>
+      </section>
     </div>` : `<div class="lan-grid">
       <section class="panel lan-panel">
         <div class="settings-head"><span class="head-icon">${icon('radio', 16)}</span><div><h3>创建房间</h3><p>由一台设备作为主机，进入存档后开放局域网</p></div></div>
@@ -5173,13 +5358,17 @@ function renderLanRoute() {
       ${icon('chevronRight', 16)}
     </a>
     ${ipv6PanelHtml()}
-    ${tailscalePanelHtml()}
-    ${playitPanelHtml()}
+    <button class="panel share-entry-link tunnel-entry" data-action="open-tunnel-methods">
+      <span class="head-icon">${icon('globe', 16)}</span>
+      <div><strong>无法联机？尝试隧道方式吧！</strong><p>Tailscale 私有网络 / playit.gg 公网隧道，适合没有公网 IPv6 或端口无法映射的情况</p></div>
+      ${icon('chevronRight', 16)}
+    </button>
   </div>`;
   state.lan.roomSignature = '';
   state.lan.hostSignature = JSON.stringify(state.lan.host || null);
   hydrateIcons($('#view'));
   paintLanRooms(true);
+  if (!state.invite.status) refreshInvite();
   if (!state.ipv6.status || state.ipv6.status.port !== ipv6Port()) refreshIpv6();
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
@@ -5417,8 +5606,9 @@ async function refreshLanPreflightCheck(check, instanceId = check.local.id) {
       host: check.address,
       port: check.port,
       instanceId,
+      secret: check.secret || '',
     });
-    return { ...fresh, roomKey: '', address: check.address, port: check.port, remote: true, busy: '', error: check.error || '' };
+    return { ...fresh, roomKey: '', address: check.address, port: check.port, remote: true, secret: check.secret || '', busy: '', error: check.error || '' };
   }
   const fresh = await api.invoke('lan:preflight', { roomKey: check.roomKey, instanceId });
   return { ...fresh, roomKey: check.roomKey, address: check.address, port: check.port, busy: '', error: check.error || '' };
@@ -6546,6 +6736,9 @@ async function runAction(action, el, event) {
       case 'save-share-download':
         await downloadSharedSave(el.dataset.key || '');
         break;
+      case 'open-tunnel-methods':
+        openTunnelMethods();
+        break;
       case 'ipv6-open':
         await openIpv6();
         break;
@@ -6561,6 +6754,27 @@ async function runAction(action, el, event) {
         break;
       case 'ipv6-copy':
         await copyLanText(el.dataset.text || '');
+        break;
+      case 'ipv6-reveal-host':
+        revealHostIpv6();
+        break;
+      case 'invite-create':
+        await createInviteKey();
+        break;
+      case 'invite-copy':
+        await copyInviteKey();
+        break;
+      case 'invite-rearm':
+        await rearmInviteKey();
+        break;
+      case 'invite-join':
+        await joinByInvite();
+        break;
+      case 'invite-reveal':
+        revealInviteAddress();
+        break;
+      case 'invite-direct':
+        directJoinInvite();
         break;
       case 'tailscale-install':
         await installTailscale();

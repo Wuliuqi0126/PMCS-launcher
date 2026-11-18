@@ -44,7 +44,7 @@ function broadcastOf(address, netmask) {
   }
 }
 
-function createResourceShare({ app, store, accounts, onUpdate }) {
+function createResourceShare({ app, store, accounts, invite, onUpdate }) {
   const hostId = crypto.randomBytes(8).toString('hex');
   const shares = new Map();
   let socket = null;
@@ -328,14 +328,44 @@ function createResourceShare({ app, store, accounts, onUpdate }) {
       try { url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`); } catch (_) {
         res.writeHead(400); res.end('bad request'); return;
       }
+      if (url.pathname === '/invite-info') {
+        const secret = String(url.searchParams.get('key') || '');
+        if (!invite || !invite.isActive(secret)) {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ ok: false, code: 'expired', message: '密钥已过期或无效，请让主机重新激活密钥' }));
+          return;
+        }
+        const payload = {
+          ...(beaconPayload() || {}),
+          magic: MAGIC,
+          hostId,
+          game: active?.game || null,
+        };
+        const envelope = invite.encrypt(payload, secret);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ok: true, encrypted: true, ...envelope }));
+        return;
+      }
       if (url.pathname === '/info') {
+        // Public summary only. Full game config, file list and download token
+        // require the encrypted /invite-info key exchange.
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
         const payload = beaconPayload() || {};
         res.end(JSON.stringify({
           magic: MAGIC,
           hostId,
-          ...payload,
-          game: active?.game || payload.game || null,
+          hostName: payload.hostName || '',
+          owner: payload.owner || '',
+          instanceName: payload.instanceName || '',
+          game: payload.game ? {
+            versionId: payload.game.versionId,
+            loader: payload.game.loader,
+            loaderVersion: payload.game.loaderVersion,
+            instanceName: payload.game.instanceName,
+            worldName: payload.game.worldName,
+            owner: payload.game.owner,
+            modCount: payload.game.modCount,
+          } : null,
         }));
         return;
       }
