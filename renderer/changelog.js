@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.2.0',
+    title: 'IPv6 权限安装时放行',
+    current: true,
+    items: [
+      '安装程序提前放行 TCP 49152–65535 的公网 IPv6 入站，首次开放不再弹 UAC。',
+      '启动器优先复用安装程序创建的 PMCS IPv6 Direct 规则。',
+      '便携版仍可能首次弹一次 UAC。',
+      '卸载时清理永久规则和临时规则。',
+    ],
+  },
+  {
     version: '2.1.0',
     title: 'IPv6 公网直连',
-    current: true,
     items: [
       '联机页自动检测公网 IPv6、公网出口、游戏端口和 Windows 防火墙。',
       '检测到端口后自动放行当前 TCP 端口，生成 [IPv6]:端口 地址。',
