@@ -740,6 +740,23 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .component-body .notice { margin-top: 10px; }
 
 /* ==== TAILSCALE ==== */
+.ipv6-panel { margin-top: 13px; }
+.ipv6-body { padding: 15px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
+.ipv6-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.ipv6-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.012); }
+.ipv6-row span { color: var(--muted); font-size: 8.5px; }
+.ipv6-row strong { font-size: 8.5px; font-weight: 650; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ipv6-row strong.green { color: var(--accent); }
+.ipv6-row strong.amber { color: var(--amber); }
+.ipv6-address { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid rgba(110,231,149,.18); border-radius: 9px; background: rgba(110,231,149,.045); }
+.ipv6-address small { display: block; color: var(--muted); font-size: 8px; margin-bottom: 4px; }
+.ipv6-address code { font-family: var(--font-mono); font-size: 11px; color: var(--accent); word-break: break-all; }
+.ipv6-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.ipv6-join { display: flex; flex-direction: column; gap: 5px; }
+.ipv6-join label { color: var(--muted); font-size: 8.5px; }
+.ipv6-hint { display: flex; gap: 6px; margin: 0; color: var(--muted-2); font-size: 8px; line-height: 1.6; }
+.ipv6-hint svg { flex: 0 0 auto; margin-top: 1px; }
+@media (max-width: 760px) { .ipv6-grid { grid-template-columns: 1fr; } }
 .tailscale-panel { margin-top: 13px; }
 .tailscale-body { padding: 16px 20px 18px; }
 .tailscale-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

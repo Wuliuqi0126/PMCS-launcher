@@ -15,6 +15,7 @@ const { createCache } = require('./cache');
 const { createGuides } = require('./guide');
 const { createLanService } = require('./lan');
 const { createNetworkInfo } = require('./network-info');
+const ipv6 = require('./ipv6');
 const { createResourceShare } = require('./resource-share');
 const { createComponents } = require('./components');
 const { createTailscale } = require('./tailscale');
@@ -489,6 +490,9 @@ function registerIpc() {
   ipcMain.handle('lan:worlds', async (_event, instanceId) => lan.listWorlds(instanceId));
   ipcMain.handle('lan:hostStart', async (_event, payload) => lan.startHost(payload || {}));
   ipcMain.handle('network:info', async () => networkInfo.state());
+  ipcMain.handle('ipv6:state', async (_event, port) => ipv6.state(Number(port) || 0));
+  ipcMain.handle('ipv6:open', async (_event, port) => ipv6.open(Number(port) || 0));
+  ipcMain.handle('ipv6:close', async () => ipv6.close());
   ipcMain.handle('resourcesShare:state', async () => resourceShare.state());
   ipcMain.handle('resourcesShare:start', async (_event, payload) => resourceShare.startHost(payload || {}));
   ipcMain.handle('resourcesShare:stop', async () => resourceShare.stopHost());

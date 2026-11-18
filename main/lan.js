@@ -617,8 +617,9 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     const instance = store.getInstance(String(instanceId || ''));
     if (!instance) throw new Error('请选择要加入的实例');
     if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
-    const hostName = String(address || '').trim();
-    if (!hostName || (!/^[A-Za-z0-9.-]+$/.test(hostName) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostName))) {
+    const hostName = String(address || '').trim().replace(/^\[|\]$/g, '');
+    const ipv6Host = net.isIP(hostName) === 6;
+    if (!hostName || (!ipv6Host && !/^[A-Za-z0-9.-]+$/.test(hostName) && !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostName))) {
       throw new Error('房间地址无效');
     }
     const portNumber = Number(port);
@@ -627,7 +628,8 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
       const check = await preflight({ roomKey, instanceId: instance.id });
       if (!check.canJoin) throw new Error('本机与房间配置不一致，请先完成缺失内容下载');
     }
-    await launcher.launch(instance.id, { quickPlayMultiplayer: `${hostName}:${portNumber}` });
+    const endpoint = ipv6Host ? `[${hostName}]:${portNumber}` : `${hostName}:${portNumber}`;
+    await launcher.launch(instance.id, { quickPlayMultiplayer: endpoint });
     return true;
   }
 

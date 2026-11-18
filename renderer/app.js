@@ -49,6 +49,14 @@ const state = {
     peers: [],
     self: null,
   },
+  ipv6: {
+    status: null,
+    loading: false,
+    busy: '',
+    autoTried: '',
+    autoOpen: true,
+    address: '',
+  },
   share: {
     state: null,
     loading: false,
@@ -4658,6 +4666,131 @@ function openPlayitTunnelGuide() {
   });
 }
 
+function ipv6Port() {
+  return Number(state.lan.host?.port) || 0;
+}
+
+function ipv6StatusChip(status) {
+  if (!status) return '<span class="chip">检测中</span>';
+  if (status.ready) return '<span class="chip green">公网可连</span>';
+  if (!status.supported) return '<span class="chip amber">仅 Windows</span>';
+  if (!status.primary) return '<span class="chip amber">无公网 IPv6</span>';
+  if (!status.external) return '<span class="chip amber">IPv6 出口不可用</span>';
+  return '<span class="chip">待开放</span>';
+}
+
+function ipv6PanelHtml() {
+  const data = state.ipv6;
+  const s = data.status;
+  const port = ipv6Port();
+  const address = s?.address || (s?.primary && port ? `[${s.primary.address}]:${port}` : '');
+  const rows = s ? [
+    ['本机 IPv6', s.primary?.address || '未检测到', s.primary ? 'green' : 'amber'],
+    ['公网出口', s.external || s.externalError || '检测中', s.external ? 'green' : 'amber'],
+    ['游戏端口', port ? `${port}${s.listening ? ' · 已监听 IPv6' : ' · 暂未监听 IPv6'}` : '等待开放局域网', s.listening ? 'green' : 'amber'],
+    ['防火墙', s.firewall?.exists ? `已放行 TCP ${s.firewall.port || port || ''}` : '未放行', s.firewall?.exists ? 'green' : 'amber'],
+  ] : [];
+  return `<section class="panel ipv6-panel" id="ipv6-panel">
+    <div class="settings-head">
+      <span class="head-icon">${icon('globe', 16)}</span>
+      <div><h3>IPv6 公网直连</h3><p>不需要 Tailscale 或 playit，直接通过 IPv6 地址让外网朋友加入</p></div>
+      <span class="chip ${s?.ready ? 'green' : ''}" style="margin-left:auto">${ipv6StatusChip(s)}</span>
+    </div>
+    <div class="ipv6-body">
+      ${data.loading && !s ? `<div class="tailscale-loading"><span class="spinner light"></span> 正在检测 IPv6 地址、公网出口和防火墙…</div>` : ''}
+      ${s ? `<div class="ipv6-grid">${rows.map(([label, value, color]) => `<div class="ipv6-row"><span>${h(label)}</span><strong class="${color}">${h(value)}</strong></div>`).join('')}</div>` : ''}
+      ${address ? `<div class="ipv6-address"><div><small>主机公网地址（发给客机）</small><code>${h(address)}</code></div><button class="btn btn-primary btn-sm" data-action="ipv6-copy" data-text="${h(address)}">${icon('copy', 13)} 复制地址</button></div>` : ''}
+      ${s && !s.ready && s.primary ? `<div class="notice ${s.external ? 'info' : 'warn'}">${icon(s.external ? 'info' : 'alert', 15)}<span>${h(s.reason || (s.external ? '点击下方按钮放行 Windows 防火墙端口。' : '你的网络没有可用的公网 IPv6 出口；IPv6 直连只适用于双方都有公网 IPv6 的网络。'))}</span></div>` : ''}
+      <div class="ipv6-actions">
+        <button class="btn btn-primary btn-sm" data-action="ipv6-open" ${data.busy || !s?.primary || !port ? 'disabled' : ''}>${data.busy === 'open' ? '<span class="spinner"></span> 正在开放' : `${icon('shield', 13)} 检测并开放端口`}</button>
+        <button class="btn btn-secondary btn-sm" data-action="ipv6-refresh" ${data.loading ? 'disabled' : ''}>${icon('refresh', 12)} 重新检测</button>
+        ${s?.firewall?.exists ? `<button class="btn btn-ghost btn-sm" data-action="ipv6-close" ${data.busy ? 'disabled' : ''}>${icon('x', 12)} 关闭防火墙规则</button>` : ''}
+      </div>
+      <div class="ipv6-join">
+        <label for="ipv6-join-address">客机：输入主机 IPv6 地址</label>
+        <div class="input-row">
+          <input class="input" id="ipv6-join-address" placeholder="例如 [2408:8207:...:1]:54321" value="${h(data.address)}" autocomplete="off">
+          <button class="btn btn-secondary btn-sm" data-action="ipv6-join">${icon('arrowRight', 13)} 加入</button>
+        </div>
+      </div>
+      <p class="ipv6-hint">${icon('info', 13)} 只有主机和客机都拥有公网 IPv6 才能直连；首次放行端口会弹出 Windows UAC，请允许管理员权限。路由器或运营商防火墙也可能拦截入站，失败时改用 Tailscale/playit。公网端口可被扫描，请只把地址发给可信玩家。</p>
+    </div>
+  </section>`;
+}
+
+async function refreshIpv6(force = false) {
+  const port = ipv6Port();
+  if (state.ipv6.loading) return;
+  if (!force && state.ipv6.status && state.ipv6.status.port === port && !state.ipv6.busy) return;
+  state.ipv6.loading = true;
+  if (state.route === 'lan') paintIpv6Panel();
+  try {
+    state.ipv6.status = await api.invoke('ipv6:state', port);
+    const status = state.ipv6.status;
+    if (state.ipv6.autoOpen && port && status?.primary && status.external && !status.ready && state.ipv6.autoTried !== String(port)) {
+      state.ipv6.autoTried = String(port);
+      setTimeout(() => { if (state.route === 'lan') openIpv6(true); }, 300);
+    }
+  } catch (err) {
+    state.ipv6.status = { supported: false, error: err.message || String(err), reason: err.message || String(err), primary: null, external: '', firewall: {}, port: 0, ready: false };
+  } finally {
+    state.ipv6.loading = false;
+    if (state.route === 'lan') paintIpv6Panel();
+  }
+}
+
+async function openIpv6(auto = false) {
+  const port = ipv6Port();
+  if (state.ipv6.busy) return;
+  if (!port) {
+    if (!auto) toast('还没有游戏端口', '先在游戏内「对局域网开放」，启动器读取端口后再开放 IPv6', 'info', 6000);
+    return;
+  }
+  state.ipv6.busy = 'open';
+  paintIpv6Panel();
+  try {
+    state.ipv6.status = await api.invoke('ipv6:open', port);
+    toast('IPv6 公网入口已开放', state.ipv6.status.address || `端口 ${port}`, 'success', 9000);
+  } catch (err) {
+    state.ipv6.status = await api.invoke('ipv6:state', port).catch(() => state.ipv6.status);
+    toast('开放 IPv6 端口失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.ipv6.busy = '';
+    paintIpv6Panel();
+  }
+}
+
+async function closeIpv6() {
+  if (state.ipv6.busy) return;
+  state.ipv6.busy = 'close';
+  paintIpv6Panel();
+  try {
+    state.ipv6.status = await api.invoke('ipv6:close');
+    toast('IPv6 防火墙规则已关闭', '公网端口不再放行', 'info');
+  } catch (err) {
+    toast('关闭 IPv6 规则失败', cleanError(err), 'error');
+  } finally {
+    state.ipv6.busy = '';
+    paintIpv6Panel();
+  }
+}
+
+function paintIpv6Panel() {
+  if (state.route !== 'lan') return;
+  const panel = $('#ipv6-panel');
+  if (!panel) return;
+  panel.outerHTML = ipv6PanelHtml();
+  hydrateIcons($('#ipv6-panel'));
+}
+
+async function joinIpv6() {
+  const raw = String($('#ipv6-join-address')?.value || '').trim();
+  const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/);
+  if (!match) return toast('IPv6 地址格式不正确', '请使用 [IPv6]:端口，例如 [2408:8207:...:1]:54321', 'error');
+  state.ipv6.address = raw;
+  await joinLanRoom('', match[1], Number(match[2]));
+}
+
 function playitPanelHtml() {
   const p = state.playit;
   const s = p.status;
@@ -4997,6 +5130,7 @@ function renderLanRoute() {
       <div><strong>共享资源</strong><p>共享存档、模组、资源包、光影和皮肤，或从局域网其他启动器下载。</p></div>
       ${icon('chevronRight', 16)}
     </a>
+    ${ipv6PanelHtml()}
     ${tailscalePanelHtml()}
     ${playitPanelHtml()}
   </div>`;
@@ -5004,6 +5138,7 @@ function renderLanRoute() {
   state.lan.hostSignature = JSON.stringify(state.lan.host || null);
   hydrateIcons($('#view'));
   paintLanRooms(true);
+  if (!state.ipv6.status || state.ipv6.status.port !== ipv6Port()) refreshIpv6();
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
   if (!state.lan.initialized) refreshLanState();
@@ -5184,7 +5319,16 @@ async function inspectLanRoom(roomKey, host, port) {
   state.lan.preflightBusy = true;
   paintLanRooms(true);
   try {
-    const check = await api.invoke('lan:preflight', { roomKey, instanceId: instance.id });
+    const check = roomKey
+      ? await api.invoke('lan:preflight', { roomKey, instanceId: instance.id })
+      : {
+        canJoin: true,
+        blocking: [],
+        warnings: [{ kind: 'manual-address', title: '手动地址', message: '手动输入的地址无法读取房主模组清单，进入后如果掉线请核对版本和模组' }],
+        info: [],
+        host: { name: '手动地址', instanceName: `${host}:${port}`, version: '未知', loader: 'vanilla', modCount: 0 },
+        local: { id: instance.id, name: instance.name, version: instance.versionId, loader: instance.loader, loaderVersion: instance.loaderVersion || '', modCount: 0 },
+      };
     state.lan.preflight = { ...check, roomKey, address: host, port: Number(port), busy: '', error: '' };
     openModal({
       title: '加入房间前检查',
@@ -5345,9 +5489,9 @@ async function joinLanRoom(roomKey, host, port) {
 
 async function joinLanManual() {
   const raw = String(state.lan.manualAddress || $('#lan-manual-address')?.value || '').trim();
-  const match = raw.match(/^([A-Za-z0-9.-]+):(\d{1,5})$/);
-  if (!match) return toast('地址格式不正确', '请使用 IP:端口，例如 192.168.1.23:54321', 'error');
-  await joinLanRoom(match[1], Number(match[2]));
+  const match = raw.match(/^\[?([0-9a-fA-F:]+)\]?:(\d{1,5})$/) || raw.match(/^([A-Za-z0-9.-]+):(\d{1,5})$/);
+  if (!match) return toast('地址格式不正确', '请使用 IPv4:端口 或 [IPv6]:端口，例如 192.168.1.23:54321', 'error');
+  await joinLanRoom('', match[1], Number(match[2]));
 }
 
 async function copyLanText(text) {
@@ -6344,6 +6488,22 @@ async function runAction(action, el, event) {
         break;
       case 'save-share-download':
         await downloadSharedSave(el.dataset.key || '');
+        break;
+      case 'ipv6-open':
+        await openIpv6();
+        break;
+      case 'ipv6-refresh':
+        state.ipv6.autoTried = '';
+        await refreshIpv6(true);
+        break;
+      case 'ipv6-close':
+        await closeIpv6();
+        break;
+      case 'ipv6-join':
+        await joinIpv6();
+        break;
+      case 'ipv6-copy':
+        await copyLanText(el.dataset.text || '');
         break;
       case 'tailscale-install':
         await installTailscale();

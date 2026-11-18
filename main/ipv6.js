@@ -1,0 +1,218 @@
+'use strict';
+
+const os = require('os');
+const net = require('net');
+const https = require('https');
+const { execFile, spawnSync } = require('child_process');
+const { promisify } = require('util');
+
+const execFileAsync = promisify(execFile);
+const RULE_NAME = 'PMCS_IPv6_Direct';
+const EXTERNAL_HOSTS = ['api64.ipify.org', 'ipv6.icanhazip.com'];
+
+function globalAddresses() {
+  const result = [];
+  for (const [name, entries] of Object.entries(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if (entry.family !== 'IPv6' && entry.family !== 6) continue;
+      const address = String(entry.address || '').split('%')[0];
+      if (!address || entry.internal) continue;
+      const lower = address.toLowerCase();
+      if (lower === '::1' || lower.startsWith('fe80:') || lower.startsWith('fc') || lower.startsWith('fd')) continue;
+      result.push({ interface: name, address, scopeid: entry.scopeid || 0 });
+    }
+  }
+  const unique = new Map();
+  for (const item of result) if (!unique.has(item.address)) unique.set(item.address, item);
+  return [...unique.values()];
+}
+
+function run(file, args, timeout = 10000) {
+  return execFileAsync(file, args, {
+    timeout,
+    windowsHide: true,
+    encoding: 'utf8',
+    maxBuffer: 2 * 1024 * 1024,
+  });
+}
+
+function isAdmin() {
+  if (process.platform !== 'win32') return false;
+  try {
+    const result = spawnSync('net', ['session'], { windowsHide: true, timeout: 2500, stdio: 'ignore' });
+    return result.status === 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function requestText(hostname, path, family = 6) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname,
+      path,
+      method: 'GET',
+      family,
+      timeout: 4500,
+      headers: { 'User-Agent': 'PMCS-launcher/2.0', Accept: 'text/plain, application/json' },
+    }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    });
+    req.on('timeout', () => req.destroy(new Error('IPv6 测试超时')));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function externalAddress() {
+  for (const host of EXTERNAL_HOSTS) {
+    try {
+      const result = await requestText(host, host === 'api64.ipify.org' ? '/?format=json' : '/');
+      if (result.status !== 200) continue;
+      const text = String(result.body || '').trim();
+      let value = text;
+      try { value = JSON.parse(text).ip || text; } catch (_) { /* plain text */ }
+      value = String(value || '').trim();
+      if (net.isIP(value) === 6) return { address: value, source: host };
+    } catch (_) { /* try next host */ }
+  }
+  return { address: '', source: '', error: '未检测到可用的 IPv6 公网出口' };
+}
+
+function ruleInfo() {
+  if (process.platform !== 'win32') return { exists: false, port: 0, admin: false };
+  try {
+    const result = spawnSync('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${RULE_NAME}`], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 3500,
+    });
+    const text = String(result.stdout || '');
+    if (result.status !== 0 || !/LocalPort|本地端口/i.test(text)) return { exists: false, port: 0, admin: isAdmin() };
+    const port = Number((/LocalPort:\s*(\d+)/i.exec(text) || /本地端口:\s*(\d+)/i.exec(text) || [])[1]) || 0;
+    return { exists: true, port, admin: isAdmin() };
+  } catch (_) {
+    return { exists: false, port: 0, admin: isAdmin() };
+  }
+}
+
+function listeningOnIpv6(port) {
+  if (!port) return false;
+  try {
+    const result = spawnSync('netstat', ['-ano', '-p', 'TCPv6'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 3500,
+    });
+    return String(result.stdout || '').split(/\r?\n/).some((line) => {
+      if (!/LISTENING/i.test(line)) return false;
+      const match = /\[[^\]]*\]:(\d+)\s+\[[^\]]*\]:\d+\s+LISTENING/i.exec(line);
+      return Boolean(match && Number(match[1]) === port);
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
+function elevatedNetsh(args) {
+  const list = args.map((item) => `'${String(item).replace(/'/g, "''")}'`).join(',');
+  const script = `$p = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${list}) -Verb RunAs -Wait -PassThru; exit $p.ExitCode`;
+  return execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    timeout: 60000,
+    windowsHide: true,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024,
+  });
+}
+
+async function addFirewallRule(port) {
+  const deleteArgs = ['advfirewall', 'firewall', 'delete', 'rule', `name=${RULE_NAME}`];
+  const addArgs = [
+    'advfirewall', 'firewall', 'add', 'rule',
+    `name=${RULE_NAME}`,
+    'dir=in',
+    'action=allow',
+    'protocol=TCP',
+    `localport=${port}`,
+    'profile=any',
+    'enable=yes',
+  ];
+  if (isAdmin()) {
+    try { await run('netsh', deleteArgs); } catch (_) { /* rule may not exist */ }
+    await run('netsh', addArgs);
+    return;
+  }
+  try {
+    await elevatedNetsh(deleteArgs);
+  } catch (_) { /* rule may not exist or UAC canceled */ }
+  await elevatedNetsh(addArgs);
+}
+
+async function removeFirewallRule() {
+  const args = ['advfirewall', 'firewall', 'delete', 'rule', `name=${RULE_NAME}`];
+  if (isAdmin()) {
+    await run('netsh', args);
+  } else {
+    await elevatedNetsh(args);
+  }
+}
+
+async function state(port = 0) {
+  const portNumber = Number(port) || 0;
+  const addresses = globalAddresses();
+  const primary = addresses.find((item) => /^2[0-9a-f]{3}:/i.test(item.address)) || addresses[0] || null;
+  const external = await externalAddress();
+  const firewall = ruleInfo();
+  const listening = portNumber ? listeningOnIpv6(portNumber) : false;
+  const ready = Boolean(primary && external.address && firewall.exists && (!portNumber || listening));
+  const publicAddress = external.address || primary?.address || '';
+  let reason = '';
+  if (!primary) reason = '没有检测到公网 IPv6 地址';
+  else if (!external.address) reason = external.error || 'IPv6 公网出口不可用';
+  else if (!portNumber) reason = '等待游戏开放局域网端口';
+  else if (!firewall.exists) reason = 'Windows 防火墙尚未放行端口';
+  else if (!firewall.port || firewall.port !== portNumber) reason = '防火墙规则端口与当前端口不一致';
+  else if (!listening) reason = '游戏端口尚未监听 IPv6';
+  return {
+    supported: process.platform === 'win32',
+    platform: process.platform,
+    addresses,
+    primary,
+    external: external.address,
+    externalSource: external.source,
+    externalError: external.error || '',
+    firewall: {
+      exists: firewall.exists,
+      port: firewall.port,
+      admin: firewall.admin,
+      name: RULE_NAME,
+    },
+    port: portNumber,
+    listening,
+    ready,
+    address: publicAddress && portNumber ? `[${publicAddress}]:${portNumber}` : '',
+    reason,
+  };
+}
+
+async function open(port) {
+  const portNumber = Number(port);
+  if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+    throw new Error('请先在游戏内开放局域网端口');
+  }
+  const before = await state(portNumber);
+  if (!before.primary) throw new Error('没有检测到公网 IPv6 地址，无法开启 IPv6 直连');
+  if (!before.external) throw new Error(before.externalError || 'IPv6 公网出口不可用，无法开启 IPv6 直连');
+  await addFirewallRule(portNumber);
+  return state(portNumber);
+}
+
+async function close() {
+  try { await removeFirewallRule(); } catch (_) { /* ignore */ }
+  return state(0);
+}
+
+module.exports = { state, open, close, globalAddresses, isAdmin, RULE_NAME };
