@@ -765,7 +765,7 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
     if (!instance) throw new Error('请选择要加入的实例');
     if (instance.status !== 'ready') throw new Error('实例尚未安装完成');
     const hostName = String(address || '').trim().replace(/^\[|\]$/g, '');
-    if (net.isIP(hostName) !== 6) throw new Error('请输入有效的 IPv6 地址');
+    if (!hostName || (!net.isIP(hostName) && !/^[A-Za-z0-9.-]+$/.test(hostName))) throw new Error('主机地址无效');
     const portNumber = Number(port);
     if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) throw new Error('端口无效');
     const urlHost = hostName.includes(':') ? `[${hostName}]` : hostName;
@@ -778,15 +778,15 @@ function createLanService({ store, launcher, accounts, resourceShare, onUpdate, 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       data = await response.json();
     } catch (err) {
-      throw new Error(`无法读取主机配置：${err.message}。请确认主机已创建房间、使用 2.2.1 或更高版本，并允许 IPv6 资源共享端口 24460`);
+      throw new Error(`无法读取主机配置：${err.message}。请确认主机已创建房间、使用 2.3.0 或更高版本，并允许资源共享端口 24460`);
     }
     const game = data?.game && typeof data.game === 'object' ? data.game : {};
     const room = {
       key: `remote:${hostName}:${portNumber}`,
       ip: hostName,
       port: portNumber,
-      name: game.worldName || game.instanceName || 'IPv6 房间',
-      instanceName: game.instanceName || 'IPv6 主机',
+      name: game.worldName || game.instanceName || '远程房间',
+      instanceName: game.instanceName || '远程主机',
       owner: game.owner || data.owner || '',
       version: game.versionId || '',
       loader: game.loader || 'vanilla',
