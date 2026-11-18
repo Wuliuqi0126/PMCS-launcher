@@ -6,9 +6,20 @@
  */
 export const CHANGELOG = [
   {
+    version: '1.16.0',
+    title: '更多加载器关闭正版验证',
+    current: true,
+    items: [
+      'Fabric / Quilt 安装 OfflineLAN，Forge / NeoForge 安装 LAN Server Properties。',
+      '修复工具按实例加载器自动切换模组名称、安装按钮和游戏内操作步骤。',
+      'Quilt 以 Fabric 兼容模式安装 OfflineLAN，并同时处理 Fabric API 前置。',
+      'Forge / NeoForge 当前版本没有 LAN Server Properties 兼容构建时，会明确提示改用独立服务端。',
+      '原版实例仍使用独立服务端修改 server.properties 的方式。',
+    ],
+  },
+  {
     version: '1.15.0',
     title: '存档来源与输入法优化',
-    current: true,
     items: [
       '接收共享存档记录来源玩家、来源实例、主机名和下载时间，局域网列表直接显示来源与共享时间。',
       '实例管理页新增「查看存档」，可查看该实例所有存档并标明本地/共享。',
