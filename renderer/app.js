@@ -1776,12 +1776,12 @@ async function refreshNetworkInfo() {
 function paintNetworkInfo() {
   const name = $('#home-network-name');
   const count = $('#home-network-count');
-  if (name) name.textContent = state.network.name || '未连接网络';
-  if (count) count.textContent = state.network.count ? `${state.network.count} 人` : '检测中';
+  if (name) name.textContent = state.network?.name || '未连接网络';
+  if (count) count.textContent = state.network?.count ? `${state.network.count} 人` : '检测中';
 }
 
 function networkInfoModalBody() {
-  const data = state.network;
+  const data = state.network || { name: '未连接网络', count: 1, peers: [], self: null };
   const peers = [data.self, ...(data.peers || [])].filter(Boolean);
   return `<div class="network-modal">
     <div class="network-modal-hero">
@@ -1878,8 +1878,8 @@ function renderHomeRoute() {
       </div>
       <button class="home-network-info" type="button" data-action="open-network-info" title="查看当前网络和同一网络中的启动器">
         <span class="home-network-icon">${icon('wifi', 14)}</span>
-        <span class="home-network-copy"><small>当前网络</small><strong id="home-network-name">${h(state.network.name)}</strong></span>
-        <span class="home-network-count" id="home-network-count">${state.network.count ? `${state.network.count} 人` : '检测中'}</span>
+        <span class="home-network-copy"><small>当前网络</small><strong id="home-network-name">${h(state.network?.name || '正在检测网络…')}</strong></span>
+        <span class="home-network-count" id="home-network-count">${state.network?.count ? `${state.network.count} 人` : '检测中'}</span>
       </button>
       <div class="home-meta-actions">
         <button class="home-recommend" type="button" data-action="open-recommendations">${icon('star', 14)} 推荐</button>

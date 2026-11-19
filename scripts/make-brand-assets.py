@@ -80,10 +80,7 @@ for (x, y) in [(7, 10), (9, 8), (11, 12), (52, 9), (54, 12)]:
 icon512 = img.resize((512, 512), Image.Resampling.NEAREST)
 icon512.save(ASSETS / "icon.png")
 icon512.save(ASSETS / "icon-512.png")
-img.resize((256, 256), Image.Resampling.NEAREST).save(ASSETS / "icon-256.png")
 icon512.save(ASSETS / "icon.ico", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
-img.resize((64, 64), Image.Resampling.NEAREST).save(ASSETS / "icon-preview-64.png")
-img.resize((32, 32), Image.Resampling.NEAREST).save(ASSETS / "icon-preview-32.png")
 
 # ------------------------------------------------------- NSIS sidebar 164x314
 W, H = 164, 314
@@ -136,12 +133,11 @@ def text3(text, cx, y, color, scale=2):
 text3("PMCS LAUNCHER", W // 2, 148, (201, 255, 214), 3)
 text3("MINECRAFT JAVA", W // 2, 178, (110, 231, 149), 1)
 text3("PIXEL EDITION", W // 2, 188, (74, 160, 104), 1)
-text3("VERSION 2.7.2", W // 2, 210, (143, 212, 164), 1)
+text3("VERSION 2.7.3", W // 2, 210, (143, 212, 164), 1)
 for y in (232, 236):
     sd.line((24, y, W - 24, y), fill=(33, 86, 55))
 side.paste(icon512.resize((44, 44), Image.Resampling.NEAREST), (60, 248))
 for (x, y) in [(18, 270), (22, 266), (26, 274), (140, 266), (136, 272)]:
     sd.rectangle((x, y, x + 3, y + 3), fill=(56, 156, 92))
 side.save(ASSETS / "installer-sidebar.bmp")
-side.save(ASSETS / "installer-sidebar.png")
 print("brand assets written to", ASSETS)
