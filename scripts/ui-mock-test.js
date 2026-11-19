@@ -159,7 +159,7 @@ async function main() {
   });
   const page = await browser.newPage();
   const errors = [];
-  page.on('pageerror', (err) => errors.push(`PAGEERROR: ${err.message}`));
+  page.on('pageerror', (err) => errors.push(`PAGEERROR: ${err.message}\n${err.stack || ''}`));
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(`CONSOLE: ${msg.text()}`);
   });
@@ -446,9 +446,12 @@ async function main() {
       await page.waitForSelector('#mods-content .mod-card', { timeout: 20000 });
     }
     if (name === 'lan') {
-      await page.evaluate(() => document.querySelector('#playit-panel')?.scrollIntoView({ block: 'center' }));
+      await page.click('[data-action="open-tunnel-methods"]');
+      await page.waitForSelector('.tunnel-modal');
       await new Promise((r) => setTimeout(r, 350));
       await page.screenshot({ path: path.join(OUT, 'lan-playit.png') });
+      await page.click('[data-action="scan-close-modal"]');
+      await page.waitForFunction(() => !document.querySelector('.modal'), { timeout: 10000 });
     }
   }
 
@@ -489,10 +492,10 @@ async function main() {
   await new Promise((r) => setTimeout(r, 600));
   await page.screenshot({ path: path.join(OUT, 'lan-open.png') });
 
-  await page.evaluate(() => document.querySelector('.tailscale-panel')?.scrollIntoView({ block: 'center' }));
+  await page.click('[data-action="open-tunnel-methods"]');
+  await page.waitForSelector('.tunnel-modal');
   await new Promise((r) => setTimeout(r, 500));
   await page.screenshot({ path: path.join(OUT, 'lan-tailscale.png') });
-  await page.evaluate(() => window.scrollTo(0, 0));
 
   await page.click('[data-action="tailscale-guide"]');
   await page.waitForSelector('.lan-guide');

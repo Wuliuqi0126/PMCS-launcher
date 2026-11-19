@@ -55,7 +55,11 @@ function inFabricRange(version, predicate) {
   const expression = String(predicate || '').trim();
   if (!expression || expression === '*') return true;
   if (expression.includes(' ')) return expression.split(/\s+/).every((part) => inFabricRange(value, part));
-  if (expression.endsWith('.x')) return value.toLowerCase().startsWith(expression.slice(0, -1).toLowerCase());
+  if (expression.endsWith('.x')) {
+    const prefix = expression.slice(0, -1).toLowerCase();
+    const base = prefix.slice(0, -1);
+    return value.toLowerCase() === base || value.toLowerCase().startsWith(prefix);
+  }
   const match = /^(>=|<=|>|<|=|~|\^)?\s*(.+)$/.exec(expression);
   if (!match) return true;
   const [, operator = '=', rawTarget] = match;
@@ -141,6 +145,7 @@ function parseFabricJson(text) {
     version: String(data.version || '').replace(/\$\{file\.jarVersion\}/g, ''),
     dependencies: [...dependencies, ...optional],
     breaks: Object.entries(data.breaks || {}).map(([id, range]) => ({ id, range: Array.isArray(range) ? range[0] : range })),
+    provides: Array.isArray(data.provides) ? data.provides.map(String) : [],
     environment: String(data.environment || '*'),
     loader: 'fabric',
     raw: data,
@@ -234,6 +239,7 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
   const info = [];
   const installed = [];
   const byId = new Map();
+  const providedBy = new Map();
   let files = [];
   try {
     files = fs.readdirSync(modsDir, { withFileTypes: true })
@@ -273,6 +279,10 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
         blocking.push({ kind: 'duplicate', title: mod.name || filename, message: `发现重复 modId：${mod.id}`, filename, id: mod.id, action: 'disable' });
       } else {
         byId.set(modKey, mod);
+        for (const provided of mod.provides || []) {
+          const key = String(provided || '').toLowerCase();
+          if (key && !providedBy.has(key)) providedBy.set(key, mod);
+        }
       }
       installed.push(mod);
       if (!mod.version) {
@@ -301,11 +311,12 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
           continue;
         }
         if (depId === 'java') continue;
-        const target = byId.get(depId);
+        const virtualFabricModule = depId.startsWith('fabric-');
+        const target = byId.get(depId) || providedBy.get(depId) || (virtualFabricModule ? byId.get('fabric-api') : null);
         if (!target) {
           const item = { kind: 'missing-dependency', title: mod.name || mod.id, message: `缺少前置 ${dep.id}${dep.range ? `（${dep.range}）` : ''}`, filename: mod.filename, id: mod.id, dependency: dep.id, action: 'disable' };
           (dep.mandatory ? blocking : warnings).push(item);
-        } else if (dep.range && target.version && !inFabricRange(target.version, dep.range)) {
+        } else if (!virtualFabricModule && dep.range && target.version && !inFabricRange(target.version, dep.range)) {
           blocking.push({ kind: 'dependency-version', title: mod.name || mod.id, message: `前置 ${dep.id} 需要 ${dep.range}，当前 ${target.version}`, filename: mod.filename, id: mod.id, action: 'disable' });
         }
       }
