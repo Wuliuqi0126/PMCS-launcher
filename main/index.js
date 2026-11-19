@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray, nativeImage, nativeTheme } = require('electron');
 const { Store } = require('./store');
 const { Accounts } = require('./accounts');
@@ -27,6 +28,7 @@ const { createOfflineLan } = require('./offline-lan');
 const { createSaveShare } = require('./save-share');
 const { createModCheck } = require('./mod-check');
 const { createShaderLoader } = require('./shader-loader');
+const { createModCleanup } = require('./mod-cleanup');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -83,6 +85,7 @@ let launcher = null;
 let mods = null;
 let modCheck = null;
 let shaderLoader = null;
+let modCleanup = null;
 let skins = null;
 let cacheManager = null;
 let guides = null;
@@ -306,6 +309,10 @@ function buildBootstrap() {
 
 function registerIpc() {
   ipcMain.handle('app:bootstrap', () => buildBootstrap());
+  ipcMain.handle('system:memory', () => ({
+    totalMb: Math.round(os.totalmem() / 1048576),
+    freeMb: Math.round(os.freemem() / 1048576),
+  }));
 
   ipcMain.handle('app:openExternal', async (_event, url) => {
     const value = String(url || '');
@@ -589,6 +596,8 @@ function registerIpc() {
 
   ipcMain.handle('components:list', async (_event, instanceId) => components.list(String(instanceId)));
   ipcMain.handle('shaders:provision', async (_event, id) => shaderLoader.provision(String(id)));
+  ipcMain.handle('mods:cleanup-preview', async (_event, id) => modCleanup.scan(String(id)));
+  ipcMain.handle('mods:cleanup-apply', async (_event, id) => modCleanup.apply(String(id)));
   ipcMain.handle('components:toggle', async (_event, payload) => {
     return components.toggle(
       String(payload?.instanceId || ''),
@@ -701,6 +710,7 @@ app.whenReady().then(() => {
   mods = createMods({ store, tasks });
   modCheck = createModCheck({ store });
   shaderLoader = createShaderLoader({ store, mods });
+  modCleanup = createModCleanup({ store });
   offlineLan = createOfflineLan({ store, mods });
   saveShare = createSaveShare({
     app,

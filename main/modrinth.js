@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { fetchJson, downloadFile } = require('./http');
 const { translateQuery } = require('./mod-search-i18n');
 const { ensureDir, readJson, writeJson, exists, fileSize, sanitizeFileName } = require('./util');
@@ -382,12 +383,30 @@ function createMods({ store, tasks }) {
     try { files = fs.readdirSync(dir); } catch (_) { /* empty */ }
     const items = [];
     const filePattern = module === 'shaders' ? /\.zip$/i : /\.jar(\.disabled)?$/i;
+    let manifestChanged = false;
     for (const filename of files) {
       if (!filePattern.test(filename)) continue;
       const full = path.join(dir, filename);
       const enabled = !filename.endsWith('.disabled');
       let meta = manifest.mods[filename];
       if (!meta && enabled) meta = manifest.mods[`${filename}.disabled`];
+      if (!meta && module === 'mods') {
+        let sha1 = '';
+        try { sha1 = crypto.createHash('sha1').update(fs.readFileSync(full)).digest('hex'); } catch (_) { /* ignore */ }
+        meta = {
+          projectId: '',
+          source: 'local',
+          manual: true,
+          title: filename.replace(/\.jar(\.disabled)?$/i, ''),
+          filename,
+          versionNumber: '',
+          sha1,
+          installedAt: new Date().toISOString(),
+          enabled,
+        };
+        manifest.mods[filename] = meta;
+        manifestChanged = true;
+      }
       items.push({
         filename,
         enabled,
@@ -406,6 +425,7 @@ function createMods({ store, tasks }) {
       if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
       return a.title.localeCompare(b.title, 'zh-CN');
     });
+    if (manifestChanged) saveManifest(instance, manifest, module);
     return items;
   }
 

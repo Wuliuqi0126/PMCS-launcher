@@ -49,6 +49,7 @@ const state = {
     peers: [],
     self: null,
   },
+  systemMemory: { totalMb: 0, freeMb: 0 },
   ipv6: {
     status: null,
     loading: false,
@@ -1415,6 +1416,12 @@ async function reloadBoot(render = true) {
   try {
     state.boot = await api.invoke('app:bootstrap');
     state.running = new Map(state.boot.running.map((item) => [item.instanceId, item]));
+    if (!state.systemMemory.totalMb) {
+      api.invoke('system:memory').then((info) => {
+        state.systemMemory = info || state.systemMemory;
+        if (state.route === 'settings') renderRoute();
+      }).catch(() => {});
+    }
     syncSelection();
     renderShell();
     if (render) renderRoute();
@@ -2778,13 +2785,23 @@ async function deleteInstance(instance) {
   }
 }
 
+function offlineAccountMode() {
+  const account = getAccount();
+  return !account || account.type !== 'microsoft';
+}
+
+function offlineAuthNoise(line) {
+  return /realms|realmservice|invalidcredentials|status:\s*40[13]|profile key pair|failed to fetch user properties|sessionserver\.mojang\.com\/session/i.test(String(line || ''));
+}
+
 async function openLogsModal(instanceId) {
   const instance = getInstance(instanceId);
+  const offline = offlineAccountMode();
   const dialog = openModal({
     title: '运行日志',
     subtitle: instance ? `${instance.name} · 实时输出` : '最近一次游戏输出',
     wide: true,
-    body: `<div class="log-view" id="log-view"><span class="faint">正在读取日志…</span></div>
+    body: `${offline ? `<div class="notice info">${icon('info', 14)}<span>离线账号模式：已隐藏 Realms 和 Mojang 正版验证错误。</span></div>` : ''}<div class="log-view" id="log-view"><span class="faint">正在读取日志…</span></div>
       <div class="log-foot">
         <span class="form-note" id="log-path">${h(instance ? `${state.boot.config.gameDir}\\logs` : '')}</span>
         <div style="display:flex;gap:7px">
@@ -2820,6 +2837,7 @@ async function openLogsModal(instanceId) {
 }
 
 function appendSingleLog(box, line) {
+  if (offlineAccountMode() && offlineAuthNoise(line)) return;
   const div = document.createElement('div');
   div.className = 'log-line';
   if (/error|exception|failed|crash/i.test(line)) div.classList.add('error');
@@ -3443,6 +3461,11 @@ function paintComponentSettings() {
         <span class="count">${(categories[kind] || []).filter((item) => item.enabled).length} / ${(categories[kind] || []).length}</span>
       </button>`).join('')}
     </div>
+    ${s.tab === 'mods' ? `<div class="shader-loader-callout mod-cleanup-callout">
+      <span class="shader-loader-icon">${icon('trash', 18)}</span>
+      <div><strong>重复 / 跨版本模组清理</strong><p>扫描同名 modId、重复 Fabric API 和明显不属于当前版本的 jar；确认后移到实例内的备份目录，不会直接删除。</p></div>
+      <button class="btn btn-secondary btn-sm" data-action="mods-cleanup-preview" ${s.busy ? 'disabled' : ''}>${s.busy === 'cleanup' ? '<span class="spinner"></span> 扫描中' : `${icon('search', 12)} 扫描并清理`}</button>
+    </div>` : ''}
     ${s.tab === 'shaderpacks' ? `<div class="shader-loader-callout">
       <span class="shader-loader-icon">${icon('sparkles', 18)}</span>
       <div><strong>光影加载器</strong><p>${h(shaderLoaderHint)}</p></div>
@@ -3484,6 +3507,59 @@ async function loadComponentSettings() {
   } finally {
     s.loading = false;
     paintComponentSettings();
+  }
+}
+
+async function previewModsCleanup() {
+  const id = state.components.instanceId;
+  if (!id || state.components.busy) return;
+  state.components.busy = 'cleanup';
+  paintComponentSettings();
+  try {
+    const plan = await api.invoke('mods:cleanup-preview', id);
+    state.components.cleanupPlan = plan;
+    if (!plan.remove?.length) {
+      toast('没有需要清理的模组', '未发现重复或跨版本 jar', 'success', 5000);
+      return;
+    }
+    openModal({
+      title: '清理重复 / 跨版本模组',
+      subtitle: `将移动 ${plan.remove.length} 个文件到实例内的备份目录，不会直接删除`,
+      wide: true,
+      body: `<div class="mod-cleanup-modal">
+        <div class="notice warn">${icon('alert', 15)}<span>只处理当前实例的 mods 目录。移动后可在 <code>mods/.oasis-cleanup/</code> 中找回。</span></div>
+        <div class="mod-cleanup-list">${plan.remove.map((item) => `<div class="mod-cleanup-row">
+          <span class="mod-cleanup-icon">${icon('trash', 14)}</span>
+          <div><strong>${h(item.title || item.filename)}</strong><p>${h(item.filename)}</p></div>
+          <span class="chip amber">${h(item.reason)}</span>
+        </div>`).join('')}</div>
+        <p class="field-hint">保留：${plan.keep.length} 个模组。清理后建议重启游戏。</p>
+      </div>`,
+      footer: `<button class="btn btn-ghost" data-action="scan-close-modal">取消</button><button class="btn btn-danger" data-action="mods-cleanup-apply">${icon('trash', 13)} 确认清理</button>`,
+    });
+  } catch (err) {
+    toast('扫描模组失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.components.busy = '';
+    paintComponentSettings();
+  }
+}
+
+async function applyModsCleanup() {
+  const id = state.components.instanceId;
+  const plan = state.components.cleanupPlan;
+  if (!id || !plan?.remove?.length || state.components.busy) return;
+  state.components.busy = 'cleanup';
+  try {
+    const result = await api.invoke('mods:cleanup-apply', id);
+    closeModal();
+    state.components.cleanupPlan = null;
+    toast('模组清理完成', `已移动 ${result.moved?.length || 0} 个文件到备份目录`, 'success', 8000);
+    await loadComponentSettings();
+  } catch (err) {
+    toast('清理失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.components.busy = '';
   }
 }
 
@@ -5868,7 +5944,12 @@ function renderSettingsRoute() {
   const config = state.boot.config;
   const account = getAccount();
   const memory = Number(config.memoryMb) || 4096;
-  const rangePct = ((memory - 1024) / (16384 - 1024)) * 100;
+  const totalMb = Number(state.systemMemory.totalMb) || 16384;
+  const hardMax = Math.max(2048, Math.min(16384, Math.floor((totalMb * 0.75) / 512) * 512));
+  const warnAt = Math.max(1024, Math.min(hardMax, Math.floor((totalMb * 0.5) / 512) * 512));
+  const sliderValue = Math.min(memory, hardMax);
+  const memoryWarning = memory > warnAt;
+  const rangePct = ((sliderValue - 1024) / (hardMax - 1024)) * 100;
   const javaPath = config.javaPath || state.javaDetect?.java?.path || '';
   const detected = state.javaDetect;
   $('#view').innerHTML = `<div class="page-enter">
@@ -5905,9 +5986,13 @@ function renderSettingsRoute() {
         <div class="setting-row">
           <div class="setting-info"><strong>游戏内存</strong><p>为 Java 分配的最大堆内存。大型整合包建议 6–8 GB。</p></div>
           <div class="setting-control">
-            <input class="range" id="memory-range" type="range" min="1024" max="16384" step="512" value="${memory}" style="--range-pct:${rangePct}%">
-            <span class="memory-value" id="memory-value">${formatMemoryMb(memory)}</span>
+            <input class="range" id="memory-range" type="range" min="1024" max="${hardMax}" step="512" value="${sliderValue}" style="--range-pct:${rangePct}%">
+            <span class="memory-value" id="memory-value">${formatMemoryMb(sliderValue)}</span>
           </div>
+        </div>
+        <div class="memory-hint ${memoryWarning ? 'warn' : ''}">
+          <span>系统内存 ${formatMemoryMb(totalMb)} · 50% 警戒线 ${formatMemoryMb(warnAt)} · 滑块上限 ${formatMemoryMb(hardMax)}</span>
+          ${memoryWarning ? `<strong>${memory > hardMax ? '当前分配已超过系统安全上限，已临时限制滑块；请立即下调。' : '当前分配超过系统内存 50%，可能导致系统卡顿或游戏掉帧。'}</strong>` : ''}
         </div>
         <div class="setting-row">
           <div class="setting-info"><strong>游戏语言</strong><p>启动前写入实例的 options.txt，让游戏直接以中文显示。Minecraft 原生自带简体中文，不需要额外翻译文件。</p></div>
@@ -6759,6 +6844,12 @@ async function runAction(action, el, event) {
         break;
       case 'enable-shader-loader':
         await enableShaderLoader();
+        break;
+      case 'mods-cleanup-preview':
+        await previewModsCleanup();
+        break;
+      case 'mods-cleanup-apply':
+        await applyModsCleanup();
         break;
       case 'component-toggle':
         await toggleComponent(el.dataset.kind, el.dataset.file, el.dataset.enabled === '1');

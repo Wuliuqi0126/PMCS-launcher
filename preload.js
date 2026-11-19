@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer, clipboard } = require('electron');
 
 const INVOKE_CHANNELS = new Set([
   'app:bootstrap',
+  'system:memory',
   'app:openExternal',
   'app:openPath',
   'app:pickDirectory',
@@ -82,6 +83,8 @@ const INVOKE_CHANNELS = new Set([
   'skins:openFolder',
   'components:list',
   'shaders:provision',
+  'mods:cleanup-preview',
+  'mods:cleanup-apply',
   'components:toggle',
   'tailscale:status',
   'tailscale:install',
