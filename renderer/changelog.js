@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.8.0',
+    title: '模组清理与内存安全',
+    current: true,
+    items: [
+      '新增重复/跨版本模组一键清理，文件移动到 mods/.oasis-cleanup。',
+      '内存滑块按系统内存 75% 自动限制，超过 50% 显示警告。',
+      '手动放入 mods 的 jar 自动登记到 .oasis-mods.json。',
+      '离线账号日志隐藏 Realms 和 Mojang 正版验证错误。',
+    ],
+  },
+  {
     version: '2.7.3',
     title: 'Fabric 前置误报修复',
-    current: true,
     items: [
       '支持 Fabric API 的 provides 虚拟模块，不再误报缺少 fabric/fabric-* 前置。',
       '支持 26.3.x 通配版本范围。',
