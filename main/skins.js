@@ -128,7 +128,12 @@ function createSkins({ store, mods, accounts, getWindow }) {
     if (!account?.name) throw new Error('请先创建或登录账户');
     let installed = [];
     try { installed = await mods.listInstalled(instance.id, 'mods'); } catch (_) { installed = []; }
-    const hasLoader = installed.some((item) => item.projectId === CUSTOM_SKIN_LOADER_PROJECT || /customskinloader/i.test(item.filename));
+    const loader = installed.find((item) => item.enabled && (item.projectId === CUSTOM_SKIN_LOADER_PROJECT || /customskinloader/i.test(item.filename)));
+    const needsUniversal = String(instance.versionId).startsWith('26.');
+    const hasLoader = Boolean(loader && (!needsUniversal || /bootstrap|universal|15\./i.test(loader.filename)));
+    if (loader && needsUniversal && !hasLoader) {
+      await mods.setEnabled(instance.id, loader.filename, false);
+    }
     if (!hasLoader) {
       await mods.install(instance.id, CUSTOM_SKIN_LOADER_PROJECT, {
         source: 'modrinth',

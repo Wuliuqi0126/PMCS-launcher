@@ -269,6 +269,16 @@ function checkInstanceConfig(instance, modsDir, options = {}) {
         blocking.push({ kind: 'loader', title: mod.name || filename, message: `${mod.loader} 模组不能加载到 ${instance.loader} 实例`, filename, id: mod.id, action: 'disable' });
         continue;
       }
+      if (String(instance.versionId).startsWith('26.') && /customskinloader/i.test(`${mod.id || ''} ${filename}`) && /customskinloader_fabric-14|customskinloader.*14\./i.test(filename)) {
+        blocking.push({
+          kind: 'class-tweaker',
+          title: mod.name || filename,
+          message: '旧版 CustomSkinLoader 14.x 的 classTweaker 命名空间与 26.x 不兼容，请清理并安装 CustomSkinLoader Universal 15.1+',
+          filename,
+          id: mod.id,
+          action: 'disable',
+        });
+      }
       if (mod.environment === 'server') {
         info.push({ kind: 'environment', title: mod.name || filename, message: '这是服务端模组，客户端不需要加载', filename });
       }
