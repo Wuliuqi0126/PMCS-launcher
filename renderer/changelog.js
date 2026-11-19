@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.7.3',
+    title: 'Fabric 前置误报修复',
+    current: true,
+    items: [
+      '支持 Fabric API 的 provides 虚拟模块，不再误报缺少 fabric/fabric-* 前置。',
+      '支持 26.3.x 通配版本范围。',
+      '首页网络信息未加载时不再抛空引用错误。',
+      'UI 自动化测试适配隧道方式弹窗。',
+    ],
+  },
+  {
     version: '2.7.2',
     title: '修复游戏内无法移动',
-    current: true,
     items: [
       '不再每 250ms 重复关联 IME 上下文和切换键盘布局。',
       '每个游戏窗口只完整禁用一次输入法，每个焦点只切换一次布局。',
