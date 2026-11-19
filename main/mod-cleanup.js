@@ -18,6 +18,7 @@ function createModCleanup({ store }) {
 
   function filenameMismatch(filename, versionId) {
     if (String(versionId).startsWith('26.')) {
+      if (/customskinloader_fabric-14|customskinloader.*14\./i.test(filename)) return true;
       return /(?:^|[-_+])1\.21(?:\.\d+)?(?=[-_.+]|$)/i.test(filename);
     }
     if (String(versionId).startsWith('1.21.')) {

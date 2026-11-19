@@ -6,9 +6,18 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.8.1',
+    title: 'CustomSkinLoader 26.3 修复',
+    current: true,
+    items: [
+      '26.x 实例阻止旧版 CustomSkinLoader 14.x 启动。',
+      '应用皮肤时自动改用 CustomSkinLoader Universal 15.1。',
+      '清理工具识别旧版 CustomSkinLoader 为跨版本模组。',
+    ],
+  },
+  {
     version: '2.8.0',
     title: '模组清理与内存安全',
-    current: true,
     items: [
       '新增重复/跨版本模组一键清理，文件移动到 mods/.oasis-cleanup。',
       '内存滑块按系统内存 75% 自动限制，超过 50% 显示警告。',
