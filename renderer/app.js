@@ -5111,7 +5111,8 @@ function ipv6PanelHtml() {
       </div>
 
       <div class="invite-guest">
-        <label for="invite-join-key">客机：输入主机密钥名</label>
+        <div class="invite-guest-head"><span>${icon('user', 14)}</span><div><strong>客机加入</strong><small>粘贴主机生成的完整密钥</small></div></div>
+        <label for="invite-join-key">输入主机密钥</label>
         <div class="input-row">
           <input class="input" id="invite-join-key" placeholder="粘贴主机复制的完整密钥" autocomplete="off">
           <button class="icon-btn invite-clear-key" data-action="invite-clear-key" title="清空密钥" aria-label="清空密钥">${icon('x', 13)}</button>
@@ -6192,11 +6193,19 @@ function renderSettingsRoute() {
       <section class="panel settings-panel">
         <div class="settings-head"><span class="head-icon">${icon('gamepad', 16)}</span><div><h3>游戏与性能</h3><p>控制实例位置与游戏内存</p></div></div>
         <div class="setting-row">
-          <div class="setting-info"><strong>游戏目录</strong><p>版本、资源、实例与日志都保存在这里。</p></div>
+          <div class="setting-info"><strong>游戏目录</strong><p>实例、存档、版本、运行库和日志。更改时会先迁移并校验，再删除旧目录。</p></div>
           <div class="setting-control">
             <span class="path-box" title="${h(config.gameDir)}">${h(config.gameDir)}</span>
-            <button class="btn btn-secondary btn-sm" data-action="settings-pick-dir">更改</button>
+            <button class="btn btn-secondary btn-sm" data-action="settings-migrate-game">迁移</button>
             <button class="icon-btn" title="打开目录" data-action="open-game-dir">${icon('folder', 15)}</button>
+          </div>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info"><strong>资源目录</strong><p>模组、光影、材质包、整合包和皮肤。更改时会迁移到新目录并建立实例链接。</p></div>
+          <div class="setting-control">
+            <span class="path-box" title="${h(config.resourceDir || config.gameDir)}">${h(config.resourceDir || config.gameDir)}</span>
+            <button class="btn btn-secondary btn-sm" data-action="settings-migrate-resources">迁移</button>
+            <button class="icon-btn" title="打开资源目录" data-action="open-resource-dir">${icon('folder', 15)}</button>
           </div>
         </div>
         <div class="setting-row">
@@ -6436,6 +6445,43 @@ async function applyDownloadSource(source) {
     fmm: '后续下载将使用 FastMinecraftMirror',
   };
   toast('下载源已切换', messages[next], 'info');
+}
+
+async function migrateStorageDir(type) {
+  const config = state.boot.config;
+  const isGame = type === 'game';
+  const current = isGame ? config.gameDir : (config.resourceDir || config.gameDir);
+  try {
+    const dir = await api.invoke('app:pickDirectory', {
+      title: isGame ? '选择新的游戏目录' : '选择新的资源目录',
+      defaultPath: current,
+    });
+    if (!dir || pathNormalize(dir) === pathNormalize(current)) return;
+    const answer = await confirmDialog({
+      title: isGame ? '迁移游戏目录' : '迁移资源目录',
+      message: `将把当前内容迁移到 <strong>${h(dir)}</strong>。<br><br>启动器会先复制并校验，校验通过后才删除原目录。<br>如果目标目录里已有其他文件，会自动创建新的子文件夹。<br><br><b>迁移期间请不要启动游戏。</b>`,
+      confirmText: '开始迁移',
+      danger: true,
+    });
+    if (!answer.confirmed) return;
+    toast('正在迁移目录', '文件较多时可能需要几分钟，请勿关闭启动器', 'info', 60000);
+    const result = await api.invoke('paths:migrate', { type, path: dir });
+    await reloadBoot(false);
+    state.versions = null;
+    resetModsState();
+    state.boot = await api.invoke('app:bootstrap');
+    state.selectedInstanceId = state.boot.library.activeInstanceId || state.boot.library.instances[0]?.id || null;
+    syncSelection();
+    renderShell();
+    renderRoute();
+    toast(isGame ? '游戏目录迁移完成' : '资源目录迁移完成', `${result.path} · 已校验 ${result.files || 0} 个文件`, 'success', 9000);
+  } catch (err) {
+    toast('目录迁移失败', cleanError(err), 'error', 12000);
+  }
+}
+
+function pathNormalize(value) {
+  return String(value || '').replace(/[\\/]+/g, '\\').replace(/\\$/, '').toLowerCase();
 }
 
 async function chooseGameDir() {
@@ -7529,6 +7575,15 @@ async function runAction(action, el, event) {
         break;
       case 'settings-pick-dir':
         await chooseGameDir();
+        break;
+      case 'settings-migrate-game':
+        await migrateStorageDir('game');
+        break;
+      case 'settings-migrate-resources':
+        await migrateStorageDir('resources');
+        break;
+      case 'open-resource-dir':
+        await openPath(state.boot.config.resourceDir || state.boot.config.gameDir);
         break;
       case 'settings-pick-java':
         await pickJavaForSettings();

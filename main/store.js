@@ -8,6 +8,7 @@ const {
 
 const DEFAULT_CONFIG = {
   gameDir: '',
+  resourceDir: '',
   memoryMb: 4096,
   javaPath: '',
   downloadSource: 'auto',
@@ -84,6 +85,10 @@ class Store {
     return this.config.gameDir;
   }
 
+  get resourceRoot() {
+    return this.config.resourceDir || this.config.gameDir;
+  }
+
   get instances() {
     return this.library.instances;
   }
@@ -94,6 +99,26 @@ class Store {
 
   instanceDir(instance) {
     return path.join(this.gameDir, 'instances', instance.id);
+  }
+
+  ensureResourceLinks(instance) {
+    if (!instance?.id || this.resourceRoot === this.gameDir) return;
+    const kinds = ['mods', 'resourcepacks', 'shaderpacks', 'modpacks'];
+    for (const kind of kinds) {
+      const target = path.join(this.resourceRoot, 'instances', instance.id, kind);
+      const link = path.join(this.instanceDir(instance), kind);
+      ensureDir(target);
+      try {
+        if (fs.existsSync(link)) {
+          let stat;
+          try { stat = fs.lstatSync(link); } catch (_) { stat = null; }
+          if (stat?.isSymbolicLink()) continue;
+          if (fs.readdirSync(link).length === 0) fs.rmdirSync(link);
+          else continue;
+        }
+        fs.symlinkSync(target, link, 'junction');
+      } catch (_) { /* fall back to a normal instance directory */ }
+    }
   }
 
   upsertInstance(instance) {
@@ -149,6 +174,7 @@ class Store {
       totalPlayMs: 0,
     };
     this.upsertInstance(instance);
+    this.ensureResourceLinks(instance);
     return this.getInstance(id);
   }
 
@@ -174,6 +200,7 @@ class Store {
   publicConfig() {
     return {
       gameDir: this.config.gameDir,
+      resourceDir: this.resourceRoot,
       memoryMb: this.config.memoryMb,
       javaPath: this.config.javaPath,
       downloadSource: this.config.downloadSource,
@@ -195,7 +222,7 @@ class Store {
   }
 
   updateConfig(patch) {
-    const allowed = ['memoryMb', 'javaPath', 'downloadSource', 'gameLanguage', 'closeOnLaunch', 'showGameLog', 'msClientId', 'activeAccountId', 'announcementSeenVersion', 'closeAction', 'modSource', 'modMirror', 'lastLanInstanceId'];
+    const allowed = ['memoryMb', 'javaPath', 'downloadSource', 'gameLanguage', 'closeOnLaunch', 'showGameLog', 'msClientId', 'activeAccountId', 'announcementSeenVersion', 'closeAction', 'modSource', 'modMirror', 'lastLanInstanceId', 'resourceDir'];
     let gameDirChanged = false;
     const next = { ...this.config };
     for (const key of allowed) {
@@ -208,6 +235,7 @@ class Store {
         gameDirChanged = true;
       }
     }
+    if (patch.resourceDir) next.resourceDir = path.resolve(String(patch.resourceDir));
     if (next.memoryMb) {
       next.memoryMb = Math.max(1024, Math.min(32768, Math.round(Number(next.memoryMb) || 4096)));
     }
