@@ -5558,8 +5558,7 @@ function renderLanRoute() {
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
   if (!state.lan.initialized) refreshLanState();
-  loadSaveShareSaves().then(() => refreshSaveShareState());
-  refreshSaveShareState();
+  loadSaveShareSaves().then(() => refreshSaveShareState()).catch(() => {});
   startLanScan();
   startIntegrationWatch();
   if (host && state.lan.worldsInstanceId !== host.id && !state.lan.worldsLoading) {

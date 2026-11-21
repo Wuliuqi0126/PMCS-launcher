@@ -6,9 +6,18 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.9.1',
+    title: '联机页面卡顿修复',
+    current: true,
+    items: [
+      'IPv6 防火墙、端口和管理员检测改为异步执行，不再阻塞主进程。',
+      '防火墙规则增加 8 秒缓存。',
+      '联机页重复的存档共享刷新合并为一次。',
+    ],
+  },
+  {
     version: '2.9.0',
     title: '整合包与材质包市场',
-    current: true,
     items: [
       '模组市场新增「整合包」「材质包」模块。',
       '整合包/材质包聚合 Modrinth + CurseForge 搜索与来源展示。',

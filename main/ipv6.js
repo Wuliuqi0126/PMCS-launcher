@@ -181,6 +181,80 @@ function listeningOnIpv6(port) {
   }
 }
 
+async function isAdminAsync() {
+  if (process.platform !== 'win32') return false;
+  try {
+    await run('net', ['session'], 2500);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+const ruleCache = new Map();
+const RULE_CACHE_MS = 8000;
+
+async function readRuleAsync(name) {
+  if (process.platform !== 'win32') return null;
+  const cached = ruleCache.get(name);
+  if (cached && Date.now() - cached.at < RULE_CACHE_MS) return cached.value;
+  let value = null;
+  try {
+    const safeName = String(name).replace(/'/g, "''");
+    const script = [
+      `$r = Get-NetFirewallRule -DisplayName '${safeName}' -ErrorAction SilentlyContinue | Select-Object -First 1`,
+      "if (-not $r) { '{\"exists\":false}'; exit 0 }",
+      '$p = $r | Get-NetFirewallPortFilter',
+      '[pscustomobject]@{ exists = $true; localPort = [string]$p.LocalPort; remoteAddress = [string]$p.RemoteAddress; enabled = [string]$r.Enabled } | ConvertTo-Json -Compress',
+    ].join('\n');
+    const result = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], 5000);
+    const data = JSON.parse(String(result.stdout || '').replace(/^\uFEFF/, '').trim());
+    if (data?.exists && String(data.enabled).toLowerCase() !== 'false') {
+      const range = String(data.localPort || '').trim();
+      value = { name, range, port: /^\d+$/.test(range) ? Number(range) : 0, remoteAddress: String(data.remoteAddress || '') };
+    }
+  } catch (_) {
+    try {
+      const result = await run('netsh', ['advfirewall', 'firewall', 'show', 'rule', `name=${name}`], 3500);
+      const text = String(result.stdout || '');
+      const knownRange = /(49152-65535)/.exec(text)?.[1] || '';
+      const match = /(?:LocalPort|本地端口):\s*(\S+)/i.exec(text);
+      const range = knownRange || (match ? String(match[1]).trim() : '');
+      if (range) value = { name, range, port: /^\d+$/.test(range) ? Number(range) : 0 };
+    } catch (_) { value = null; }
+  }
+  ruleCache.set(name, { at: Date.now(), value });
+  return value;
+}
+
+async function ruleInfoAsync(port = 0) {
+  if (process.platform !== 'win32') return { exists: false, port: 0, admin: false };
+  const permanent = await readRuleAsync(PERMANENT_RULE_NAME);
+  if (permanent && ruleCovers(permanent, port)) {
+    return { exists: true, port: permanent.port, range: permanent.range, permanent: true, name: permanent.name, admin: await isAdminAsync() };
+  }
+  const dynamic = await readRuleAsync(RULE_NAME);
+  if (dynamic && ruleCovers(dynamic, port)) {
+    return { exists: true, port: dynamic.port, range: dynamic.range, permanent: false, name: dynamic.name, admin: await isAdminAsync() };
+  }
+  const found = permanent || dynamic;
+  return { exists: false, port: found?.port || 0, range: found?.range || '', permanent: Boolean(permanent), name: found?.name || '', admin: await isAdminAsync() };
+}
+
+async function listeningOnIpv6Async(port) {
+  if (!port) return false;
+  try {
+    const result = await run('netstat', ['-ano', '-p', 'TCPv6'], 3500);
+    return String(result.stdout || '').split(/\r?\n/).some((line) => {
+      if (!/LISTENING/i.test(line)) return false;
+      const match = /\[[^\]]*\]:(\d+)\s+\[[^\]]*\]:\d+\s+LISTENING/i.exec(line);
+      return Boolean(match && Number(match[1]) === port);
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
 function elevatedNetsh(args) {
   const list = args.map((item) => `'${String(item).replace(/'/g, "''")}'`).join(',');
   const script = `$p = Start-Process -FilePath 'netsh.exe' -ArgumentList @(${list}) -Verb RunAs -Wait -PassThru; exit $p.ExitCode`;
@@ -207,12 +281,14 @@ async function addFirewallRule(port) {
   if (isAdmin()) {
     try { await run('netsh', deleteArgs); } catch (_) { /* rule may not exist */ }
     await run('netsh', addArgs);
+    ruleCache.clear();
     return;
   }
   try {
     await elevatedNetsh(deleteArgs);
   } catch (_) { /* rule may not exist or UAC canceled */ }
   await elevatedNetsh(addArgs);
+  ruleCache.clear();
 }
 
 async function removeFirewallRule() {
@@ -222,6 +298,7 @@ async function removeFirewallRule() {
   } else {
     await elevatedNetsh(args);
   }
+  ruleCache.clear();
 }
 
 async function state(port = 0) {
@@ -229,8 +306,8 @@ async function state(port = 0) {
   const addresses = globalAddresses();
   const primary = addresses.find((item) => /^2[0-9a-f]{3}:/i.test(item.address)) || addresses[0] || null;
   const external = await externalAddress();
-  const firewall = ruleInfo(portNumber);
-  const listening = portNumber ? listeningOnIpv6(portNumber) : false;
+  const firewall = await ruleInfoAsync(portNumber);
+  const listening = portNumber ? await listeningOnIpv6Async(portNumber) : false;
   const ready = Boolean(primary && external.address && firewall.exists && (!portNumber || listening));
   const publicAddress = external.address || primary?.address || '';
   let reason = '';
