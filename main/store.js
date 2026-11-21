@@ -18,6 +18,7 @@ const DEFAULT_CONFIG = {
   activeAccountId: '',
   announcementSeenVersion: '',
   closeAction: 'ask',
+  lastLanInstanceId: '',
   modSource: 'modrinth',
   modMirror: 'mcim',
 };
@@ -182,6 +183,7 @@ class Store {
       msClientId: this.config.msClientId,
       announcementSeenVersion: this.config.announcementSeenVersion || '',
       closeAction: this.config.closeAction || 'ask',
+      lastLanInstanceId: this.config.lastLanInstanceId || '',
       modSource: this.config.modSource || 'modrinth',
       modMirror: this.config.modMirror || 'mcim',
     };
@@ -193,7 +195,7 @@ class Store {
   }
 
   updateConfig(patch) {
-    const allowed = ['memoryMb', 'javaPath', 'downloadSource', 'gameLanguage', 'closeOnLaunch', 'showGameLog', 'msClientId', 'activeAccountId', 'announcementSeenVersion', 'closeAction', 'modSource', 'modMirror'];
+    const allowed = ['memoryMb', 'javaPath', 'downloadSource', 'gameLanguage', 'closeOnLaunch', 'showGameLog', 'msClientId', 'activeAccountId', 'announcementSeenVersion', 'closeAction', 'modSource', 'modMirror', 'lastLanInstanceId'];
     let gameDirChanged = false;
     const next = { ...this.config };
     for (const key of allowed) {

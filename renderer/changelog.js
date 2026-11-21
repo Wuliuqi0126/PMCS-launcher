@@ -6,9 +6,17 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.10.2',
+    title: '共享存档默认实例修复',
+    current: true,
+    items: [
+      '保存客机最近联机实例。',
+      '联机过的共享存档默认导入最近联机实例。',
+    ],
+  },
+  {
     version: '2.10.1',
     title: '联机页面分组与密钥优化',
-    current: true,
     items: [
       '局域网联机和公网联机分别使用独立容器。',
       '安全密钥缩短，输入框增加一键清空。',
