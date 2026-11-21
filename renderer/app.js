@@ -4426,6 +4426,7 @@ async function refreshLanState() {
     state.lan.addresses = data.addresses || [];
     state.lan.discoveryError = data.discoveryError || '';
     state.lan.initialized = true;
+    state.lan.lastScanAt = Date.now();
     if (state.route === 'lan') {
       updateLanHostStatus();
       paintLanRooms(true);
@@ -5021,6 +5022,15 @@ async function copyInviteKey() {
 async function joinByInvite() {
   const raw = String($('#invite-join-key')?.value || '').trim();
   if (!raw) return toast('请输入主机密钥名', '', 'info');
+  const direct = raw.match(/^\[([0-9a-fA-F:]+)\]:(\d{1,5})$/) || raw.match(/^([A-Za-z0-9.-]+):(\d{1,5})$/);
+  if (direct) {
+    try {
+      await openRemotePreflight(direct[1], Number(direct[2]), '直连房间');
+    } catch (err) {
+      toast('直接连接失败', cleanError(err), 'error', 9000);
+    }
+    return;
+  }
   try {
     const resolved = await api.invoke('invite:resolve', raw);
     state.invite.resolved = resolved;
@@ -5104,6 +5114,7 @@ function ipv6PanelHtml() {
         <label for="invite-join-key">客机：输入主机密钥名</label>
         <div class="input-row">
           <input class="input" id="invite-join-key" placeholder="粘贴主机复制的完整密钥" autocomplete="off">
+          <button class="icon-btn invite-clear-key" data-action="invite-clear-key" title="清空密钥" aria-label="清空密钥">${icon('x', 13)}</button>
           <button class="btn btn-primary btn-sm" data-action="invite-join">${icon('arrowRight', 13)} 使用密钥加入</button>
         </div>
         <button class="btn btn-ghost btn-sm invite-reveal" data-action="invite-reveal">${icon('eye', 12)} 无法连接？点击这里直接获取 IP 地址</button>
@@ -5458,7 +5469,7 @@ function startLanScan() {
   if (lanScanTimer) return;
   lanScanTimer = setInterval(() => {
     if (state.route === 'lan' && !state.lan.loading) refreshLanState();
-  }, 3000);
+  }, 1500);
 }
 
 function stopLanScan() {
@@ -5494,6 +5505,8 @@ function renderLanRoute() {
         <button class="btn btn-secondary" data-action="lan-refresh">${icon('refresh', 15)} 刷新</button>
       </div>
     </div>
+    <section class="lan-mode-section lan-mode-lan">
+    <div class="lan-mode-head"><span class="head-icon">${icon('wifi', 16)}</span><div><h2>局域网联机</h2><p>同一 Wi-Fi、路由器或热点下的设备，无需公网 IP</p></div></div>
     ${!instances.length ? `<div class="lan-grid">
       <section class="panel lan-panel">
         <div class="settings-head"><span class="head-icon">${icon('plus', 16)}</span><div><h3>先创建实例</h3><p>没有实例也可以搜索局域网房间，但需要实例才能加入</p></div></div>
@@ -5571,17 +5584,21 @@ function renderLanRoute() {
         </div>
       </section>
     </div>`}
+    </section>
     <a class="panel share-entry-link" href="#/share">
       <span class="head-icon">${icon('folder', 16)}</span>
       <div><strong>共享资源</strong><p>共享存档、模组、资源包、光影和皮肤，或从局域网其他启动器下载。</p></div>
       ${icon('chevronRight', 16)}
     </a>
-    ${ipv6PanelHtml()}
-    <button class="panel share-entry-link tunnel-entry" data-action="open-tunnel-methods">
-      <span class="head-icon">${icon('globe', 16)}</span>
-      <div><strong>无法联机？尝试隧道方式吧！</strong><p>Tailscale 私有网络 / playit.gg 公网隧道，适合没有公网 IPv6 或端口无法映射的情况</p></div>
-      ${icon('chevronRight', 16)}
-    </button>
+    <section class="lan-mode-section lan-mode-public">
+      <div class="lan-mode-head"><span class="head-icon">${icon('globe', 16)}</span><div><h2>公网联机</h2><p>安全密钥或 IPv6 直连，适合不在同一网络的玩家</p></div></div>
+      ${ipv6PanelHtml()}
+      <button class="panel share-entry-link tunnel-entry" data-action="open-tunnel-methods">
+        <span class="head-icon">${icon('globe', 16)}</span>
+        <div><strong>无法联机？尝试隧道方式吧！</strong><p>Tailscale 私有网络 / playit.gg 公网隧道，适合没有公网 IPv6 或端口无法映射的情况</p></div>
+        ${icon('chevronRight', 16)}
+      </button>
+    </section>
   </div>`;
   state.lan.roomSignature = '';
   state.lan.hostSignature = JSON.stringify(state.lan.host || null);
@@ -5591,7 +5608,7 @@ function renderLanRoute() {
   if (!state.ipv6.status || state.ipv6.status.port !== ipv6Port()) refreshIpv6();
   if (!state.tailscale.initialized && !state.tailscale.loading) refreshTailscale();
   if (!state.playit.initialized && !state.playit.loading) refreshPlayit();
-  if (!state.lan.initialized) refreshLanState();
+  if (!state.lan.loading && (!state.lan.initialized || Date.now() - (state.lan.lastScanAt || 0) > 1500)) refreshLanState();
   loadSaveShareSaves().then(() => refreshSaveShareState()).catch(() => {});
   startLanScan();
   startIntegrationWatch();
@@ -7163,6 +7180,14 @@ async function runAction(action, el, event) {
       case 'invite-join':
         await joinByInvite();
         break;
+      case 'invite-clear-key': {
+        const input = $('#invite-join-key');
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
+        break;
+      }
       case 'invite-reveal':
         revealInviteAddress();
         break;
