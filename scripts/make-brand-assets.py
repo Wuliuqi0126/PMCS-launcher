@@ -133,7 +133,7 @@ def text3(text, cx, y, color, scale=2):
 text3("PMCS LAUNCHER", W // 2, 148, (201, 255, 214), 3)
 text3("MINECRAFT JAVA", W // 2, 178, (110, 231, 149), 1)
 text3("PIXEL EDITION", W // 2, 188, (74, 160, 104), 1)
-text3("VERSION 2.9.1", W // 2, 210, (143, 212, 164), 1)
+text3("VERSION 2.10.0", W // 2, 210, (143, 212, 164), 1)
 for y in (232, 236):
     sd.line((24, y, W - 24, y), fill=(33, 86, 55))
 side.paste(icon512.resize((44, 44), Image.Resampling.NEAREST), (60, 248))

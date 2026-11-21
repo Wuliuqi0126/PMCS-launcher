@@ -1235,6 +1235,9 @@ function bindGlobalEvents() {
     if (event.target.id === 'memory-range') {
       await saveConfig({ memoryMb: Number(event.target.value) });
     }
+    if (event.target.id === 'lan-preflight-instance') {
+      await switchLanPreflightInstance(event.target.value);
+    }
     if (event.target.id === 'game-language') {
       await saveConfig({ gameLanguage: event.target.value });
       toast('游戏语言已更新', event.target.value === 'auto' ? '启动时不会修改 options.txt' : '将在下次启动游戏前写入实例设置', 'info');
@@ -4277,21 +4280,52 @@ async function stopSaveShare() {
   }
 }
 
+function saveDownloadDefaultName(share) {
+  const host = share?.save?.multiplayerHost || share?.sender || share?.hostName || '主机';
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}`;
+  return `${host}（${stamp}）共享存档`;
+}
+
 async function downloadSharedSave(key) {
   const data = state.saveShare;
+  const shares = state.saveShare.state?.shares || data.shares || [];
+  const share = shares.find((item) => item.key === key);
+  if (!share) return toast('共享存档已失效', '请刷新后重试', 'error');
+  const instances = (state.boot.library.instances || []).filter((item) => item.status === 'ready');
+  const preferredId = share.save?.multiplayer ? (state.boot.config.lastLanInstanceId || state.lan.guestInstanceId) : '';
+  const target = instances.find((item) => item.id === preferredId)
+    || instances.find((item) => item.id === data.targetInstanceId)
+    || instances[0];
+  if (!target) return toast('请先创建实例', '需要一个已经安装完成的实例', 'info');
+  const defaultName = share.save?.multiplayer ? saveDownloadDefaultName(share) : (share.save?.name || '共享存档');
+  openModal({
+    title: '导入共享存档',
+    subtitle: share.save?.multiplayer ? '检测到这是联机游玩过的存档，已默认选择最近联机实例' : '选择导入实例和存档名称',
+    body: `<div class="lan-create-join">
+      <div class="field"><label for="save-download-name">存档名称</label><input class="input" id="save-download-name" maxlength="60" value="${h(defaultName)}"></div>
+      <div class="field"><label for="save-download-instance">导入到实例</label><select class="select" id="save-download-instance">${instances.map((item) => `<option value="${h(item.id)}" ${item.id === target.id ? 'selected' : ''}>${h(item.name)} · ${h(item.versionId)} · ${h(loaderInfo(item.loader).label)}</option>`).join('')}</select></div>
+      ${share.save?.multiplayer ? `<div class="notice info">${icon('info', 14)}<span>主机 ${h(share.save.multiplayerHost || share.sender || '')} 曾用这个存档联机，默认导入到最近联机实例。</span></div>` : ''}
+      <p class="field-hint">如果同名存档已存在，会自动添加序号，不会覆盖。</p>
+    </div>`,
+    footer: `<button class="btn btn-ghost" data-action="scan-close-modal">取消</button><button class="btn btn-primary" data-action="save-download-confirm" data-key="${h(key)}">${icon('download', 13)} 开始导入</button>`,
+  });
+}
+
+async function confirmSaveDownload(key) {
+  const data = state.saveShare;
   if (data.busy) return;
-  const target = saveShareTargetInstance();
-  if (!target) {
-    toast('请先选择导入实例', '需要一个已经安装完成的实例', 'info');
-    return;
-  }
-  data.targetInstanceId = target.id;
+  const instanceId = $('#save-download-instance')?.value || '';
+  const name = String($('#save-download-name')?.value || '').trim();
+  if (!instanceId) return toast('请选择导入实例', '', 'info');
+  data.targetInstanceId = instanceId;
   data.busy = 'download';
   data.error = '';
+  closeModal();
   paintSaveSharePanel(true);
   try {
-    const result = await api.invoke('saves:download', { instanceId: target.id, key });
-    toast('共享存档已导入', `${result.worldName || result.name}${result.sharedFrom ? ` · 来自 ${result.sharedFrom}` : ''} · ${formatDate(result.downloadedAt, true)}`, 'success', 9000);
+    const result = await api.invoke('saves:download', { instanceId, key, name });
+    toast('共享存档已导入', `${name || result.worldName || result.name}${result.sharedFrom ? ` · 来自 ${result.sharedFrom}` : ''}`, 'success', 9000);
     await loadSaveShareSaves(true);
     await refreshSaveShareState();
   } catch (err) {
@@ -5722,6 +5756,20 @@ function lanPreflightHtml(check) {
       <label><input type="checkbox" id="lan-dl-resourcepacks" ${check.hostResource.resourcepacks?.length ? '' : 'disabled'}> 资源包${check.hostResource.resourcepacks?.length ? `（${check.hostResource.resourcepacks.length}）` : ''}</label>
       <span class="lan-download-note">必装模组会一并补齐；光影加载器和光影包只影响画面，可不下载。</span>
     </div>` : ''}
+    <div class="lan-entry-choices">
+      <div class="lan-entry-choice ${ready ? 'recommended' : ''}">
+        <div class="lan-entry-choice-head">${icon('box', 15)}<strong>从已有实例中选择</strong>${ready ? '<span class="chip green">最接近</span>' : `<span class="chip amber">${check.blocking?.length || 0} 项差异</span>`}</div>
+        <select class="select" id="lan-preflight-instance">
+          ${(check.candidates?.length ? check.candidates : [{ instanceId: check.local.id, name: check.local.name, check }]).map((item) => `<option value="${h(item.instanceId)}" ${item.instanceId === check.local.id ? 'selected' : ''}>${h(item.name)} · ${h(item.check.local?.version || '')} · ${h(lanPreflightLoaderLabel(item.check.local?.loader))}${item.check.canJoin ? ' · 可进入' : ` · ${item.check.blocking?.length || 0} 项差异`}</option>`).join('')}
+        </select>
+        <p>${ready ? '该实例与主机配置最接近，可直接进入。' : `仍需处理：${(check.blocking || []).slice(0, 3).map((item) => item.title || item.kind).join('、')}${(check.blocking || []).length > 3 ? ' 等' : ''}`}</p>
+      </div>
+      <div class="lan-entry-choice">
+        <div class="lan-entry-choice-head">${icon('plus', 15)}<strong>创建全新实例并加入</strong></div>
+        <p>自动使用主机版本、加载器和必需模组，可自定义实例名称。</p>
+        <button class="btn btn-primary btn-sm" data-action="lan-preflight-create-new">${icon('plus', 13)} 创建并配置</button>
+      </div>
+    </div>
     <div class="lan-preflight-actions">
       ${ready ? `<button class="btn btn-primary" data-action="lan-preflight-join">${icon('play', 13)} 仍然加入房间</button>` : ''}
       ${check.hostResource?.names?.length && !busy ? `<button class="btn btn-primary" data-action="lan-preflight-download-host">${icon('wifi', 13)} 从房主局域网补齐资源（${check.hostResource.names.length}）</button>` : ''}
@@ -5741,20 +5789,36 @@ async function inspectLanRoom(roomKey, host, port) {
   state.lan.preflightBusy = true;
   paintLanRooms(true);
   try {
-    const check = roomKey
-      ? await api.invoke('lan:preflight', { roomKey, instanceId: instance.id })
-      : {
+    let check;
+    let candidates = [];
+    if (roomKey) {
+      const ready = (state.boot.library.instances || []).filter((item) => item.status === 'ready').slice(0, 8);
+      for (const item of ready) {
+        try {
+          const result = await api.invoke('lan:preflight', { roomKey, instanceId: item.id });
+          candidates.push({ instanceId: item.id, name: item.name, check: result });
+        } catch (_) { /* skip broken instance */ }
+      }
+      candidates.sort((a, b) => {
+        const score = (value) => (value.canJoin ? 0 : 1000) + (value.blocking?.length || 0) * 10 + (value.warnings?.length || 0);
+        return score(a.check) - score(b.check);
+      });
+      check = candidates[0]?.check || await api.invoke('lan:preflight', { roomKey, instanceId: instance.id });
+    } else {
+      check = {
         canJoin: true,
         blocking: [],
         warnings: [{ kind: 'manual-address', title: '手动地址', message: '手动输入的地址无法读取房主模组清单，进入后如果掉线请核对版本和模组' }],
         info: [],
-        host: { name: '手动地址', instanceName: `${host}:${port}`, version: '未知', loader: 'vanilla', modCount: 0 },
+        host: { name: '手动地址', instanceName: `${host}:${port}`, version: '未知', loader: 'vanilla', modCount: 0, mods: [] },
         local: { id: instance.id, name: instance.name, version: instance.versionId, loader: instance.loader, loaderVersion: instance.loaderVersion || '', modCount: 0 },
       };
-    state.lan.preflight = { ...check, roomKey, address: host, port: Number(port), busy: '', error: '' };
+    }
+    state.lan.preflightCandidates = candidates;
+    state.lan.preflight = { ...check, candidates, roomKey, address: host, port: Number(port), busy: '', error: '' };
     openModal({
       title: '加入房间前检查',
-      subtitle: '对比主机与本机的版本、加载器和模组',
+      subtitle: '选择已有实例，或创建全新实例并加入',
       wide: true,
       body: lanPreflightHtml(state.lan.preflight),
       footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
@@ -5765,6 +5829,24 @@ async function inspectLanRoom(roomKey, host, port) {
     state.lan.preflightBusy = false;
     paintLanRooms(true);
   }
+}
+
+async function switchLanPreflightInstance(instanceId) {
+  const check = state.lan.preflight;
+  if (!check || check.busy) return;
+  const candidate = (state.lan.preflightCandidates || []).find((item) => item.instanceId === instanceId);
+  if (!candidate) return;
+  state.lan.preflight = {
+    ...candidate.check,
+    candidates: state.lan.preflightCandidates,
+    roomKey: check.roomKey,
+    address: check.address,
+    port: check.port,
+    busy: '',
+    error: '',
+  };
+  state.lan.guestInstanceId = instanceId;
+  setModalBody(lanPreflightHtml(state.lan.preflight));
 }
 
 async function performLanJoin(check) {
@@ -5899,6 +5981,84 @@ async function waitForLanInstance(instanceId, timeoutMs = 8 * 60 * 1000) {
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
   throw new Error('匹配实例安装超时，请到实例管理查看进度');
+}
+
+function openCreateLanJoinInstance() {
+  const check = state.lan.preflight;
+  if (!check?.host?.version) return toast('主机版本未知', '请刷新房间后重试', 'error');
+  const host = check.host;
+  const mods = (host.mods || []).filter((item) => item.enabled !== false);
+  const defaultName = `${host.instanceName || host.name || '联机'} · ${host.version} ${lanPreflightLoaderLabel(host.loader)}`;
+  openModal({
+    title: '创建全新实例并加入',
+    subtitle: '自动使用主机的版本、加载器和必需模组',
+    wide: true,
+    body: `<div class="lan-create-join">
+      <div class="field"><label for="lan-new-name">实例名称</label><input class="input" id="lan-new-name" maxlength="40" value="${h(defaultName)}"></div>
+      <div class="lan-create-meta"><span class="chip">${h(host.version)}</span><span class="chip">${h(lanPreflightLoaderLabel(host.loader))}</span><span class="chip">${mods.length} 个模组</span></div>
+      <label class="checkbox-row"><input type="checkbox" id="lan-new-install-mods" checked> 安装主机要求的全部必需模组</label>
+      ${mods.length ? `<div class="lan-create-mod-list">${mods.slice(0, 12).map((mod) => `<label><input type="checkbox" data-lan-host-mod="${h(mod.filename)}" checked> ${h(mod.title || mod.filename)}</label>`).join('')}${mods.length > 12 ? `<span class="field-hint">还有 ${mods.length - 12} 个模组会按主机配置一起安装</span>` : ''}</div>` : '<p class="field-hint">主机没有提供可读取的模组清单。</p>'}
+      <div class="notice info">${icon('info', 14)}<span>创建完成后会自动下载缺失资源；下载完成后自动重新检测，进入可联机页面。</span></div>
+    </div>`,
+    footer: `<button class="btn btn-ghost" data-action="lan-create-join-cancel">取消</button><button class="btn btn-primary" data-action="lan-create-join-submit">${icon('plus', 13)} 创建并配置</button>`,
+  });
+}
+
+async function createLanJoinInstance() {
+  const check = state.lan.preflight;
+  if (!check || state.lan.createBusy) return;
+  state.lan.createBusy = true;
+  try {
+    const name = String($('#lan-new-name')?.value || '').trim() || `PMCS · ${check.host.version}`;
+    const installMods = Boolean($('#lan-new-install-mods')?.checked);
+    const selected = installMods ? [...document.querySelectorAll('[data-lan-host-mod]:checked')].map((el) => el.dataset.lanHostMod) : [];
+    const instance = await api.invoke('instances:create', {
+      name,
+      versionId: check.host.version,
+      loader: check.host.loader || 'vanilla',
+      loaderVersion: check.host.loaderVersion || '',
+    });
+    state.lan.guestInstanceId = instance.id;
+    closeModal();
+    toast('正在创建实例', '游戏文件安装完成后会自动补齐模组', 'info', 6000);
+    await waitForLanInstance(instance.id);
+    if (installMods && selected.length) {
+      let downloaded = 0;
+      if (check.hostResource?.key) {
+        const result = await api.invoke('resourcesShare:download', {
+          shareKey: check.hostResource.key,
+          instanceId: instance.id,
+          kind: 'mods',
+          names: selected,
+        });
+        downloaded = result.downloaded || 0;
+      } else {
+        for (const filename of selected) {
+          const mod = (check.host.mods || []).find((item) => item.filename === filename);
+          if (!mod?.projectId) continue;
+          try {
+            await api.invoke('mods:install', { instanceId: instance.id, projectId: mod.projectId, source: mod.source || 'modrinth', module: 'mods' });
+            downloaded += 1;
+          } catch (_) { /* preflight will show remaining */ }
+        }
+      }
+      if (downloaded) toast('已补齐主机模组', `${downloaded} 个文件`, 'success', 5000);
+    }
+    state.lan.preflight = await refreshLanPreflightCheck(check, instance.id);
+    state.lan.preflight.candidates = [];
+    openModal({
+      title: '加入房间前检查',
+      subtitle: '新实例已创建，差异会自动刷新',
+      wide: true,
+      body: lanPreflightHtml(state.lan.preflight),
+      footer: `<button class="btn btn-ghost" data-action="scan-close-modal">关闭</button>`,
+    });
+    if (state.lan.preflight.canJoin) toast('新实例已可进入', '点击「仍然加入房间」开始联机', 'success', 7000);
+  } catch (err) {
+    toast('创建联机实例失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.lan.createBusy = false;
+  }
 }
 
 async function createLanMatchingInstance() {
@@ -6966,6 +7126,9 @@ async function runAction(action, el, event) {
       case 'save-share-download':
         await downloadSharedSave(el.dataset.key || '');
         break;
+      case 'save-download-confirm':
+        await confirmSaveDownload(el.dataset.key || '');
+        break;
       case 'open-tunnel-methods':
         openTunnelMethods();
         break;
@@ -7096,6 +7259,15 @@ async function runAction(action, el, event) {
         break;
       case 'lan-preflight-create':
         await createLanMatchingInstance();
+        break;
+      case 'lan-preflight-create-new':
+        openCreateLanJoinInstance();
+        break;
+      case 'lan-create-join-submit':
+        await createLanJoinInstance();
+        break;
+      case 'lan-create-join-cancel':
+        closeModal();
         break;
       case 'lan-preflight-open-mods': {
         const check = state.lan.preflight;

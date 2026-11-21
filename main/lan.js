@@ -562,6 +562,19 @@ function createLanService({ store, launcher, accounts, resourceShare, invite, on
     } catch (_) { /* the room can still advertise version/loader */ }
     let owner = '';
     try { owner = accounts?.getActive?.()?.name || ''; } catch (_) { /* ignore */ }
+    if (worldId) {
+      try {
+        fs.writeFileSync(path.join(store.instanceDir(instance), 'saves', String(worldId), '.pmcs-lan.json'), JSON.stringify({
+          instanceId: instance.id,
+          instanceName: instance.name,
+          worldId: String(worldId),
+          worldName,
+          hostName: owner,
+          hostId,
+          lastMultiplayerAt: Date.now(),
+        }, null, 2));
+      } catch (_) { /* save marker is best-effort */ }
+    }
     let resourceAuto = false;
     let resourceKey = '';
     if (resourceShare) {
@@ -657,6 +670,7 @@ function createLanService({ store, launcher, accounts, resourceShare, invite, on
       if (!check.canJoin) throw new Error('本机与房间配置不一致，请先完成缺失内容下载');
     }
     const endpoint = ipv6Host ? `[${hostName}]:${portNumber}` : `${hostName}:${portNumber}`;
+    try { store.updateConfig({ lastLanInstanceId: instance.id }); } catch (_) { /* optional */ }
     await launcher.launch(instance.id, { quickPlayMultiplayer: endpoint });
     return true;
   }
@@ -762,6 +776,14 @@ function createLanService({ store, launcher, accounts, resourceShare, invite, on
         loaderVersion: room.loaderVersion,
         modCount: room.config?.mods?.length || 0,
         hasConfig: Boolean(room.config),
+        mods: (room.config?.mods || []).map((mod) => ({
+          filename: mod.filename,
+          title: mod.title || mod.filename,
+          projectId: mod.projectId || '',
+          versionNumber: mod.versionNumber || '',
+          source: mod.source || '',
+          enabled: mod.enabled !== false,
+        })),
       },
       local: {
         id: instance.id,
