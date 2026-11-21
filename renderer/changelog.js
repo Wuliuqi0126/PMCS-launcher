@@ -6,9 +6,19 @@
  */
 export const CHANGELOG = [
   {
+    version: '2.9.0',
+    title: '整合包与材质包市场',
+    current: true,
+    items: [
+      '模组市场新增「整合包」「材质包」模块。',
+      '整合包/材质包聚合 Modrinth + CurseForge 搜索与来源展示。',
+      '材质包安装到实例 resourcepacks。',
+      'Modrinth .mrpack 自动创建匹配实例并导入。',
+    ],
+  },
+  {
     version: '2.8.1',
     title: 'CustomSkinLoader 26.3 修复',
-    current: true,
     items: [
       '26.x 实例阻止旧版 CustomSkinLoader 14.x 启动。',
       '应用皮肤时自动改用 CustomSkinLoader Universal 15.1。',

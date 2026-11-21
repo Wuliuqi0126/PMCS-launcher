@@ -29,6 +29,7 @@ const { createSaveShare } = require('./save-share');
 const { createModCheck } = require('./mod-check');
 const { createShaderLoader } = require('./shader-loader');
 const { createModCleanup } = require('./mod-cleanup');
+const { createModpacks } = require('./modpacks');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -86,6 +87,7 @@ let mods = null;
 let modCheck = null;
 let shaderLoader = null;
 let modCleanup = null;
+let modpacks = null;
 let skins = null;
 let cacheManager = null;
 let guides = null;
@@ -474,6 +476,7 @@ function registerIpc() {
     if (payload?.sub === 'saves') target = path.join(target, 'saves');
     if (payload?.sub === 'resourcepacks') target = path.join(target, 'resourcepacks');
     if (payload?.sub === 'shaderpacks') target = path.join(target, 'shaderpacks');
+    if (payload?.sub === 'modpacks') target = path.join(target, 'modpacks');
     if (!fs.existsSync(target)) fs.mkdirSync(target, { recursive: true });
     const error = await shell.openPath(target);
     if (error) throw new Error(error);
@@ -556,7 +559,8 @@ function registerIpc() {
   ipcMain.handle('mods:install', async (_event, payload) => {
     return mods.install(String(payload?.instanceId || ''), String(payload?.projectId || ''), { source: payload?.source, mirror: payload?.mirror, module: payload?.module });
   });
-  ipcMain.handle('mods:installed', async (_event, instanceId) => mods.listInstalled(String(instanceId), 'mods'));
+  ipcMain.handle('mods:installed', async (_event, instanceId, module) => mods.listInstalled(String(instanceId), module || 'mods'));
+  ipcMain.handle('modpacks:install', async (_event, payload) => modpacks.install(String(payload?.projectId || ''), { source: payload?.source, mirror: payload?.mirror }));
   ipcMain.handle('task:pause', async (_event, taskId) => tasks.pause(String(taskId)));
   ipcMain.handle('task:resume', async (_event, taskId) => tasks.resume(String(taskId)));
   ipcMain.handle('task:cancel', async (_event, taskId) => tasks.cancel(String(taskId)));
@@ -582,7 +586,7 @@ function registerIpc() {
     return mods.setEnabled(String(payload?.instanceId), String(payload?.filename), Boolean(payload?.enabled));
   });
   ipcMain.handle('mods:remove', async (_event, payload) => {
-    return mods.remove(String(payload?.instanceId), String(payload?.filename));
+    return mods.remove(String(payload?.instanceId), String(payload?.filename), payload?.module || 'mods');
   });
   ipcMain.handle('mods:openFolder', async (_event, instanceId) => {
     const instance = store.getInstance(String(instanceId));
@@ -711,6 +715,7 @@ app.whenReady().then(() => {
   modCheck = createModCheck({ store });
   shaderLoader = createShaderLoader({ store, mods });
   modCleanup = createModCleanup({ store });
+  modpacks = createModpacks({ store, installer, tasks });
   offlineLan = createOfflineLan({ store, mods });
   saveShare = createSaveShare({
     app,

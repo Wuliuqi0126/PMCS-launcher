@@ -15,9 +15,9 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("PMCS launcher 安装程序")]
 [assembly: AssemblyProduct("PMCS launcher")]
 [assembly: AssemblyCompany("PMCS launcher")]
-[assembly: AssemblyDescription("PMCS launcher 2.8.1 安装程序")]
-[assembly: AssemblyVersion("2.8.1.0")]
-[assembly: AssemblyFileVersion("2.8.1.0")]
+[assembly: AssemblyDescription("PMCS launcher 2.9.0 安装程序")]
+[assembly: AssemblyVersion("2.9.0.0")]
+[assembly: AssemblyFileVersion("2.9.0.0")]
 
 namespace OLSetup
 {
@@ -152,7 +152,7 @@ namespace OLSetup
                 using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\PMCSLauncher"))
                 {
                     key.SetValue("DisplayName", "PMCS launcher");
-                    key.SetValue("DisplayVersion", "2.8.1");
+                    key.SetValue("DisplayVersion", "2.9.0");
                     key.SetValue("Publisher", "PMCS launcher");
                     key.SetValue("InstallLocation", fullTarget);
                     key.SetValue("DisplayIcon", exe);

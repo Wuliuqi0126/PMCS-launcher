@@ -2876,7 +2876,7 @@ async function openExternal(url) {
 function resetModsState() {
   state.mods = {
     instanceId: currentTargetInstance()?.id || '',
-    module: state.mods?.module === 'shaders' || state.mods?.module === 'skins' ? state.mods.module : 'mods',
+    module: ['mods', 'shaders', 'skins', 'modpacks', 'resourcepacks'].includes(state.mods?.module) ? state.mods.module : 'mods',
     tab: 'discover',
     query: '',
     sort: 'relevance',
@@ -2897,16 +2897,22 @@ function renderModsRoute() {
   const target = currentTargetInstance();
   if (target && state.mods.instanceId !== target.id) resetModsState();
   const instances = state.boot.library.instances;
-  const module = state.mods.module === 'shaders' ? 'shaders' : state.mods.module === 'skins' ? 'skins' : 'mods';
+  const module = ['mods', 'shaders', 'skins', 'modpacks', 'resourcepacks'].includes(state.mods.module) ? state.mods.module : 'mods';
   const isShader = module === 'shaders';
   const isSkin = module === 'skins';
+  const isModpack = module === 'modpacks';
+  const isResourcepack = module === 'resourcepacks';
   const pageCopy = isSkin
     ? { eyebrow: 'Skin Library', title: '皮肤库', subtitle: '导入本地皮肤、预览并管理皮肤文件；在线皮肤资源站可从这里直达。' }
     : isShader
       ? { eyebrow: 'Shader Library', title: '光影库', subtitle: '搜索兼容当前游戏版本的光影包，安装后放入实例 shaderpacks 目录。' }
-      : { eyebrow: 'Mod Library', title: '模组市场', subtitle: '搜索与当前实例版本、加载器兼容的模组，自动安装所需前置依赖。' };
-  const folderAction = isSkin ? 'open-skins-folder' : isShader ? 'open-shaderpacks-folder' : 'open-mods-folder';
-  const folderLabel = isSkin ? '皮肤文件夹' : isShader ? '光影文件夹' : '模组文件夹';
+      : isModpack
+        ? { eyebrow: 'Modpack Library', title: '玩法整合包', subtitle: '搜索 Modrinth / CurseForge 整合包，安装时自动创建匹配版本和加载器的实例。' }
+        : isResourcepack
+          ? { eyebrow: 'Resource Pack Library', title: '材质包市场', subtitle: '搜索 Modrinth / CurseForge 材质包，安装到当前实例的 resourcepacks 目录。' }
+          : { eyebrow: 'Mod Library', title: '模组市场', subtitle: '搜索与当前实例版本、加载器兼容的模组，自动安装所需前置依赖。' };
+  const folderAction = isSkin ? 'open-skins-folder' : isShader ? 'open-shaderpacks-folder' : isModpack ? 'open-modpacks-folder' : isResourcepack ? 'open-resourcepacks-folder' : 'open-mods-folder';
+  const folderLabel = isSkin ? '皮肤文件夹' : isShader ? '光影文件夹' : isModpack ? '整合包文件夹' : isResourcepack ? '材质包文件夹' : '模组文件夹';
   const pageHead = `<div class="page-head">
     <div class="page-head-copy">
       <div class="eyebrow">${pageCopy.eyebrow}</div>
@@ -2942,6 +2948,8 @@ function renderModsRoute() {
   const loader = loaderInfo(target.loader);
   const moduleTabs = `<div class="mods-module-tabs">
     <button class="mods-module ${module === 'mods' ? 'active' : ''}" data-action="mods-module" data-module="mods">${icon('box', 15)} 模组</button>
+    <button class="mods-module ${module === 'modpacks' ? 'active' : ''}" data-action="mods-module" data-module="modpacks">${icon('layers', 15)} 整合包</button>
+    <button class="mods-module ${module === 'resourcepacks' ? 'active' : ''}" data-action="mods-module" data-module="resourcepacks">${icon('folder', 15)} 材质包</button>
     <button class="mods-module ${module === 'shaders' ? 'active' : ''}" data-action="mods-module" data-module="shaders">${icon('sun', 15)} 光影</button>
     <button class="mods-module ${module === 'skins' ? 'active' : ''}" data-action="mods-module" data-module="skins">${icon('user', 15)} 皮肤</button>
   </div>`;
@@ -2949,23 +2957,23 @@ function renderModsRoute() {
   const discovery = !isSkin ? `
     <div class="mods-source-bar">
       <div class="mods-source-copy">
-        <span class="mods-source-mark">${icon(isShader ? 'sun' : 'layers', 15)}</span>
-        <div><strong>${isShader ? '聚合光影库' : '聚合模组库'}</strong><small>同时搜索 Modrinth + CurseForge，每个结果标明来源</small></div>
+        <span class="mods-source-mark">${icon(isShader ? 'sun' : isModpack ? 'layers' : isResourcepack ? 'folder' : 'box', 15)}</span>
+        <div><strong>${isShader ? '聚合光影库' : isModpack ? '聚合整合包库' : isResourcepack ? '聚合材质包库' : '聚合模组库'}</strong><small>同时搜索 Modrinth + CurseForge，每个结果标明来源</small></div>
       </div>
       <div class="mods-source-actions">
         <label class="mods-mirror-toggle" title="CurseForge 始终通过 MCIM；Modrinth 可切换直连"><input type="checkbox" id="mods-mirror" ${state.mods.mirror === 'mcim' ? 'checked' : ''}> MCIM 国内镜像</label>
       </div>
     </div>
-    ${vanilla && !isShader ? `<div class="notice">${icon('info', 16)}<span>原版实例无法加载 Mod。请切换到 Fabric / Forge 实例，或新建一个支持模组的实例。</span></div>` : ''}
+    ${vanilla && module === 'mods' ? `<div class="notice">${icon('info', 16)}<span>原版实例无法加载 Mod。请切换到 Fabric / Forge 实例，或新建一个支持模组的实例。</span></div>` : ''}
     <div class="mods-tabs">
-      <button class="mods-tab ${state.mods.tab === 'discover' ? 'active' : ''}" data-action="mods-tab" data-tab="discover">${icon('sparkles', 14)} 发现${isShader ? '光影' : '模组'}</button>
-      <button class="mods-tab ${state.mods.tab === 'installed' ? 'active' : ''}" data-action="mods-tab" data-tab="installed">${icon('box', 14)} 我的${isShader ? '光影' : '模组'} <span class="count" id="mods-installed-count">${state.mods.installed.length || ''}</span></button>
+      <button class="mods-tab ${state.mods.tab === 'discover' ? 'active' : ''}" data-action="mods-tab" data-tab="discover">${icon('sparkles', 14)} 发现${isShader ? '光影' : isModpack ? '整合包' : isResourcepack ? '材质包' : '模组'}</button>
+      <button class="mods-tab ${state.mods.tab === 'installed' ? 'active' : ''}" data-action="mods-tab" data-tab="installed">${icon('box', 14)} 我的${isShader ? '光影' : isModpack ? '整合包' : isResourcepack ? '材质包' : '模组'} <span class="count" id="mods-installed-count">${state.mods.installed.length || ''}</span></button>
       <span class="top-note" style="margin-left:auto"><span class="dot"></span> 数据来自 Modrinth + CurseForge · 聚合搜索</span>
     </div>
-    ${(isShader || !vanilla) && state.mods.tab === 'discover' ? `<div class="toolbar panel" style="padding:10px">
+    ${(module !== 'mods' || !vanilla) && state.mods.tab === 'discover' ? `<div class="toolbar panel" style="padding:10px">
       <div class="search-field">
         ${icon('search', 16)}
-        <input id="mods-query" type="search" placeholder="${isShader ? '搜索光影，支持中文：光影 / 低配 / 卡通…' : '搜索模组，支持中文：钠 / 优化 / 机械动力…'}" value="${h(state.mods.query)}" autocomplete="off">
+        <input id="mods-query" type="search" placeholder="${isShader ? '搜索光影，支持中文：光影 / 低配 / 卡通…' : isModpack ? '搜索整合包：生存 / 科技 / 冒险 / 空岛…' : isResourcepack ? '搜索材质包：原版风格 / 卡通 / 写实…' : '搜索模组，支持中文：钠 / 优化 / 机械动力…'}" value="${h(state.mods.query)}" autocomplete="off">
       </div>
       <div class="toolbar-right">
         <div class="select-wrap">
@@ -3084,13 +3092,15 @@ async function loadInstalledMods() {
   paintModsContent();
   try {
     const channel = state.mods.module === 'shaders' ? 'shaders:installed' : 'mods:installed';
-    const list = await api.invoke(channel, target.id);
+    const list = state.mods.module === 'shaders'
+      ? await api.invoke(channel, target.id)
+      : await api.invoke(channel, target.id, state.mods.module);
     if (currentTargetInstance()?.id !== target.id) return;
     state.mods.installed = Array.isArray(list) ? list : [];
     const count = $('#mods-installed-count');
     if (count) count.textContent = state.mods.installed.length ? String(state.mods.installed.length) : '';
   } catch (err) {
-    toast(state.mods.module === 'shaders' ? '读取已安装光影失败' : '读取已安装模组失败', err.message || String(err), 'error');
+    toast(state.mods.module === 'shaders' ? '读取已安装光影失败' : '读取已安装内容失败', err.message || String(err), 'error');
   } finally {
     state.mods.installedLoading = false;
     paintModsContent();
@@ -3114,7 +3124,11 @@ function modCard(mod) {
   const installed = modInstalled(mod.projectId);
   const installing = state.modInstalling.has(mod.projectId);
   const isShader = state.mods.module === 'shaders';
+  const isModpack = state.mods.module === 'modpacks';
+  const isResourcepack = state.mods.module === 'resourcepacks';
   const tags = [...new Set((mod.categories || []).filter((c) => !['fabric', 'forge', 'neoforge', 'quilt', 'client', 'server'].includes(c)))].slice(0, 3);
+  const action = isModpack ? 'install-modpack' : isShader ? 'install-shader' : 'install-mod';
+  const moduleName = isModpack ? 'modpacks' : isShader ? 'shaders' : isResourcepack ? 'resourcepacks' : 'mods';
   return `<article class="mod-card">
     <div class="mod-head">
       ${modIcon(mod)}
@@ -3123,7 +3137,7 @@ function modCard(mod) {
     <p class="mod-desc" title="${h(mod.description)}">${h(mod.description)}</p>
     <div class="mod-tags">
       <span class="chip mod-source-chip">来源：${mod.source === 'curseforge' ? 'CurseForge' : 'Modrinth'}</span>
-      ${isShader ? '<span class="chip">光影</span>' : `<span class="chip ${targetLoaderClass()}">${h(loaderInfo(currentTargetInstance()?.loader).label)}</span>`}
+      ${isShader ? '<span class="chip">光影</span>' : isModpack ? '<span class="chip">整合包</span>' : isResourcepack ? '<span class="chip">材质包</span>' : `<span class="chip ${targetLoaderClass()}">${h(loaderInfo(currentTargetInstance()?.loader).label)}</span>`}
       ${tags.map((tag) => `<span class="chip">${h(categoryLabel(tag))}</span>`).join('')}
     </div>
     <div class="mod-foot">
@@ -3131,8 +3145,8 @@ function modCard(mod) {
         <span class="mod-stat">${icon('download', 12)} ${h(formatNumber(mod.downloads))}</span>
         <span class="mod-stat">${icon('star', 12)} ${h(formatNumber(mod.follows))}</span>
       </div>
-      <button class="btn btn-sm ${installed ? 'btn-ghost' : 'btn-secondary'}" data-action="${isShader ? 'install-shader' : 'install-mod'}" data-id="${h(mod.projectId)}" data-source="${h(mod.source || 'modrinth')}" data-module="${isShader ? 'shaders' : 'mods'}" ${installed || installing ? 'disabled' : ''}>
-        ${installing ? '<span class="spinner light"></span> 安装中' : installed ? `${icon('check', 12)} 已安装` : `${icon('download', 12)} ${isShader ? '安装光影' : '安装'}`}
+      <button class="btn btn-sm ${installed ? 'btn-ghost' : 'btn-secondary'}" data-action="${action}" data-id="${h(mod.projectId)}" data-source="${h(mod.source || 'modrinth')}" data-module="${moduleName}" ${installed || installing ? 'disabled' : ''}>
+        ${installing ? '<span class="spinner light"></span> 安装中' : installed ? `${icon('check', 12)} 已安装` : `${icon('download', 12)} ${isModpack ? '安装整合包' : isShader ? '安装光影' : isResourcepack ? '安装材质包' : '安装'}`}
       </button>
     </div>
   </article>`;
@@ -3174,6 +3188,9 @@ function paintModsContent() {
     return;
   }
   const isShader = state.mods.module === 'shaders';
+  const isModpack = state.mods.module === 'modpacks';
+  const isResourcepack = state.mods.module === 'resourcepacks';
+  const contentLabel = isShader ? '光影' : isModpack ? '整合包' : isResourcepack ? '材质包' : '模组';
   const installedCount = state.mods.installed.length;
   const countEl = $('#mods-installed-count');
   if (countEl) countEl.textContent = installedCount ? String(installedCount) : '';
@@ -3184,22 +3201,22 @@ function paintModsContent() {
       return;
     }
     box.innerHTML = `<div class="installed-panel panel">
-      <div class="installed-head"><span>${isShader ? '光影文件' : '模组文件'}</span><span>版本</span><span>状态</span><span style="text-align:right">操作</span></div>
+      <div class="installed-head"><span>${contentLabel}文件</span><span>版本</span><span>状态</span><span style="text-align:right">操作</span></div>
       ${state.mods.installed.length ? state.mods.installed.map((mod) => `<div class="installed-row ${mod.enabled ? '' : 'disabled'}">
         <div class="installed-file">${modIcon(mod)}<div><strong>${h(mod.title)}</strong><span>${h(mod.filename)}</span></div></div>
         <div class="version-date">${h(mod.versionNumber || '—')}</div>
-        <div>${isShader ? '<span class="chip">已安装</span>' : `<button class="toggle ${mod.enabled ? 'on' : ''}" type="button" title="${mod.enabled ? '停用模组' : '启用模组'}" data-action="toggle-mod" data-file="${h(mod.filename)}" data-enabled="${mod.enabled ? '1' : '0'}"></button>`}</div>
+        <div>${isShader || isModpack || isResourcepack ? '<span class="chip">已安装</span>' : `<button class="toggle ${mod.enabled ? 'on' : ''}" type="button" title="${mod.enabled ? '停用模组' : '启用模组'}" data-action="toggle-mod" data-file="${h(mod.filename)}" data-enabled="${mod.enabled ? '1' : '0'}"></button>`}</div>
         <div class="installed-actions">
-          <button class="icon-btn danger" title="删除${isShader ? '光影' : '模组'}" data-action="${isShader ? 'delete-shader' : 'delete-mod'}" data-file="${h(mod.filename)}">${icon('trash', 15)}</button>
+          <button class="icon-btn danger" title="删除${contentLabel}" data-action="${isShader ? 'delete-shader' : isModpack || isResourcepack ? 'delete-content' : 'delete-mod'}" data-module="${h(state.mods.module)}" data-file="${h(mod.filename)}">${icon('trash', 15)}</button>
         </div>
-      </div>`).join('') : `<div class="table-empty">还没有安装${isShader ? '光影' : '模组'}。<br><span class="faint">去「发现${isShader ? '光影' : '模组'}」看看适合当前实例的内容。</span></div>`}
+      </div>`).join('') : `<div class="table-empty">还没有安装${contentLabel}。<br><span class="faint">去「发现${contentLabel}」看看适合当前实例的内容。</span></div>`}
     </div>`;
     hydrateIcons(box);
     return;
   }
 
   if (state.mods.error) {
-    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('alert', 30)}</div><h3>${isShader ? '光影加载失败' : '模组加载失败'}</h3><p>${h(state.mods.error)}</p><div class="empty-actions"><button class="btn btn-secondary" data-action="refresh-mods">${icon('refresh', 15)} 重新加载</button></div></div>`;
+    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('alert', 30)}</div><h3>${contentLabel}加载失败</h3><p>${h(state.mods.error)}</p><div class="empty-actions"><button class="btn btn-secondary" data-action="refresh-mods">${icon('refresh', 15)} 重新加载</button></div></div>`;
     hydrateIcons(box);
     return;
   }
@@ -3210,7 +3227,7 @@ function paintModsContent() {
   }
 
   if (!state.mods.data || !state.mods.data.hits.length) {
-    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('search', 30)}</div><h3>没有找到兼容${isShader ? '光影' : '模组'}</h3><p>试试更换关键词，或确认当前实例的游戏版本${isShader ? '' : '与加载器'}。</p><div class="empty-actions"><button class="btn btn-secondary" data-action="clear-mods-search">清除搜索</button><button class="btn btn-ghost" data-action="external" data-url="https://search.mcmod.cn/s?key=${encodeURIComponent(state.mods.query || '')}">${icon('external', 14)} 在 MC百科搜索</button></div></div>`;
+    box.innerHTML = `<div class="panel empty-state"><div class="empty-icon">${icon('search', 30)}</div><h3>没有找到兼容${contentLabel}</h3><p>试试更换关键词，或确认当前参考实例的游戏版本。</p><div class="empty-actions"><button class="btn btn-secondary" data-action="clear-mods-search">清除搜索</button><button class="btn btn-ghost" data-action="external" data-url="https://search.mcmod.cn/s?key=${encodeURIComponent(state.mods.query || '')}">${icon('external', 14)} 在 MC百科搜索</button></div></div>`;
     hydrateIcons(box);
     return;
   }
@@ -3334,10 +3351,31 @@ async function installMod(projectId, source = 'modrinth', module = state.mods.mo
   try {
     const result = await api.invoke('mods:install', { instanceId: target.id, projectId, source, module });
     state.mods.installed = result.installed || state.mods.installed;
-    toast(module === 'shaders' ? '光影安装完成' : '模组安装完成', module === 'shaders' ? `已安装 ${result.installed?.length || 1} 个光影文件` : `已安装 ${result.installed?.length || 1} 个文件（含必要前置）`, 'success');
+    const label = module === 'shaders' ? '光影' : module === 'resourcepacks' ? '材质包' : '模组';
+    toast(`${label}安装完成`, `已安装 ${result.installed?.length || 1} 个文件`, 'success');
     paintModsContent();
   } catch (err) {
-    toast(module === 'shaders' ? '光影安装失败' : '模组安装失败', cleanError(err), 'error', 9000);
+    toast('安装失败', cleanError(err), 'error', 9000);
+  } finally {
+    state.modInstalling.delete(projectId);
+    paintModsContent();
+  }
+}
+
+async function installModpack(projectId, source = 'modrinth') {
+  if (state.modInstalling.has(projectId)) return;
+  state.modInstalling.add(projectId);
+  paintModsContent();
+  try {
+    const result = await api.invoke('modpacks:install', { projectId, source, mirror: state.mods.mirror });
+    await reloadBoot(false);
+    if (result?.instance?.id) {
+      state.selectedInstanceId = result.instance.id;
+      state.mods.instanceId = result.instance.id;
+    }
+    toast('整合包安装完成', `${result?.instance?.name || '新实例'} · ${result?.count || 0} 个文件`, 'success', 9000);
+  } catch (err) {
+    toast('整合包安装失败', cleanError(err), 'error', 12000);
   } finally {
     state.modInstalling.delete(projectId);
     paintModsContent();
@@ -3360,19 +3398,21 @@ async function toggleMod(filename, enabled) {
 async function deleteMod(filename, module = state.mods.module) {
   const target = currentTargetInstance();
   if (!target) return;
+  const label = module === 'shaders' ? '光影' : module === 'resourcepacks' ? '材质包' : module === 'modpacks' ? '整合包' : '模组';
   const answer = await confirmDialog({
-    title: module === 'shaders' ? '删除光影文件' : '删除模组文件',
+    title: `删除${label}文件`,
     message: `确定要删除 <strong>${h(filename)}</strong> 吗？此操作不可撤销。`,
     confirmText: '删除',
     danger: true,
   });
   if (!answer.confirmed) return;
   try {
-    const channel = module === 'shaders' ? 'shaders:remove' : 'mods:remove';
-    const list = await api.invoke(channel, { instanceId: target.id, filename });
+    const list = module === 'shaders'
+      ? await api.invoke('shaders:remove', { instanceId: target.id, filename })
+      : await api.invoke('mods:remove', { instanceId: target.id, filename, module });
     state.mods.installed = list || [];
     paintModsContent();
-    toast(module === 'shaders' ? '光影已删除' : '模组已删除', filename, 'info');
+    toast(`${label}已删除`, filename, 'info');
   } catch (err) {
     toast('删除失败', err.message || String(err), 'error');
   }
@@ -6870,6 +6910,15 @@ async function runAction(action, el, event) {
         if (target) await api.invoke('mods:openFolder', target.id);
         break;
       }
+      case 'open-modpacks-folder':
+      case 'open-resourcepacks-folder': {
+        const target = currentTargetInstance();
+        if (target) await api.invoke('instances:openFolder', {
+          id: target.id,
+          sub: el.dataset.action === 'open-modpacks-folder' ? 'modpacks' : 'resourcepacks',
+        });
+        break;
+      }
       case 'lan-guide':
         openLanGuide();
         break;
@@ -7171,7 +7220,7 @@ async function runAction(action, el, event) {
         break;
       }
       case 'mods-module': {
-        const module = ['mods', 'shaders', 'skins'].includes(el.dataset.module) ? el.dataset.module : 'mods';
+        const module = ['mods', 'shaders', 'skins', 'modpacks', 'resourcepacks'].includes(el.dataset.module) ? el.dataset.module : 'mods';
         if (state.mods.module === module) break;
         state.mods.module = module;
         state.mods.tab = 'discover';
@@ -7194,13 +7243,19 @@ async function runAction(action, el, event) {
         }
         break;
       case 'install-mod':
-        await installMod(id, el.dataset.source || 'modrinth', 'mods');
+        await installMod(id, el.dataset.source || 'modrinth', el.dataset.module || 'mods');
+        break;
+      case 'install-modpack':
+        await installModpack(id, el.dataset.source || 'modrinth');
         break;
       case 'toggle-mod':
         await toggleMod(el.dataset.file, el.dataset.enabled !== '1');
         break;
       case 'delete-mod':
         await deleteMod(el.dataset.file, 'mods');
+        break;
+      case 'delete-content':
+        await deleteMod(el.dataset.file, el.dataset.module || state.mods.module);
         break;
       case 'delete-shader':
         await deleteMod(el.dataset.file, 'shaders');

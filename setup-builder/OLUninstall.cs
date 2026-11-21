@@ -11,8 +11,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("PMCS launcher 卸载程序")]
 [assembly: System.Reflection.AssemblyProduct("PMCS launcher")]
 [assembly: System.Reflection.AssemblyCompany("PMCS launcher")]
-[assembly: System.Reflection.AssemblyVersion("2.8.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("2.8.1.0")]
+[assembly: System.Reflection.AssemblyVersion("2.9.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("2.9.0.0")]
 
 namespace OLUninstall
 {
