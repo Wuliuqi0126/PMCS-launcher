@@ -1,6 +1,6 @@
 # PMCS launcher
 
-一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **2.9.1**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
+一个为 Windows 打造的 Minecraft: Java 版桌面启动器（当前版本 **2.10.0**）。界面使用 **Electron + React 19 + 原生 CSS** 编写，React 负责渲染根、窗口外壳与侧边栏，现有业务视图通过兼容桥接逐步迁移；支持从 **Mojang 官方版本库**下载原版游戏，创建 **原版 / Fabric / Forge / NeoForge / Quilt** 实例，并从 **Modrinth** 搜索、安装模组与前置依赖。
 
 > 渲染进程：React 19 + esbuild；主进程：Electron/Node；安装器：C# WinForms。
 
@@ -8,8 +8,8 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [PMCS launcher 2.9.1 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.9.1/PMCSLauncher-2.9.1-Setup.exe)
-- [PMCS launcher 2.9.1 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.9.1/PMCSLauncher-2.9.1-Portable.zip)
+- [PMCS launcher 2.10.0 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.10.0/PMCSLauncher-2.10.0-Setup.exe)
+- [PMCS launcher 2.10.0 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.10.0/PMCSLauncher-2.10.0-Portable.zip)
 - [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
@@ -60,6 +60,8 @@
 - **内存安全限制**：滑块上限按系统物理内存的 75% 自动限制，超过 50% 时显示警告，避免把 16 GB 内存机器分配到 16 GB 堆。
 - **手动模组登记**：手动放进 `mods` 的 jar 会自动写入 `.oasis-mods.json`，在模组列表里可识别、停用、清理。
 - **离线账号日志降噪**：离线账号运行时隐藏 Realms、正版验证和 profile 401/429 相关日志。
+- **加入前实例选择**：客机检查房间时可在「从已有实例中选择」和「创建全新实例并加入」之间选择；已有实例会标出最接近的配置和差异，新实例弹窗默认勾选主机必需模组并支持自定义名称。
+- **共享存档联机标记**：主机开放局域网时会在存档写入联机标记；客机接收共享存档时如果检测到联机记录，会默认导入最近联机实例，并生成「主机名（日期 小时）共享存档」名称。
 - **安全密钥联机**：主机生成自定义密钥名，10 分钟有效；密钥用 AES-GCM 加密 IPv6 地址、端口和房间信息，客机只有输入密钥才能读取房间并加入。主机勾选「重新激活密钥」后，同一密钥可继续使用。
 - **IP 隐藏与隧道入口**：明文 IP 默认隐藏在「无法连接？点击这里直接获取 IP 地址」按钮中；Tailscale 和 playit 收进「无法联机？尝试隧道方式吧！」弹窗，不再占用联机主区域。
 - **联机游玩**：左侧大厅入口改名为「联机游玩」，没有实例时也能搜索局域网房间，创建实例后再检查并加入。
@@ -140,7 +142,7 @@
 已构建的 Windows 一键安装包位于项目 `setup/`：
 
 ```
-setup/PMCS launcher-2.9.1-安装程序.exe
+setup/PMCS launcher-2.10.0-安装程序.exe
 ```
 
 双击后进入浅色原生 Windows 安装界面。选择父文件夹后，程序会安装到其下的 `PMCS launcher` 子文件夹；如果该子文件夹已存在则直接复用。默认安装到：
@@ -157,7 +159,7 @@ setup/PMCS launcher-2.9.1-安装程序.exe
 PMCS launcher.exe
 ```
 
-安装包文件名统一为 **PMCS launcher-2.9.1-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
+安装包文件名统一为 **PMCS launcher-2.10.0-安装程序.exe**。它不使用 NSIS/Inno Setup 的临时解压流程，所以不会再出现：
 
 ```
 NSIS Error: Error writing temporary file
@@ -176,7 +178,7 @@ SHA256: 08887F4B00342140792DCE7DC8F6C87C0DD65987D071F2DABF3D46C8F2BD6C73
 如果系统仍然拦截，或者你想完全免安装，可以直接解压：
 
 ```
-setup/PMCS launcher-2.9.1-便携版.zip
+setup/PMCS launcher-2.10.0-便携版.zip
 ```
 
 便携版 SHA256：
@@ -227,7 +229,7 @@ npm install
 - `setup-builder/SetupForm.cs`：浅色系统控件界面，包含安装目录、桌面快捷方式选项、进度和完成状态。
 - `setup-builder/OLUninstall.cs`：独立卸载程序，提供「同时删除本地游戏资源」「同时删除账户与启动器配置」「同时卸载 Tailscale」选项；默认保留存档与配置，并会保护 `游戏目录`、Windows 和 Program Files。
 - 安装后的主程序为 `PMCS launcher.exe`，快捷方式同名。
-- 安装包文件名保持 `PMCS launcher-2.9.1-安装程序.exe`。
+- 安装包文件名保持 `PMCS launcher-2.10.0-安装程序.exe`。
 - 便携版 ZIP 同步使用新主程序名和 `Uninstall.exe`。
 
 编译：
@@ -248,7 +250,7 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /target:winexe /codepage
 把 `dist\Uninstall.exe` 放入安装 payload 后再压缩封装安装器。安装包支持：
 
 ```powershell
-PMCS launcher-2.9.1-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
+PMCS launcher-2.10.0-安装程序.exe /S /DIR="D:\Games\PMCS launcher"
 ```
 
 electron-builder 和缓存保留在：

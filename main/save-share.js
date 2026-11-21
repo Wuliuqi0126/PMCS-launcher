@@ -140,6 +140,10 @@ function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
       size: save.size,
       lastPlayed: save.lastPlayed,
       icon: save.icon || '',
+      multiplayer: Boolean(save.multiplayer),
+      multiplayerHost: save.multiplayerHost || '',
+      multiplayerInstanceId: save.multiplayerInstanceId || '',
+      multiplayerAt: save.multiplayerAt || 0,
     };
   }
 
@@ -217,6 +221,8 @@ function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
       if (!fs.existsSync(levelFile)) continue;
       let stat = null;
       try { stat = fs.statSync(levelFile); } catch (_) { /* ignore */ }
+      let lanMarker = null;
+      try { lanMarker = readJson(path.join(worldDir, '.pmcs-lan.json'), null); } catch (_) { /* optional */ }
       addSave(data, {
         id: entry.name,
         path: worldDir,
@@ -224,6 +230,10 @@ function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
         size: dirSizeSync(worldDir),
         lastPlayed: stat ? stat.mtimeMs : Date.now(),
         icon: saveIcon(worldDir),
+        multiplayer: Boolean(lanMarker),
+        multiplayerHost: String(lanMarker?.hostName || ''),
+        multiplayerInstanceId: String(lanMarker?.instanceId || ''),
+        multiplayerAt: Number(lanMarker?.lastMultiplayerAt) || 0,
       }, source, instanceName, instanceId, sources[entry.name] || null);
     }
   }
@@ -529,7 +539,7 @@ function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
     });
   }
 
-  async function download({ instanceId, key }) {
+  async function download({ instanceId, key, name }) {
     const instance = store.getInstance(String(instanceId || ''));
     if (!instance) throw new Error('请选择要导入的实例');
     const share = shares.get(String(key || ''));
@@ -572,7 +582,8 @@ function createSaveShare({ app, store, tasks, accounts, onUpdate }) {
       const savesDir = path.join(store.instanceDir(instance), 'saves');
       ensureDir(savesDir);
       const worldName = readLevelName(path.join(worldRoot, 'level.dat')) || share.save.name || '共享存档';
-      const target = uniqueWorldDir(savesDir, worldName);
+      const requestedName = sanitizeFileName(String(name || worldName).trim(), worldName);
+      const target = uniqueWorldDir(savesDir, requestedName);
       fs.cpSync(worldRoot, target, { recursive: true });
       const downloadedAt = Date.now();
       const sources = readSourceMap(savesDir);
