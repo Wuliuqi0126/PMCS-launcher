@@ -766,7 +766,13 @@ h1.page-title { margin: 0; font-family: var(--font-display); font-weight: 600; f
 .ipv6-actions { display: flex; flex-wrap: wrap; gap: 7px; }
 .invite-clear-key { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; color: var(--muted); background: rgba(255,255,255,.04); }
 .invite-clear-key:hover { color: var(--text); background: rgba(255,255,255,.09); }
-.invite-card, .invite-guest { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px; border: 1px solid rgba(127,183,255,.16); border-radius: 9px; background: rgba(127,183,255,.035); }
+.invite-card { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px; border: 1px solid rgba(110,231,149,.18); border-radius: 9px; background: rgba(110,231,149,.035); }
+.invite-guest { display: flex; flex-direction: column; gap: 7px; padding: 13px 14px; margin-top: 12px; border: 2px solid rgba(240,198,106,.42); border-radius: 11px; background: rgba(240,198,106,.065); box-shadow: inset 0 0 0 1px rgba(240,198,106,.08); }
+.invite-guest-head { display: flex; align-items: center; gap: 7px; padding-bottom: 7px; border-bottom: 1px solid rgba(240,198,106,.16); }
+.invite-guest-head > span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 7px; background: rgba(240,198,106,.12); color: var(--amber); }
+.invite-guest-head strong { display: block; font-size: 10px; }
+.invite-guest-head small { display: block; margin-top: 2px; color: var(--muted); font-size: 7.5px; }
+.invite-guest .input { border-color: rgba(240,198,106,.28); background: rgba(240,198,106,.04); }
 .invite-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .invite-card-head strong { font-size: 10px; }
 .invite-name-row { display: flex; gap: 7px; }

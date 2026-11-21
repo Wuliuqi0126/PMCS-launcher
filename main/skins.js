@@ -30,7 +30,7 @@ const LOCAL_SKIN_ENTRY = {
 
 function createSkins({ store, mods, accounts, getWindow }) {
   function skinsDir() {
-    const dir = path.join(store.gameDir, 'skins');
+    const dir = path.join(store.resourceRoot, 'skins');
     ensureDir(dir);
     return dir;
   }

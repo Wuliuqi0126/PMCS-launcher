@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer, clipboard } = require('electron');
 const INVOKE_CHANNELS = new Set([
   'app:bootstrap',
   'system:memory',
+  'paths:migrate',
   'app:openExternal',
   'app:openPath',
   'app:pickDirectory',

@@ -30,6 +30,7 @@ const { createModCheck } = require('./mod-check');
 const { createShaderLoader } = require('./shader-loader');
 const { createModCleanup } = require('./mod-cleanup');
 const { createModpacks } = require('./modpacks');
+const { createPaths } = require('./paths');
 const java = require('./java');
 const loaders = require('./loaders');
 const { probeSources, ensureFastestSource, getActiveSource, sourceLabel } = require('./http');
@@ -88,6 +89,7 @@ let modCheck = null;
 let shaderLoader = null;
 let modCleanup = null;
 let modpacks = null;
+let paths = null;
 let skins = null;
 let cacheManager = null;
 let guides = null;
@@ -311,6 +313,13 @@ function buildBootstrap() {
 
 function registerIpc() {
   ipcMain.handle('app:bootstrap', () => buildBootstrap());
+  ipcMain.handle('paths:migrate', async (_event, payload) => {
+    const target = String(payload?.path || '');
+    if (!target) throw new Error('请选择新目录');
+    if (payload?.type === 'game') return paths.migrateGameDir(target);
+    if (payload?.type === 'resources') return paths.migrateResourceDir(target);
+    throw new Error('未知迁移类型');
+  });
   ipcMain.handle('system:memory', () => ({
     totalMb: Math.round(os.totalmem() / 1048576),
     freeMb: Math.round(os.freemem() / 1048576),
@@ -325,7 +334,7 @@ function registerIpc() {
 
   ipcMain.handle('app:openPath', async (_event, target, mode = 'open') => {
     const resolved = path.resolve(String(target || ''));
-    const allowedRoots = [store.gameDir, app.getPath('userData')];
+    const allowedRoots = [store.gameDir, store.resourceRoot, app.getPath('userData')];
     if (!allowedRoots.some((root) => isPathInside(root, resolved))) throw new Error('路径不在启动器目录内');
     if (!fs.existsSync(resolved)) throw new Error('路径不存在');
     if (mode === 'reveal') {
@@ -716,6 +725,7 @@ app.whenReady().then(() => {
   shaderLoader = createShaderLoader({ store, mods });
   modCleanup = createModCleanup({ store });
   modpacks = createModpacks({ store, installer, tasks });
+  paths = createPaths({ store, launcher });
   offlineLan = createOfflineLan({ store, mods });
   saveShare = createSaveShare({
     app,
