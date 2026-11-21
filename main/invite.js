@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const TTL_MS = 10 * 60 * 1000;
 
@@ -20,7 +21,8 @@ function derive(secret) {
 function encrypt(value, secret) {
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', derive(secret), iv);
-  const data = Buffer.concat([cipher.update(Buffer.from(JSON.stringify(value), 'utf8')), cipher.final()]);
+  const packed = zlib.deflateRawSync(Buffer.from(JSON.stringify(value), 'utf8'));
+  const data = Buffer.concat([cipher.update(packed), cipher.final()]);
   return { iv: b64(iv), data: b64(data), tag: b64(cipher.getAuthTag()) };
 }
 
@@ -28,11 +30,15 @@ function decrypt(envelope, secret) {
   const decipher = crypto.createDecipheriv('aes-256-gcm', derive(secret), unb64(envelope.iv));
   decipher.setAuthTag(unb64(envelope.tag));
   const data = Buffer.concat([decipher.update(unb64(envelope.data)), decipher.final()]);
-  return JSON.parse(data.toString('utf8'));
+  try {
+    return JSON.parse(zlib.inflateRawSync(data).toString('utf8'));
+  } catch (_) {
+    return JSON.parse(data.toString('utf8'));
+  }
 }
 
 function safeName(value, fallback) {
-  const text = String(value || '').trim().replace(/[@\r\n\t]/g, '').slice(0, 32);
+  const text = String(value || '').trim().replace(/[@\r\n\t]/g, '').slice(0, 16);
   return text || fallback;
 }
 
@@ -44,7 +50,7 @@ function createInviteService() {
   }
 
   function makeKey() {
-    const payload = { v: 1, host: active.host, port: active.port, name: active.name };
+    const payload = { v: 1, host: active.host, port: active.port };
     const envelope = encrypt(payload, active.secret);
     return `${active.name}@${active.secret}.${envelope.iv}.${envelope.data}.${envelope.tag}`;
   }
@@ -68,7 +74,7 @@ function createInviteService() {
     if (!hostName) throw new Error('还没有可用的主机地址');
     if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) throw new Error('还没有可用的游戏端口');
     active = {
-      secret: crypto.randomBytes(32).toString('base64url'),
+      secret: crypto.randomBytes(16).toString('base64url'),
       host: hostName,
       port: portNumber,
       name: safeName(name, `房间-${crypto.randomBytes(2).toString('hex')}`),
