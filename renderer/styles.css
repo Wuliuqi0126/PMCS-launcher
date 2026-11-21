@@ -2067,7 +2067,7 @@ body.scan-open .task-stack {
 
 /* ==== MOD / SHADER / SKIN MODULES ==== */
 .mods-module-tabs {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px;
   margin: 0 0 12px;
 }
 .mods-module {

@@ -12,6 +12,17 @@ const MR_MCIM = 'https://mod.mcimirror.top/modrinth/v2';
 const CF_MCIM = 'https://mod.mcimirror.top/curseforge/v1';
 const MANIFEST = '.oasis-mods.json';
 
+const MODULES = {
+  mods: { type: 'mod', label: '模组', dir: 'mods', ext: 'jar', cf: '6' },
+  shaders: { type: 'shader', label: '光影', dir: 'shaderpacks', ext: 'zip', cf: '6552' },
+  resourcepacks: { type: 'resourcepack', label: '材质包', dir: 'resourcepacks', ext: 'zip', cf: '12' },
+  modpacks: { type: 'modpack', label: '整合包', dir: 'modpacks', ext: 'mrpack', cf: '4471' },
+};
+
+function normalizeModule(value) {
+  return MODULES[value] ? value : 'mods';
+}
+
 function loaderCategory(loader) {
   if (loader === 'fabric') return 'fabric';
   if (loader === 'forge') return 'forge';
@@ -53,12 +64,13 @@ function createMods({ store, tasks }) {
   function ensureInstance(instanceId, module = 'mods') {
     const instance = store.getInstance(instanceId);
     if (!instance) throw new Error('请选择要安装内容的实例');
-    if (module !== 'shaders' && instance.loader === 'vanilla') throw new Error('原版实例无法加载 Mod，请先创建一个 Fabric 或 Forge 实例');
+    if (normalizeModule(module) === 'mods' && instance.loader === 'vanilla') throw new Error('原版实例无法加载 Mod，请先创建一个 Fabric 或 Forge 实例');
     return instance;
   }
 
   function contentDir(instance, module = 'mods') {
-    const dir = path.join(store.instanceDir(instance), module === 'shaders' ? 'shaderpacks' : 'mods');
+    const definition = MODULES[normalizeModule(module)];
+    const dir = path.join(store.instanceDir(instance), definition.dir);
     ensureDir(dir);
     return dir;
   }
@@ -73,15 +85,15 @@ function createMods({ store, tasks }) {
 
   async function searchModrinth(instance, options, mirror) {
     const loader = loaderCategory(instance.loader);
-    const module = options.module === 'shaders' ? 'shaders' : 'mods';
+    const module = normalizeModule(options.module);
     const originalQuery = String(options.query || '').trim();
     const translation = translateQuery(originalQuery);
     const query = translation.query;
     const offset = Math.max(0, Number(options.offset) || 0);
     const limit = Math.max(1, Math.min(24, Number(options.limit) || 12));
     const sort = ['relevance', 'downloads', 'follows', 'newest', 'updated'].includes(options.sort) ? options.sort : 'relevance';
-    const facets = [[`project_type:${module === 'shaders' ? 'shader' : 'mod'}`]];
-    if (instance.versionId) facets.push([`versions:${instance.versionId}`]);
+    const facets = [[`project_type:${MODULES[module].type}`]];
+    if (instance.versionId && module !== 'modpacks') facets.push([`versions:${instance.versionId}`]);
     if (module === 'mods' && loader) facets.push([`categories:${loader}`]);
     const api = mirror === 'mcim' ? MR_MCIM : MR_API;
     const url = `${api}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&index=${sort}&offset=${offset}&limit=${limit}`;
@@ -113,18 +125,19 @@ function createMods({ store, tasks }) {
     const offset = Math.max(0, Number(options.offset) || 0);
     const limit = Math.max(1, Math.min(24, Number(options.limit) || 12));
     const sortField = { relevance: 2, downloads: 6, follows: 2, newest: 3, updated: 3 }[options.sort] || 2;
+    const module = normalizeModule(options.module);
     const params = new URLSearchParams({
       gameId: '432',
-      classId: options.module === 'shaders' ? '6552' : '6',
+      classId: MODULES[module].cf,
       searchFilter: query,
       sortField: String(sortField),
       sortOrder: 'desc',
       index: String(offset),
       pageSize: String(limit),
     });
-    if (instance.versionId) params.set('gameVersion', instance.versionId);
+    if (instance.versionId && module !== 'modpacks') params.set('gameVersion', instance.versionId);
     const loaderType = cfLoaderType(instance.loader);
-    if (options.module !== 'shaders' && loaderType) params.set('modLoaderType', String(loaderType));
+    if (module === 'mods' && loaderType) params.set('modLoaderType', String(loaderType));
     const data = await fetchJson(`${CF_MCIM}/mods/search?${params.toString()}`, { timeout: 30000, retries: 2 });
     const rows = Array.isArray(data.data) ? data.data : [];
     return {
@@ -150,7 +163,7 @@ function createMods({ store, tasks }) {
   async function search(instanceId, options = {}) {
     const instance = store.getInstance(instanceId);
     if (!instance) return { hits: [], total: 0, offset: 0, limit: 20, errors: [] };
-    const module = options.module === 'shaders' ? 'shaders' : 'mods';
+    const module = normalizeModule(options.module);
     const originalQuery = String(options.query || '').trim();
     const translation = translateQuery(originalQuery);
     const query = translation.query;
@@ -216,10 +229,11 @@ function createMods({ store, tasks }) {
   }
 
   async function fetchModrinthVersion(projectId, instance, mirror, module = 'mods', loaderOverride = '') {
+    const definition = MODULES[normalizeModule(module)];
     const loader = loaderOverride || loaderCategory(instance.loader);
     const facets = [];
-    if (instance.versionId) facets.push(`game_versions=${encodeURIComponent(JSON.stringify([instance.versionId]))}`);
-    if (module !== 'shaders' && loader) facets.push(`loaders=${encodeURIComponent(JSON.stringify([loader]))}`);
+    if (instance.versionId && definition.type !== 'modpack') facets.push(`game_versions=${encodeURIComponent(JSON.stringify([instance.versionId]))}`);
+    if (definition.type === 'mod' && loader) facets.push(`loaders=${encodeURIComponent(JSON.stringify([loader]))}`);
     const api = mirror === 'mcim' ? MR_MCIM : MR_API;
     const versions = await fetchJson(`${api}/project/${encodeURIComponent(projectId)}/version?${facets.join('&')}`, { timeout: 30000, retries: 2 });
     if (!Array.isArray(versions) || !versions.length) {
@@ -229,10 +243,11 @@ function createMods({ store, tasks }) {
   }
 
   async function fetchCurseForgeVersion(projectId, instance, module = 'mods') {
+    const definition = MODULES[normalizeModule(module)];
     const params = new URLSearchParams({ pageSize: '50', index: '0' });
-    if (instance.versionId) params.set('gameVersion', instance.versionId);
+    if (instance.versionId && definition.type !== 'modpack') params.set('gameVersion', instance.versionId);
     const loaderType = cfLoaderType(instance.loader);
-    if (module !== 'shaders' && loaderType) params.set('modLoaderType', String(loaderType));
+    if (definition.type === 'mod' && loaderType) params.set('modLoaderType', String(loaderType));
     const data = await fetchJson(`${CF_MCIM}/mods/${encodeURIComponent(projectId)}/files?${params.toString()}`, { timeout: 30000, retries: 2 });
     const file = (data.data || [])[0];
     if (!file) throw new Error(`该模组没有适用于 ${instance.versionId} / ${instance.loader} 的 CurseForge 文件`);
@@ -277,6 +292,7 @@ function createMods({ store, tasks }) {
 
   async function downloadModVersion(instance, version, manifest, mirror, depth = 0, visited = new Set(), module = 'mods', signal = null, task = null, loaderOverride = '') {
     if (depth > 5) return [];
+    const definition = MODULES[normalizeModule(module)];
     const source = version.source === 'curseforge' ? 'curseforge' : 'modrinth';
     const projectKey = `${source}:${version.project_id}`;
     if (!version.project_id || visited.has(projectKey)) return [];
@@ -284,7 +300,7 @@ function createMods({ store, tasks }) {
     const file = (version.files || []).find((item) => item.primary) || version.files?.[0];
     if (!file?.url || !file.filename) throw new Error('模组文件信息缺失');
     const dir = contentDir(instance, module);
-    const filename = sanitizeFileName(file.filename, `${version.project_id}.${module === 'shaders' ? 'zip' : 'jar'}`);
+    const filename = sanitizeFileName(file.filename, `${version.project_id}.${definition.ext}`);
     const destination = path.join(dir, filename);
     const remoteUrls = [...new Set([mirrorFileUrl(file.url, mirror), file.url].filter(Boolean))];
     await downloadFile(remoteUrls, destination, {
@@ -323,7 +339,7 @@ function createMods({ store, tasks }) {
     };
     saveManifest(instance, manifest, module);
     const installed = [manifest.mods[filename]];
-    for (const dependency of (module === 'shaders' ? [] : (version.dependencies || []))) {
+    for (const dependency of (definition.type === 'mod' ? (version.dependencies || []) : [])) {
       if (dependency.dependency_type !== 'required') continue;
       if (!dependency.project_id) continue;
       const depKey = `${source}:${dependency.project_id}`;
@@ -348,25 +364,26 @@ function createMods({ store, tasks }) {
   }
 
   async function install(instanceId, projectId, options = {}) {
-    const module = options.module === 'shaders' ? 'shaders' : 'mods';
+    const module = normalizeModule(options.module);
+    const definition = MODULES[module];
     const instance = ensureInstance(instanceId, module);
     const loaderOverride = options.loaderOverride === 'fabric' ? 'fabric' : '';
     const { source, mirror } = sourceOf(store, options);
     const task = tasks.start({
-      title: `安装${source === 'curseforge' ? ' CurseForge ' : ' Modrinth '}${module === 'shaders' ? '光影' : '模组'}`,
-      kind: module === 'shaders' ? 'shader' : 'mod',
+      title: `安装${source === 'curseforge' ? ' CurseForge ' : ' Modrinth '}${definition.label}`,
+      kind: module === 'shaders' ? 'shader' : module === 'resourcepacks' ? 'resourcepack' : 'mod',
       meta: { instanceId, projectId, source, module },
     });
     try {
-      task.update({ stage: '查找兼容版本', percent: 5, detail: `${instance.versionId} · ${module === 'shaders' ? '光影' : instance.loader}` });
+      task.update({ stage: '查找兼容版本', percent: 5, detail: `${instance.versionId} · ${definition.label}` });
       const version = source === 'curseforge'
         ? await fetchCurseForgeVersion(projectId, instance, module)
         : await fetchModrinthVersion(projectId, instance, mirror, module, loaderOverride);
       version.source = source;
       const manifest = readManifest(instance, module);
-      task.update({ stage: `下载${module === 'shaders' ? '光影' : '模组'}文件`, percent: 20, detail: version.version_number || version.name || '' });
+      task.update({ stage: `下载${definition.label}文件`, percent: 20, detail: version.version_number || version.name || '' });
       const installed = await downloadModVersion(instance, version, manifest, mirror, 0, new Set(), module, task.signal, task, loaderOverride);
-      task.done({ stage: '安装完成', detail: `${installed.length} 个${module === 'shaders' ? '光影' : '模组'}` });
+      task.done({ stage: '安装完成', detail: `${installed.length} 个${definition.label}` });
       return { ok: true, installed: await listInstalled(instanceId, module), module };
     } catch (err) {
       task.fail(err);
@@ -377,12 +394,14 @@ function createMods({ store, tasks }) {
   async function listInstalled(instanceId, module = 'mods') {
     const instance = store.getInstance(instanceId);
     if (!instance) return [];
+    module = normalizeModule(module);
+    const definition = MODULES[module];
     const dir = contentDir(instance, module);
     const manifest = readManifest(instance, module);
     let files = [];
     try { files = fs.readdirSync(dir); } catch (_) { /* empty */ }
     const items = [];
-    const filePattern = module === 'shaders' ? /\.zip$/i : /\.jar(\.disabled)?$/i;
+    const filePattern = module === 'mods' ? /\.jar(\.disabled)?$/i : definition.type === 'modpack' ? /\.mrpack(\.disabled)?$/i : /\.zip(\.disabled)?$/i;
     let manifestChanged = false;
     for (const filename of files) {
       if (!filePattern.test(filename)) continue;

@@ -67,6 +67,7 @@ const INVOKE_CHANNELS = new Set([
   'mods:search',
   'mods:install',
   'mods:installed',
+  'modpacks:install',
   'mods:toggle',
   'mods:remove',
   'mods:openFolder',
