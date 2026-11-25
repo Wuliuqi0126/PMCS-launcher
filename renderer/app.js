@@ -6174,7 +6174,7 @@ function renderSettingsRoute() {
       <div class="page-head-copy">
         <div class="eyebrow">Settings</div>
         <h1 class="page-title">设置</h1>
-        <p class="page-subtitle">配置会立即保存。更改游戏目录后将加载该目录下已有的实例。</p>
+        <p class="page-subtitle">配置会立即保存。迁移游戏或资源目录时会先复制并校验，再删除旧目录。</p>
       </div>
       <div class="page-actions">
         <span class="top-note"><span class="dot"></span> 自动保存</span>
@@ -6191,7 +6191,7 @@ function renderSettingsRoute() {
     </section>
     <div class="settings-grid">
       <section class="panel settings-panel">
-        <div class="settings-head"><span class="head-icon">${icon('gamepad', 16)}</span><div><h3>游戏与性能</h3><p>控制实例位置与游戏内存</p></div></div>
+        <div class="settings-head"><span class="head-icon">${icon('gamepad', 16)}</span><div><h3>游戏与性能</h3><p>游戏目录、资源目录与 Java 内存</p></div></div>
         <div class="setting-row">
           <div class="setting-info"><strong>游戏目录</strong><p>实例、存档、版本、运行库和日志。更改时会先迁移并校验，再删除旧目录。</p></div>
           <div class="setting-control">
