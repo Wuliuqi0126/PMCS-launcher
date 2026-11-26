@@ -8,9 +8,9 @@
 
 > 仓库为私有仓库，下载前需要拥有该仓库的访问权限。
 
-- [PMCS launcher 2.11.1 安装程序](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.11.1/PMCSLauncher-2.11.1-Setup.exe)
-- [PMCS launcher 2.11.1 便携版](https://github.com/Wuliuqi0126/ol-launcher-releases/releases/download/v2.11.1/PMCSLauncher-2.11.1-Portable.zip)
-- [查看全部版本](https://github.com/Wuliuqi0126/ol-launcher-releases/releases)
+- [PMCS launcher 2.11.1 安装程序](https://github.com/Wuliuqi0126/PMCS-launcher-releases/releases/download/v2.11.1/PMCSLauncher-2.11.1-Setup.exe)
+- [PMCS launcher 2.11.1 便携版](https://github.com/Wuliuqi0126/PMCS-launcher-releases/releases/download/v2.11.1/PMCSLauncher-2.11.1-Portable.zip)
+- [查看全部版本](https://github.com/Wuliuqi0126/PMCS-launcher-releases/releases)
 
 安装包 SHA256 见对应 Release 说明。安装包未签名，Windows SmartScreen 可能提示，请选择“更多信息 → 仍要运行”。
 
